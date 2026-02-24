@@ -10,12 +10,6 @@ import './SearchResultsGrid.css'
 
 const columns = [
   {
-    id: 'id',
-    accessorKey: 'id',
-    header: 'ID',
-    cell: (info) => info.getValue(),
-  },
-  {
     id: 'title',
     accessorKey: 'title',
     header: 'Title',
