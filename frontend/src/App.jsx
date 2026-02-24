@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import reactLogo from './assets/react.svg'
 import viteLogo from '/vite.svg'
+import { SearchResultsGrid } from './SearchResultsGrid'
 import './App.css'
 
 function App() {
@@ -75,9 +76,7 @@ function App() {
           </button>
         </form>
         {searchError && <p className="search-error">{searchError}</p>}
-        {searchResult != null && (
-          <pre className="search-result">{JSON.stringify(searchResult, null, 2)}</pre>
-        )}
+        {searchResult != null && <SearchResultsGrid data={searchResult} />}
       </section>
 
       <div className="card">

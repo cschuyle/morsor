@@ -1,0 +1,123 @@
+.search-results-grid {
+  margin-top: 1rem;
+  text-align: left;
+}
+
+.grid-toolbar {
+  margin-bottom: 0.75rem;
+}
+
+.grid-filter-input {
+  width: 100%;
+  max-width: 20rem;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid #444;
+  border-radius: 6px;
+  background: #242424;
+  color: inherit;
+  font-size: 0.95rem;
+}
+
+.grid-filter-input::placeholder {
+  color: #888;
+}
+
+.grid-filter-input:focus {
+  outline: none;
+  border-color: #646cff;
+  box-shadow: 0 0 0 2px rgba(100, 108, 255, 0.2);
+}
+
+.grid-wrapper {
+  overflow-x: auto;
+  border: 1px solid #444;
+  border-radius: 8px;
+  background: #242424;
+}
+
+.grid-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+.grid-table th,
+.grid-table td {
+  padding: 0.6rem 0.75rem;
+  border-bottom: 1px solid #444;
+  vertical-align: top;
+}
+
+.grid-table thead th {
+  background: #242424;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.grid-table th.sortable {
+  cursor: pointer;
+  user-select: none;
+}
+
+.grid-table th.sortable:hover {
+  background: #2e2e2e;
+}
+
+.grid-table tbody td {
+  background: #242424;
+}
+
+.sort-indicator {
+  margin-left: 0.25rem;
+  color: #646cff;
+}
+
+.grid-table tbody tr:hover td {
+  background: #2e2e2e;
+}
+
+.grid-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.grid-table td {
+  max-width: 20rem;
+}
+
+.grid-table .grid-empty {
+  padding: 2rem;
+  text-align: center;
+  color: #aaa;
+}
+
+.grid-table .col-id {
+  width: 3rem;
+}
+
+.grid-table .col-trove {
+  width: 8rem;
+}
+
+@media (prefers-color-scheme: light) {
+  .grid-filter-input,
+  .grid-wrapper,
+  .grid-table thead th,
+  .grid-table tbody td {
+    background: #ffffff;
+  }
+  .grid-wrapper,
+  .grid-filter-input {
+    border-color: #ddd;
+  }
+  .grid-table th,
+  .grid-table td {
+    border-bottom-color: #eee;
+  }
+  .grid-table th.sortable:hover,
+  .grid-table tbody tr:hover td {
+    background: #f5f5f5;
+  }
+  .grid-table .grid-empty {
+    color: #666;
+  }
+}
