@@ -19,9 +19,14 @@ Thumbs.db
 # Spring Boot
 *.log
 *.pid
+src/main/resources/static/
 
 # Java
 *.class
 *.jar
 *.war
 !gradle/wrapper/gradle-wrapper.jar
+
+# Node / frontend
+frontend/node_modules/
+frontend/dist/

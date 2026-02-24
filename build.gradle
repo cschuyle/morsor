@@ -17,6 +17,7 @@ repositories {
 
 dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-web'
+    implementation 'org.springframework.boot:spring-boot-starter-actuator'
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 }
@@ -24,3 +25,11 @@ dependencies {
 tasks.named('test') {
     useJUnitPlatform()
 }
+
+tasks.register('buildFrontend', Exec) {
+    group = 'build'
+    description = 'Build React frontend into src/main/resources/static'
+    workingDir = file('frontend')
+    commandLine 'npm', 'run', 'build'
+}
+processResources.dependsOn buildFrontend
