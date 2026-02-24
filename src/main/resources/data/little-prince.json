@@ -30,10 +30,7 @@
         "publisher": "Juan Coderch",
         "largeImageUrl": "https://moocho-test.s3-us-west-2.amazonaws.com/public/little-prince/images/1500/little-prince-ancient-greek.jpg",
         "smallImageUrl": "https://moocho-test.s3-us-west-2.amazonaws.com/public/little-prince/images/150/little-prince-ancient-greek.jpg",
-        "tags": [
-          "language isolate*",
-          "dead language"
-        ],
+        "tags": ["language isolate*", "dead language"],
         "date-added": "2019-07-04",
         "lpid": "PP-4277"
       }

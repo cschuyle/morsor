@@ -1,0 +1,15 @@
+{
+  "titles": [
+    "An Introduction to Machine Learning with Web Data",
+    "@eaDir",
+    "Effective Data Visualization",
+    "Introduction to Big Data",
+    "Introduction to Modern Client-Side Programming",
+    "Learning iPython Notebook",
+    "Learning Path-Architect and Build Big Data Applications",
+    "R"
+  ],
+  "id": "synology-bu-courses",
+  "name": "Synology-BU: Courses",
+  "shortName": "BU Courses (Video)"
+}

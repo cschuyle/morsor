@@ -16,7 +16,7 @@ class CollectionToSearchResultMapperTest {
 
     @Test
     void mapsCollectionJsonToSearchResults() throws Exception {
-        try (InputStream in = new ClassPathResource("search-data.json").getInputStream()) {
+        try (InputStream in = new ClassPathResource("data/little-prince.json").getInputStream()) {
             JsonNode root = objectMapper.readTree(in);
             List<SearchResult> results = CollectionToSearchResultMapper.mapRootToSearchResults(root);
             assertThat(results).hasSize(2);
