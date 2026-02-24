@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
 import App from './App'
 
 describe('App', () => {
@@ -19,7 +19,7 @@ describe('App', () => {
     })
   })
 
-  it('increments count when button is clicked', async () => {
+  it('renders search form with Search button', async () => {
     vi.mocked(fetch).mockResolvedValueOnce({
       ok: true,
       json: () => Promise.resolve({ status: 'UP' }),
@@ -28,10 +28,6 @@ describe('App', () => {
     await waitFor(() => {
       expect(screen.getByText('Backend is up')).toBeInTheDocument()
     })
-    const button = screen.getByRole('button', { name: /count is 0/i })
-    fireEvent.click(button)
-    expect(screen.getByRole('button', { name: /count is 1/i })).toBeInTheDocument()
-    fireEvent.click(button)
-    expect(screen.getByRole('button', { name: /count is 2/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Search' })).toBeInTheDocument()
   })
 })

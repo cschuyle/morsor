@@ -64,6 +64,13 @@
   color: #c00;
   margin-top: 1rem;
 }
+
+.search-count {
+  margin-top: 1rem;
+  margin-bottom: 0;
+  color: #888;
+  font-size: 0.95rem;
+}
 .search-result {
   margin-top: 1rem;
   padding: 1rem;

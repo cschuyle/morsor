@@ -5,7 +5,6 @@ import { SearchResultsGrid } from './SearchResultsGrid'
 import './App.css'
 
 function App() {
-  const [count, setCount] = useState(0)
   const [message, setMessage] = useState('')
   const [trove, setTrove] = useState('')
   const [query, setQuery] = useState('')
@@ -76,14 +75,17 @@ function App() {
           </button>
         </form>
         {searchError && <p className="search-error">{searchError}</p>}
-        {searchResult != null && <SearchResultsGrid data={searchResult} />}
+        {searchResult != null && (() => {
+          const results = Array.isArray(searchResult.results) ? searchResult.results : []
+          const count = typeof searchResult.count === 'number' ? searchResult.count : results.length
+          return (
+            <>
+              <p className="search-count">{count} result{count !== 1 ? 's' : ''}</p>
+              <SearchResultsGrid data={results} />
+            </>
+          )
+        })()}
       </section>
-
-      <div className="card">
-        <button onClick={() => setCount((count) => count + 1)}>
-          count is {count}
-        </button>
-      </div>
     </>
   )
 }

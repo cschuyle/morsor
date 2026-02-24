@@ -23,17 +23,19 @@ class SearchControllerTest {
     @Test
     void searchReturnsCannedData() {
         String url = "http://localhost:" + port + "/search?trove=newspaper&query=test";
-        ResponseEntity<List<SearchResult>> response = restTemplate.exchange(
+        ResponseEntity<SearchResponse> response = restTemplate.exchange(
                 url,
                 HttpMethod.GET,
                 null,
                 new ParameterizedTypeReference<>() {}
         );
         assertThat(response.getStatusCode().is2xxSuccessful()).isTrue();
-        List<SearchResult> body = response.getBody();
-        assertThat(body).isNotNull().hasSize(3);
-        assertThat(body.get(0).id()).isEqualTo("1");
-        assertThat(body.get(0).trove()).isEqualTo("newspaper");
-        assertThat(body.get(0).title()).isEqualTo("First result for test");
+        SearchResponse body = response.getBody();
+        assertThat(body).isNotNull();
+        assertThat(body.count()).isEqualTo(3);
+        assertThat(body.results()).hasSize(3);
+        assertThat(body.results().get(0).id()).isEqualTo("1");
+        assertThat(body.results().get(0).trove()).isEqualTo("newspaper");
+        assertThat(body.results().get(0).title()).isEqualTo("First result for test");
     }
 }
