@@ -99,6 +99,10 @@
   line-height: 1.3;
 }
 
+.trove-item--has-results .trove-name {
+  font-weight: 700;
+}
+
 .main {
   flex: 1;
   min-width: 0;

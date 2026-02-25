@@ -96,7 +96,7 @@ function App() {
                 return searchResult.results.filter((r) => r.troveId === t.id).length
               })()
               return (
-                <li key={t.id} className="trove-item">
+                <li key={t.id} className={`trove-item${resultCount > 0 ? ' trove-item--has-results' : ''}`}>
                   <label className="trove-checkbox">
                     <input
                       type="checkbox"
