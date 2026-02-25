@@ -181,7 +181,7 @@ function App() {
       </h1>
       <div className="app-layout">
         <aside className="sidebar">
-          <h2 className="sidebar-title">Troves <span className="sidebar-title-note">(<button type="button" className="sidebar-title-link" onClick={clearTroves}>Select none</button> to search all)</span></h2>
+          <h2 className="sidebar-title">Troves <span className="sidebar-title-note">(<button type="button" className="sidebar-title-link" onClick={clearTroves}>clear selections</button> to search all)</span></h2>
           <p className="sidebar-selection-message" aria-live="polite">
             {selectedTroveIds.size === 0
               ? 'All troves will be searched'
