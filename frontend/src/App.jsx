@@ -90,18 +90,26 @@ function App() {
             </button>
           </div>
           <ul className="trove-list">
-            {troves.map((t) => (
-              <li key={t.id} className="trove-item">
-                <label className="trove-checkbox">
-                  <input
-                    type="checkbox"
-                    checked={selectedTroveIds.has(t.id)}
-                    onChange={() => toggleTrove(t.id)}
-                  />
-                  <span className="trove-name">{t.name} ({t.count})</span>
-                </label>
-              </li>
-            ))}
+            {troves.map((t) => {
+              const resultCount = (() => {
+                if (searchResult?.results == null || !Array.isArray(searchResult.results)) return 0
+                return searchResult.results.filter((r) => r.troveId === t.id).length
+              })()
+              return (
+                <li key={t.id} className="trove-item">
+                  <label className="trove-checkbox">
+                    <input
+                      type="checkbox"
+                      checked={selectedTroveIds.has(t.id)}
+                      onChange={() => toggleTrove(t.id)}
+                    />
+                    <span className="trove-name">
+                      {t.name} ({resultCount}/{t.count})
+                    </span>
+                  </label>
+                </li>
+              )
+            })}
           </ul>
         </aside>
         <main className="main">
