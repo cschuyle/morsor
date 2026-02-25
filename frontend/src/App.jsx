@@ -122,10 +122,13 @@ function App() {
 
   const { withHits, noHits } = useMemo(() => {
     const hasResults = searchResult?.results != null && Array.isArray(searchResult.results)
+    const troveCounts = searchResult?.troveCounts != null && typeof searchResult.troveCounts === 'object'
+      ? searchResult.troveCounts
+      : null
     const withCounts = troves.map((t) => ({
       ...t,
       resultCount: hasResults
-        ? searchResult.results.filter((r) => r.troveId === t.id).length
+        ? (troveCounts != null ? (troveCounts[t.id] ?? 0) : searchResult.results.filter((r) => r.troveId === t.id).length)
         : 0,
     }))
     if (!hasResults) {
@@ -278,9 +281,13 @@ function App() {
               const pageNum = typeof searchResult.page === 'number' ? searchResult.page : 0
               const size = typeof searchResult.size === 'number' ? searchResult.size : pageSize
               const totalPages = size > 0 ? Math.ceil(count / size) : 0
-              const trovesWithResults = new Set(
-                results.map((r) => r.troveId).filter(Boolean)
-              ).size
+              const troveCounts = searchResult.troveCounts != null && typeof searchResult.troveCounts === 'object'
+                ? searchResult.troveCounts
+                : null
+              const trovesWithResults =
+                troveCounts != null
+                  ? Object.keys(troveCounts).length
+                  : new Set(results.map((r) => r.troveId).filter(Boolean)).size
               const trovesInScope =
                 selectedTroveIds.size > 0 ? selectedTroveIds.size : troves.length
               const scopeLabel =

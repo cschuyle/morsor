@@ -6,6 +6,8 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api")
@@ -35,9 +37,12 @@ public class SearchController {
         size = Math.min(MAX_PAGE_SIZE, Math.max(1, size));
         List<SearchResult> all = searchDataService.search(trove, query);
         long total = all.size();
+        Map<String, Long> troveCounts = all.stream()
+                .filter(r -> r.troveId() != null && !r.troveId().isBlank())
+                .collect(Collectors.groupingBy(SearchResult::troveId, Collectors.counting()));
         int from = (int) Math.min((long) page * size, total);
         int to = (int) Math.min(from + size, total);
         List<SearchResult> pageResults = from < to ? all.subList(from, to) : List.of();
-        return new SearchResponse(total, pageResults, page, size);
+        return new SearchResponse(total, pageResults, page, size, troveCounts);
     }
 }
