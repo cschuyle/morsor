@@ -216,6 +216,35 @@
   color: #666;
   font-size: 0.95rem;
 }
+.pagination {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-top: 0.75rem;
+  margin-bottom: 0.5rem;
+}
+.pagination-btn {
+  padding: 0.4rem 0.75rem;
+  font-size: 0.9rem;
+}
+.pagination-info {
+  color: #666;
+  font-size: 0.9rem;
+}
+.search-results-options {
+  margin-top: 0.5rem;
+}
+.page-size-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.9rem;
+  color: #666;
+}
+.page-size-select {
+  padding: 0.35rem 0.5rem;
+  font-size: 0.9rem;
+}
 .search-result {
   margin-top: 1rem;
   padding: 1rem;

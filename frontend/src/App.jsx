@@ -12,10 +12,42 @@ function App() {
   const [searchResult, setSearchResult] = useState(null)
   const [searchError, setSearchError] = useState(null)
   const [searching, setSearching] = useState(false)
+  const [pageSize, setPageSize] = useState(500)
   const queryRef = useRef(query)
   const skipCheckboxSearchRef = useRef(true)
   const abortControllerRef = useRef(null)
+  const PAGE_SIZE_OPTIONS = [10, 25, 100, 500, 1000, 5000, 10000]
   queryRef.current = query
+
+  function fetchSearch(pageNum, sizeOverride = null) {
+    const size = sizeOverride ?? pageSize
+    const q = queryRef.current
+    if (!q.trim()) {
+      setSearchResult({ count: 0, results: [], page: 0, size })
+      return
+    }
+    abortControllerRef.current?.abort()
+    const controller = new AbortController()
+    abortControllerRef.current = controller
+    setSearching(true)
+    setSearchError(null)
+    const params = new URLSearchParams({
+      query: q.trim(),
+      page: String(pageNum),
+      size: String(size),
+    })
+    selectedTroveIds.forEach((id) => params.append('trove', id))
+    fetch(`/api/search?${params}`, { signal: controller.signal })
+      .then((res) => {
+        if (!res.ok) throw new Error(res.statusText)
+        return res.json()
+      })
+      .then(setSearchResult)
+      .catch((err) => {
+        if (err.name !== 'AbortError') setSearchError(err.message)
+      })
+      .finally(() => setSearching(false))
+  }
 
   useEffect(() => {
     fetch('/actuator/health')
@@ -40,26 +72,10 @@ function App() {
     const t = setTimeout(() => {
       const q = queryRef.current
       if (!q.trim()) {
-        setSearchResult({ count: 0, results: [] })
+        setSearchResult({ count: 0, results: [], page: 0, size: pageSize })
         return
       }
-      abortControllerRef.current?.abort()
-      const controller = new AbortController()
-      abortControllerRef.current = controller
-      setSearching(true)
-      setSearchError(null)
-      const params = new URLSearchParams({ query: q.trim() })
-      selectedTroveIds.forEach((id) => params.append('trove', id))
-      fetch(`/api/search?${params}`, { signal: controller.signal })
-        .then((res) => {
-          if (!res.ok) throw new Error(res.statusText)
-          return res.json()
-        })
-        .then(setSearchResult)
-        .catch((err) => {
-          if (err.name !== 'AbortError') setSearchError(err.message)
-        })
-        .finally(() => setSearching(false))
+      fetchSearch(0)
     }, 400)
     return () => clearTimeout(t)
   }, [selectedTroveIds])
@@ -88,27 +104,20 @@ function App() {
   function handleSearch(e) {
     e?.preventDefault()
     if (!query.trim()) {
-      setSearchResult({ count: 0, results: [] })
+      setSearchResult({ count: 0, results: [], page: 0, size: pageSize })
       return
     }
-    abortControllerRef.current?.abort()
-    const controller = new AbortController()
-    abortControllerRef.current = controller
-    setSearching(true)
-    setSearchError(null)
-    setSearchResult(null)
-    const params = new URLSearchParams({ query: query.trim() })
-    selectedTroveIds.forEach((id) => params.append('trove', id))
-    fetch(`/api/search?${params}`, { signal: controller.signal })
-      .then((res) => {
-        if (!res.ok) throw new Error(res.statusText)
-        return res.json()
-      })
-      .then(setSearchResult)
-      .catch((err) => {
-        if (err.name !== 'AbortError') setSearchError(err.message)
-      })
-      .finally(() => setSearching(false))
+    fetchSearch(0)
+  }
+
+  function handlePageSizeChange(e) {
+    const newSize = Number(e.target.value)
+    setPageSize(newSize)
+    if (searchResult != null && query.trim()) fetchSearch(0, newSize)
+  }
+
+  function goToPage(nextPage) {
+    fetchSearch(nextPage)
   }
 
   const { withHits, noHits } = useMemo(() => {
@@ -237,7 +246,10 @@ function App() {
                   </>
                 )
               }
-              const count = typeof searchResult.count === 'number' ? searchResult.count : results.length
+              const count = typeof searchResult.count === 'number' ? searchResult.count : 0
+              const pageNum = typeof searchResult.page === 'number' ? searchResult.page : 0
+              const size = typeof searchResult.size === 'number' ? searchResult.size : pageSize
+              const totalPages = size > 0 ? Math.ceil(count / size) : 0
               const trovesWithResults = new Set(
                 results.map((r) => r.troveId).filter(Boolean)
               ).size
@@ -245,11 +257,54 @@ function App() {
                 selectedTroveIds.size > 0 ? selectedTroveIds.size : troves.length
               const scopeLabel =
                 selectedTroveIds.size > 0 ? 'selected troves' : 'troves'
+              const from = count === 0 ? 0 : pageNum * size + 1
+              const to = Math.min((pageNum + 1) * size, count)
               return (
                 <>
                   <p className="search-count search-count-detail">
                     {count} result{count !== 1 ? 's' : ''} in {trovesWithResults} out of {trovesInScope} {scopeLabel}.
+                    {totalPages > 1 && ` Showing ${from}–${to}.`}
                   </p>
+                  <div className="search-results-options">
+                    <label className="page-size-label">
+                      Page size
+                      <select
+                        value={pageSize}
+                        onChange={handlePageSizeChange}
+                        className="page-size-select"
+                        disabled={searching}
+                      >
+                        {PAGE_SIZE_OPTIONS.map((n) => (
+                          <option key={n} value={n}>
+                            {n}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  </div>
+                  {totalPages > 1 && (
+                    <nav className="pagination" aria-label="Search results pages">
+                      <button
+                        type="button"
+                        className="pagination-btn"
+                        disabled={pageNum <= 0 || searching}
+                        onClick={() => goToPage(pageNum - 1)}
+                      >
+                        Previous
+                      </button>
+                      <span className="pagination-info">
+                        Page {pageNum + 1} of {totalPages}
+                      </span>
+                      <button
+                        type="button"
+                        className="pagination-btn"
+                        disabled={pageNum >= totalPages - 1 || searching}
+                        onClick={() => goToPage(pageNum + 1)}
+                      >
+                        Next
+                      </button>
+                    </nav>
+                  )}
                   <SearchResultsGrid data={results} />
                 </>
               )
