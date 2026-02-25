@@ -20,11 +20,19 @@ I speak Spanish.
 
 Morsa is Walrus in Spanish.
 
+Moocho and Morsa both start with M.
+
 I used Cursor for this.
 
 Morsa + Cursor = Morsor.
 
-## Features
+I like Lord of the Rings. If you do too you know what Mordor is.
+
+There is a distance of 1 between Mordor and Morsor in two pretty basic measurements:
+- Levenshtein
+- Between keys on most keyboards
+
+# Features
 
 - Search all troves (that's what I call a list), or a subset of troves.
 - Find duplicate items (or, near-duplicates) across troves.
