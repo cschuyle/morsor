@@ -28,8 +28,9 @@ Morsa + Cursor = Morsor.
 
 - Search all troves (that's what I call a list), or a subset of troves.
 - Find duplicate items (or, near-duplicates) across troves.
+    - Example: I've got a couple trove: a list of movie favorites, and a list of movies which are available on Kanopy. Find stuff I like which is available on Kanopy.
 - Conversely, find unique items within a trove, with respect to other troves.
-    - Example: a list of movie favorites, and a list of movies which are available on Kanopy. Find movies which I like but whih I can't get on Kanopy. Then I can rent or buy those movies instead of getting them for free on Kanopy.
+    - Example: Same troves as the previous example. Find movies which I like but which I can't get on Kanopy. Then I can rent or buy those movies instead of getting them for free on Kanopy.
 
 ## Where do I get the data?
 
@@ -42,12 +43,25 @@ That's another story. Short answer: scripts and manual slogging.
 
 ## How to run
 
-Using the canned data:
+### Option 1. Using the canned data:
+
+In a terminal:
 ```
 ./gradlew bootRun
 ```
 
-You can also use AWS S3 as a data store:
+In another terminal:
+```
+cd frontend
+npm install
+npm run dev
+```
+
+Option 2. You can also use AWS S3 as a data store:
+
+You'll have to put your trove data in place. Seet <./DATA.md> for some info in this. If you need help go ahead and contact me!
+
+Once this is done, you'll need to set your AWS credentials, then do the same as a canned data run with tow extra pieces of configuration:
 ```
 SPRING_PROFILES_ACTIVE=prod MOOCHO_BUCKET_NAME=your-bucket ./gradlew bootRun
 ```
