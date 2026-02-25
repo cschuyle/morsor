@@ -22,6 +22,8 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
 
@@ -39,6 +41,9 @@ public class SearchDataService {
     @Value("${moocho.bucket.name:}")
     private String bucketName;
 
+    @Value("${moocho.only.trove.ids:}")
+    private String onlyTroveIds;
+
     private final Environment environment;
 
     private List<SearchResult> allResults = List.of();
@@ -54,21 +59,33 @@ public class SearchDataService {
     @PostConstruct
     void loadData() {
         log.info("SearchDataService.loadData() started");
+        Set<String> onlyIds = parseOnlyTroveIds(onlyTroveIds);
+        if (!onlyIds.isEmpty()) {
+            log.info("Loading only trove IDs: {}", onlyIds);
+        }
         List<SearchResult> combined = new ArrayList<>();
         boolean useS3 = environment.acceptsProfiles(Profiles.of("prod"));
         log.info("Trove load: useS3={}, bucketName={}", useS3, bucketName != null ? bucketName : "(null)");
         if (useS3 && bucketName != null && !bucketName.isBlank()) {
-            loadFromS3(combined);
+            loadFromS3(combined, onlyIds);
         } else {
             if (useS3 && (bucketName == null || bucketName.isBlank())) {
                 log.warn("Prod profile active but moocho.bucket.name is empty; loading from classpath");
             }
-            loadFromClasspath(combined);
+            loadFromClasspath(combined, onlyIds);
         }
         allResults = combined;
     }
 
-    private void loadFromS3(List<SearchResult> combined) {
+    private static Set<String> parseOnlyTroveIds(String value) {
+        if (value == null || value.isBlank()) return Set.of();
+        return Arrays.stream(value.split(","))
+                .map(String::trim)
+                .filter(s -> !s.isEmpty())
+                .collect(Collectors.toUnmodifiableSet());
+    }
+
+    private void loadFromS3(List<SearchResult> combined, Set<String> onlyIds) {
         log.info("Loading from S3");
         // Region from AWS_REGION env var (e.g. us-west-2); fallback for local runs without it set
         String region = System.getenv().getOrDefault("AWS_REGION", "us-west-2");
@@ -108,6 +125,10 @@ public class SearchDataService {
                     log.warn("Skipping trove entry with no id (tried id, troveId, trove_id); entry: {}", entry);
                     continue;
                 }
+                if (!onlyIds.isEmpty() && !onlyIds.contains(troveId)) {
+                    log.debug("Skipping trove \"{}\" (not in moocho.only.trove.ids)", troveId);
+                    continue;
+                }
                 String key = bucketPrefix.isEmpty() ? troveId + ".json" : bucketPrefix + "/" + troveId + ".json";
                 log.info("Fetching trove from S3: key={}", key);
                 try (InputStream in = s3.getObject(GetObjectRequest.builder()
@@ -128,7 +149,7 @@ public class SearchDataService {
         }
     }
 
-    private void loadFromClasspath(List<SearchResult> combined) {
+    private void loadFromClasspath(List<SearchResult> combined, Set<String> onlyIds) {
         log.info("Loading from classpath");
         try {
             Resource[] resources = resourceResolver.getResources(DATA_LOCATION);
@@ -138,10 +159,14 @@ public class SearchDataService {
             for (Resource resource : resources) {
                 try (InputStream in = resource.getInputStream()) {
                     JsonNode root = objectMapper.readTree(in);
-                    List<SearchResult> results = CollectionToSearchResultMapper.mapRootToSearchResults(root);
                     String troveId = root.has("id") && root.get("id").isTextual()
                             ? root.get("id").asText()
                             : (resource.getFilename() != null ? resource.getFilename() : "unknown");
+                    if (!onlyIds.isEmpty() && !onlyIds.contains(troveId)) {
+                        log.debug("Skipping trove \"{}\" (not in moocho.only.trove.ids)", troveId);
+                        continue;
+                    }
+                    List<SearchResult> results = CollectionToSearchResultMapper.mapRootToSearchResults(root);
                     log.info("Loaded trove \"{}\": {} records", troveId, results.size());
                     combined.addAll(results);
                 } catch (Exception e) {
@@ -154,11 +179,11 @@ public class SearchDataService {
     }
 
     public List<SearchResult> search(String trove, String query) {
-        String troveLower = trove == null ? "" : trove.trim().toLowerCase();
+        String troveParam = trove == null ? null : trove.trim();
         String queryLower = query == null ? "" : query.trim().toLowerCase();
         Stream<SearchResult> stream = allResults.stream();
-        if (!troveLower.isEmpty()) {
-            stream = stream.filter(r -> r.trove() != null && r.trove().toLowerCase().contains(troveLower));
+        if (troveParam != null && !troveParam.isEmpty()) {
+            stream = stream.filter(r -> r.troveId() != null && r.troveId().equals(troveParam));
         }
         if (!queryLower.isEmpty()) {
             stream = stream.filter(r ->
@@ -168,12 +193,13 @@ public class SearchDataService {
         return stream.toList();
     }
 
-    public List<String> getTroveNames() {
+    public List<TroveOption> getTroveOptions() {
         return allResults.stream()
-                .map(SearchResult::trove)
-                .filter(t -> t != null && !t.isBlank())
-                .distinct()
-                .sorted()
+                .filter(r -> r.troveId() != null && !r.troveId().isBlank())
+                .map(r -> new TroveOption(r.troveId(), r.trove() != null ? r.trove() : r.troveId()))
+                .collect(java.util.stream.Collectors.toMap(TroveOption::id, o -> o, (a, b) -> a))
+                .values().stream()
+                .sorted(java.util.Comparator.comparing(TroveOption::name, String.CASE_INSENSITIVE_ORDER))
                 .toList();
     }
 
