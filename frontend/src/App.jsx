@@ -223,8 +223,7 @@ function App() {
               return (
                 <>
                   <p className="search-count search-count-detail">
-                    {count} result{count !== 1 ? 's' : ''} in {trovesWithResults} trove
-                    {trovesWithResults !== 1 ? 's' : ''} out of {trovesInScope} {scopeLabel}.
+                    {count} result{count !== 1 ? 's' : ''} in {trovesWithResults} out of {trovesInScope} {scopeLabel}.
                   </p>
                   <SearchResultsGrid data={results} />
                 </>
