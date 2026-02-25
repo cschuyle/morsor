@@ -1,0 +1,17 @@
+# The app will run out of the box using the canned data. All configuration variables are optional.
+
+# For prod (which just means the data comes from AWS S3 rather than the canned data in the classpath resources)
+export SPRING_PROFILES_ACTIVE=prod
+
+export AWS_ACCESS_KEY_ID=...
+export AWS_SECRET_ACCESS_KEY=...
+export AWS_REGION=...
+
+# This is the bucket where the troves are stored. See DATA.md for more details.
+export MOOCHO_BUCKET_NAME=blah
+
+# Use this to only load a subset of troves. 
+# This can be useful if you have a LOT of data and you want to startup quicker, or have limited compute resources. 
+# This is especially important because the implementation uses embedded (in-memory) Lucene (search engine). 
+# All data is loaded and indexed at startup time.
+#export MOOCHO_ONLY_TROVE_IDS=trove-id-1,trove-id-2,...
