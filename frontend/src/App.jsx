@@ -47,7 +47,10 @@ function App() {
 
   function handleSearch(e) {
     e?.preventDefault()
-    if (!query.trim()) return
+    if (!query.trim()) {
+      setSearchResult({ count: 0, results: [] })
+      return
+    }
     setSearching(true)
     setSearchError(null)
     setSearchResult(null)
@@ -161,7 +164,7 @@ function App() {
                   placeholder="e.g. Greek, Prince, Albanian — or * for all"
                 />
               </label>
-              <button type="submit" disabled={searching || !query.trim()}>
+              <button type="submit" disabled={searching}>
                 {searching ? 'Searching…' : 'Search'}
               </button>
             </form>
