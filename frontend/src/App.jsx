@@ -14,6 +14,7 @@ function App() {
   const [searching, setSearching] = useState(false)
   const queryRef = useRef(query)
   const skipCheckboxSearchRef = useRef(true)
+  const abortControllerRef = useRef(null)
   queryRef.current = query
 
   useEffect(() => {
@@ -42,17 +43,22 @@ function App() {
         setSearchResult({ count: 0, results: [] })
         return
       }
+      abortControllerRef.current?.abort()
+      const controller = new AbortController()
+      abortControllerRef.current = controller
       setSearching(true)
       setSearchError(null)
       const params = new URLSearchParams({ query: q.trim() })
       selectedTroveIds.forEach((id) => params.append('trove', id))
-      fetch(`/api/search?${params}`)
+      fetch(`/api/search?${params}`, { signal: controller.signal })
         .then((res) => {
           if (!res.ok) throw new Error(res.statusText)
           return res.json()
         })
         .then(setSearchResult)
-        .catch((err) => setSearchError(err.message))
+        .catch((err) => {
+          if (err.name !== 'AbortError') setSearchError(err.message)
+        })
         .finally(() => setSearching(false))
     }, 400)
     return () => clearTimeout(t)
@@ -75,24 +81,33 @@ function App() {
     setSelectedTroveIds(new Set())
   }
 
+  function cancelSearch() {
+    abortControllerRef.current?.abort()
+  }
+
   function handleSearch(e) {
     e?.preventDefault()
     if (!query.trim()) {
       setSearchResult({ count: 0, results: [] })
       return
     }
+    abortControllerRef.current?.abort()
+    const controller = new AbortController()
+    abortControllerRef.current = controller
     setSearching(true)
     setSearchError(null)
     setSearchResult(null)
     const params = new URLSearchParams({ query: query.trim() })
     selectedTroveIds.forEach((id) => params.append('trove', id))
-    fetch(`/api/search?${params}`)
+    fetch(`/api/search?${params}`, { signal: controller.signal })
       .then((res) => {
         if (!res.ok) throw new Error(res.statusText)
         return res.json()
       })
       .then(setSearchResult)
-      .catch((err) => setSearchError(err.message))
+      .catch((err) => {
+        if (err.name !== 'AbortError') setSearchError(err.message)
+      })
       .finally(() => setSearching(false))
   }
 
@@ -198,7 +213,14 @@ function App() {
                 <button type="submit" disabled={searching}>
                   {searching ? 'Searching…' : 'Search'}
                 </button>
-                {searching && <span className="search-spinner" aria-hidden="true" />}
+                {searching && (
+                  <>
+                    <span className="search-spinner" aria-hidden="true" />
+                    <button type="button" className="search-cancel" onClick={cancelSearch}>
+                      Cancel
+                    </button>
+                  </>
+                )}
               </div>
             </form>
             {searchError && <p className="search-error">{searchError}</p>}

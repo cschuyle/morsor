@@ -193,6 +193,18 @@
     transform: rotate(360deg);
   }
 }
+.search-cancel {
+  background: none;
+  border: none;
+  color: #666;
+  cursor: pointer;
+  font-size: 0.95rem;
+  padding: 0;
+}
+.search-cancel:hover {
+  color: #c00;
+  text-decoration: underline;
+}
 .search-error {
   color: #c00;
   margin-top: 1rem;
