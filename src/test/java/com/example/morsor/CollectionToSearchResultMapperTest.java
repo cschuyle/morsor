@@ -21,6 +21,7 @@ class CollectionToSearchResultMapperTest {
             List<SearchResult> results = CollectionToSearchResultMapper.mapRootToSearchResults(root);
             assertThat(results).hasSize(2);
             assertThat(results.get(0).trove()).isEqualTo("Little Prince");
+            assertThat(results.get(0).troveId()).isEqualTo("little-prince");
             assertThat(results.get(0).title()).isEqualTo("Princi i Vogël - The Little Prince in Albanian");
             assertThat(results.get(0).id()).isEqualTo("little-prince-0");
             assertThat(results.get(1).id()).isEqualTo("PP-4277");
@@ -46,6 +47,7 @@ class CollectionToSearchResultMapperTest {
         List<SearchResult> results = CollectionToSearchResultMapper.mapRootToSearchResults(root);
         assertThat(results).hasSize(3);
         assertThat(results.get(0).trove()).isEqualTo("BU Courses (Video)");
+        assertThat(results.get(0).troveId()).isEqualTo("synology-bu-courses");
         assertThat(results.get(0).title()).isEqualTo("An Introduction to Machine Learning with Web Data");
         assertThat(results.get(0).id()).isEqualTo("synology-bu-courses-0");
         assertThat(results.get(0).snippet()).isEqualTo("An Introduction to Machine Learning with Web Data");

@@ -71,7 +71,7 @@ function App() {
             >
               <option value="">All troves</option>
               {troves.map((t) => (
-                <option key={t} value={t}>{t}</option>
+                <option key={t.id} value={t.id}>{t.name}</option>
               ))}
             </select>
           </label>

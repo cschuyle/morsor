@@ -18,8 +18,8 @@ public class SearchController {
     }
 
     @GetMapping("/troves")
-    public List<String> troves() {
-        return searchDataService.getTroveNames();
+    public List<TroveOption> troves() {
+        return searchDataService.getTroveOptions();
     }
 
     @GetMapping("/search")
