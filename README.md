@@ -59,7 +59,7 @@ npm run dev
 
 Option 2. You can also use AWS S3 as a data store:
 
-You'll have to put your trove data in place. Seet <./DATA.md> for some info in this. If you need help go ahead and contact me!
+You'll have to put your trove data in place. See <./DATA.md> for some info in this. If you need help go ahead and contact me!
 
 Once this is done, you'll need to set your AWS credentials, then do the same as a canned data run with tow extra pieces of configuration:
 ```
