@@ -56,4 +56,20 @@ class CollectionToSearchResultMapperTest {
         assertThat(results.get(2).title()).isEqualTo("Introduction to Big Data");
         assertThat(results.get(2).id()).isEqualTo("synology-bu-courses-2");
     }
+
+    @Test
+    void mapsScreeningListFormatToSearchResults() throws Exception {
+        try (InputStream in = new ClassPathResource("data/screening-list.json").getInputStream()) {
+            JsonNode root = objectMapper.readTree(in);
+            List<SearchResult> results = CollectionToSearchResultMapper.mapRootToSearchResults(root);
+            assertThat(results).hasSize(8);
+            assertThat(results.get(0).troveId()).isEqualTo("screening-list");
+            assertThat(results.get(0).trove()).isEqualTo("Screenings");
+            assertThat(results.get(0).title()).isEqualTo("Chicago");
+            assertThat(results.get(0).snippet()).isEqualTo("Rob Marshall · 2002");
+            assertThat(results.get(0).id()).isEqualTo("screening-list-0");
+            assertThat(results.get(1).title()).isEqualTo("The Player");
+            assertThat(results.get(1).snippet()).isEqualTo("Robert Altman · 1992");
+        }
+    }
 }

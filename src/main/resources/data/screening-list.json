@@ -1,0 +1,63 @@
+{
+  "id": "screening-list",
+  "name": "Kai's Screening List",
+  "shortName": "Screenings",
+  "items": [
+    {
+      "movie": {
+        "title": "Chicago",
+        "year": "2002",
+        "director": "Rob Marshall"
+      }
+    },
+    {
+      "movie": {
+        "title": "The Player",
+        "year": "1992",
+        "director": "Robert Altman"
+      }
+    },
+    {
+      "movie": {
+        "title": "Run Lola Run",
+        "year": "1998",
+        "director": "Tom Twyker"
+      }
+    },
+    {
+      "movie": {
+        "title": "The Conversation",
+        "year": "1974",
+        "director": "Francis Ford Coppola"
+      }
+    },
+    {
+      "movie": {
+        "title": "Mulholland Drive",
+        "year": "2001",
+        "director": "David Lynch"
+      }
+    },
+    {
+      "movie": {
+        "title": "Jaws",
+        "year": "1975",
+        "director": "Steven Spielberg"
+      }
+    },
+    {
+      "movie": {
+        "title": "Lone Star",
+        "year": "1996",
+        "director": "John Sayles"
+      }
+    },
+    {
+      "movie": {
+        "title": "Once Upon A Time in the West",
+        "year": "1968",
+        "director": "Sergio Leone"
+      }
+    }
+  ]
+}

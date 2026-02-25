@@ -10,6 +10,7 @@ import java.util.stream.StreamSupport;
  * Maps collection JSON into {@link SearchResult} for search. Supports:
  * <ul>
  *   <li>Items format: {@code { "id", "name", "shortName", "items": [ { "littlePrinceItem": { ... } }, ... ] }}</li>
+ *   <li>Items format (movie/screening): {@code { "id", "name", "shortName", "items": [ { "movie": { "title", "year", "director" } }, ... ] }}</li>
  *   <li>Titles format: {@code { "id", "name", "shortName", "titles": [ "Title 1", "Title 2", ... ] }}</li>
  *   <li>Array of collections (either format): {@code [ { ... }, ... ]}</li>
  * </ul>
@@ -116,6 +117,10 @@ public final class CollectionToSearchResultMapper {
         String author = text(item, "author");
         if (author != null && !author.isEmpty()) {
             parts.add(author);
+        }
+        String director = text(item, "director");
+        if (director != null && !director.isEmpty()) {
+            parts.add(director);
         }
         String year = text(item, "year");
         if (year != null && !year.isEmpty()) {
