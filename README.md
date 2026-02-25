@@ -28,7 +28,7 @@ Morsa + Cursor = Morsor.
 
 - Search all troves (that's what I call a list), or a subset of troves.
 - Find duplicate items (or, near-duplicates) across troves.
-    - Example: I've got a couple trove: a list of movie favorites, and a list of movies which are available on Kanopy. Find stuff I like which is available on Kanopy.
+    - Example: I've got a couple troves: a list of movie favorites, and a list of movies which are available on Kanopy. Find stuff I like which is available on Kanopy.
 - Conversely, find unique items within a trove, with respect to other troves.
     - Example: Same troves as the previous example. Find movies which I like but which I can't get on Kanopy. Then I can rent or buy those movies instead of getting them for free on Kanopy.
 
