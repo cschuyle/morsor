@@ -99,6 +99,10 @@ function App() {
     setSelectedTroveIds(new Set())
   }
 
+  function selectOnlyTrove(id) {
+    setSelectedTroveIds(new Set([id]))
+  }
+
   function cancelSearch() {
     abortControllerRef.current?.abort()
   }
@@ -216,6 +220,17 @@ function App() {
                     {t.name} ({searchResult != null ? `${t.resultCount}/${t.count}` : t.count})
                   </span>
                 </label>
+                {(selectedTroveIds.size !== 1 || !selectedTroveIds.has(t.id)) && (
+                  <button
+                    type="button"
+                    className="trove-only-link"
+                    onClick={(e) => { e.preventDefault(); selectOnlyTrove(t.id) }}
+                    aria-label={`Search only ${t.name}`}
+                    title="Select only this trove"
+                  >
+                    only
+                  </button>
+                )}
               </li>
             ))}
             {selectedTroves.length > 0 && notSelectedTroves.length > 0 && (
@@ -238,6 +253,17 @@ function App() {
                     {t.name} ({searchResult != null ? `${t.resultCount}/${t.count}` : t.count})
                   </span>
                 </label>
+                {(selectedTroveIds.size !== 1 || !selectedTroveIds.has(t.id)) && (
+                  <button
+                    type="button"
+                    className="trove-only-link"
+                    onClick={(e) => { e.preventDefault(); selectOnlyTrove(t.id) }}
+                    aria-label={`Search only ${t.name}`}
+                    title="Select only this trove"
+                  >
+                    only
+                  </button>
+                )}
               </li>
             ))}
           </ul>
