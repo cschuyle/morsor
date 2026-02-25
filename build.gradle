@@ -21,6 +21,9 @@ dependencies {
     implementation 'com.fasterxml.jackson.core:jackson-databind'
     implementation 'software.amazon.awssdk:s3:2.25.0'
     implementation 'software.amazon.awssdk:url-connection-client:2.25.0'
+    implementation 'org.apache.lucene:lucene-core:9.10.0'
+    implementation 'org.apache.lucene:lucene-queryparser:9.10.0'
+    implementation 'org.apache.lucene:lucene-analysis-common:9.10.0'
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 }

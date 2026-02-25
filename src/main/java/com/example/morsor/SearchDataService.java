@@ -2,6 +2,28 @@ package com.example.morsor;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.apache.lucene.analysis.standard.StandardAnalyzer;
+import org.apache.lucene.document.Document;
+import org.apache.lucene.document.Field;
+import org.apache.lucene.document.StoredField;
+import org.apache.lucene.document.StringField;
+import org.apache.lucene.document.TextField;
+import org.apache.lucene.index.DirectoryReader;
+import org.apache.lucene.index.IndexWriter;
+import org.apache.lucene.index.IndexWriterConfig;
+import org.apache.lucene.index.StoredFields;
+import org.apache.lucene.queryparser.classic.QueryParser;
+import org.apache.lucene.search.BooleanClause;
+import org.apache.lucene.search.BooleanQuery;
+import org.apache.lucene.search.IndexSearcher;
+import org.apache.lucene.search.Query;
+import org.apache.lucene.search.ScoreDoc;
+import org.apache.lucene.search.TermInSetQuery;
+import org.apache.lucene.search.TopDocs;
+import org.apache.lucene.store.ByteBuffersDirectory;
+import org.apache.lucene.store.Directory;
+import org.apache.lucene.index.StoredFields;
+import org.apache.lucene.index.IndexableField;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -17,6 +39,9 @@ import software.amazon.awssdk.services.s3.model.GetObjectRequest;
 import software.amazon.awssdk.services.s3.model.GetObjectResponse;
 
 import jakarta.annotation.PostConstruct;
+import org.apache.lucene.queryparser.classic.ParseException;
+
+import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
@@ -26,6 +51,7 @@ import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
+import org.apache.lucene.util.BytesRef;
 
 @Service
 public class SearchDataService {
@@ -47,6 +73,9 @@ public class SearchDataService {
     private final Environment environment;
 
     private List<SearchResult> allResults = List.of();
+    private Directory luceneDirectory;
+    private IndexSearcher luceneSearcher;
+    private final StandardAnalyzer luceneAnalyzer = new StandardAnalyzer();
 
     public SearchDataService(ResourcePatternResolver resourceResolver, ObjectMapper objectMapper,
             Environment environment) {
@@ -75,6 +104,40 @@ public class SearchDataService {
             loadFromClasspath(combined, onlyIds);
         }
         allResults = combined;
+        buildLuceneIndex();
+    }
+
+    private void buildLuceneIndex() {
+        if (allResults.isEmpty()) {
+            log.info("Lucene index skipped: no data");
+            return;
+        }
+        try {
+            Directory dir = new ByteBuffersDirectory();
+            IndexWriterConfig config = new IndexWriterConfig(luceneAnalyzer);
+            config.setOpenMode(IndexWriterConfig.OpenMode.CREATE);
+            try (IndexWriter writer = new IndexWriter(dir, config)) {
+                final String contentField = "content";
+                final String troveIdField = "troveId";
+                final String idxField = "idx";
+                for (int i = 0; i < allResults.size(); i++) {
+                    SearchResult r = allResults.get(i);
+                    Document doc = new Document();
+                    String title = r.title() != null ? r.title() : "";
+                    String snippet = r.snippet() != null ? r.snippet() : "";
+                    doc.add(new TextField(contentField, title + " " + snippet, Field.Store.NO));
+                    doc.add(new StringField(troveIdField, r.troveId() != null ? r.troveId() : "", Field.Store.NO));
+                    doc.add(new StoredField(idxField, i));
+                    writer.addDocument(doc);
+                }
+                writer.commit();
+            }
+            luceneDirectory = dir;
+            luceneSearcher = new IndexSearcher(DirectoryReader.open(luceneDirectory));
+            log.info("Lucene index built: {} documents", allResults.size());
+        } catch (IOException e) {
+            log.error("Failed to build Lucene index: {}", e.getMessage(), e);
+        }
     }
 
     private static Set<String> parseOnlyTroveIds(String value) {
@@ -183,17 +246,63 @@ public class SearchDataService {
                 .map(t -> t == null ? null : t.trim())
                 .filter(t -> t != null && !t.isEmpty())
                 .collect(Collectors.toUnmodifiableSet());
-        String queryLower = query == null ? "" : query.trim().toLowerCase();
+        String queryTrimmed = query == null ? "" : query.trim();
+        boolean matchAll = "*".equals(queryTrimmed);
+        boolean noTextQuery = queryTrimmed.isEmpty() || matchAll;
+
+        if (noTextQuery) {
+            Stream<SearchResult> stream = allResults.stream();
+            if (!troveIdSet.isEmpty()) {
+                stream = stream.filter(r -> r.troveId() != null && troveIdSet.contains(r.troveId()));
+            }
+            return stream.toList();
+        }
+
+        if (luceneSearcher == null) {
+            return searchFallback(troveIdSet, queryTrimmed);
+        }
+        try {
+            BooleanQuery.Builder bq = new BooleanQuery.Builder();
+            if (!troveIdSet.isEmpty()) {
+                List<BytesRef> terms = troveIdSet.stream().map(BytesRef::new).toList();
+                bq.add(new TermInSetQuery("troveId", terms), BooleanClause.Occur.FILTER);
+            }
+            QueryParser parser = new QueryParser("content", luceneAnalyzer);
+            parser.setDefaultOperator(QueryParser.Operator.AND);
+            Query textQuery = parser.parse(QueryParser.escape(queryTrimmed));
+            bq.add(textQuery, BooleanClause.Occur.MUST);
+            TopDocs topDocs = luceneSearcher.search(bq.build(), allResults.size());
+            List<SearchResult> out = new ArrayList<>(topDocs.scoreDocs.length);
+            StoredFields storedFields = luceneSearcher.storedFields();
+            for (ScoreDoc sd : topDocs.scoreDocs) {
+                Document hitDoc = storedFields.document(sd.doc);
+                IndexableField idxField = hitDoc.getField("idx");
+                if (idxField != null && idxField.numericValue() != null) {
+                    int idx = idxField.numericValue().intValue();
+                    if (idx >= 0 && idx < allResults.size()) {
+                        out.add(allResults.get(idx));
+                    }
+                }
+            }
+            return out;
+        } catch (ParseException e) {
+            log.debug("Lucene parse failed for query \"{}\", falling back to substring match: {}", queryTrimmed, e.getMessage());
+            return searchFallback(troveIdSet, queryTrimmed);
+        } catch (IOException e) {
+            log.warn("Lucene search failed: {}, falling back to substring match", e.getMessage());
+            return searchFallback(troveIdSet, queryTrimmed);
+        }
+    }
+
+    private List<SearchResult> searchFallback(Set<String> troveIdSet, String queryTrimmed) {
+        String queryLower = queryTrimmed.toLowerCase();
         Stream<SearchResult> stream = allResults.stream();
         if (!troveIdSet.isEmpty()) {
             stream = stream.filter(r -> r.troveId() != null && troveIdSet.contains(r.troveId()));
         }
-        boolean matchAll = "*".equals(query != null ? query.trim() : "");
-        if (!queryLower.isEmpty() && !matchAll) {
-            stream = stream.filter(r ->
-                    (r.title() != null && r.title().toLowerCase().contains(queryLower))
-                            || (r.snippet() != null && r.snippet().toLowerCase().contains(queryLower)));
-        }
+        stream = stream.filter(r ->
+                (r.title() != null && r.title().toLowerCase().contains(queryLower))
+                        || (r.snippet() != null && r.snippet().toLowerCase().contains(queryLower)));
         return stream.toList();
     }
 
