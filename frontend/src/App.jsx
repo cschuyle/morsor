@@ -182,15 +182,6 @@ function App() {
               <button
                 type="button"
                 className="search-query-btn"
-                title="Select all"
-                onClick={selectAllTroves}
-                aria-label="Select all troves"
-              >
-                *
-              </button>
-              <button
-                type="button"
-                className="search-query-btn"
                 title="Clear"
                 onClick={() => {
                   clearTroves()
