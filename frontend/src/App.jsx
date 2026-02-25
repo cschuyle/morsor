@@ -13,6 +13,7 @@ function App() {
   const [searchError, setSearchError] = useState(null)
   const [searching, setSearching] = useState(false)
   const [pageSize, setPageSize] = useState(500)
+  const [troveFilter, setTroveFilter] = useState('')
   const queryRef = useRef(query)
   const skipCheckboxSearchRef = useRef(true)
   const abortControllerRef = useRef(null)
@@ -132,19 +133,34 @@ function App() {
         : 0,
     }))
     if (!hasResults) {
-      const all = [...withCounts].sort((a, b) =>
+      let all = [...withCounts].sort((a, b) =>
         a.name.localeCompare(b.name, undefined, { sensitivity: 'base' })
       )
+      const filterLower = troveFilter.trim().toLowerCase()
+      if (filterLower) {
+        const matches = (t) =>
+          (t.name && t.name.toLowerCase().includes(filterLower)) ||
+          (t.id && t.id.toLowerCase().includes(filterLower))
+        all = all.filter(matches)
+      }
       return { withHits: [], noHits: all }
     }
-    const withHitsList = withCounts
+    let withHitsList = withCounts
       .filter((t) => t.resultCount > 0)
       .sort((a, b) => b.resultCount - a.resultCount)
-    const noHitsList = withCounts
+    let noHitsList = withCounts
       .filter((t) => t.resultCount === 0)
       .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }))
+    const filterLower = troveFilter.trim().toLowerCase()
+    if (filterLower) {
+      const matches = (t) =>
+        (t.name && t.name.toLowerCase().includes(filterLower)) ||
+        (t.id && t.id.toLowerCase().includes(filterLower))
+      withHitsList = withHitsList.filter(matches)
+      noHitsList = noHitsList.filter(matches)
+    }
     return { withHits: withHitsList, noHits: noHitsList }
-  }, [troves, searchResult])
+  }, [troves, searchResult, troveFilter])
 
   return (
     <>
@@ -161,16 +177,39 @@ function App() {
 
       <div className="app-layout">
         <aside className="sidebar">
-          <h2 className="sidebar-title">Troves</h2>
-          <p className="sidebar-hint">Select none = search all</p>
-          <div className="sidebar-actions">
-            <button type="button" className="sidebar-link" onClick={selectAllTroves}>
-              Select all
-            </button>
-            <span className="sidebar-sep">·</span>
-            <button type="button" className="sidebar-link" onClick={clearTroves}>
-              Clear
-            </button>
+          <h2 className="sidebar-title">Troves <span className="sidebar-title-note">(Select none = search all)</span></h2>
+          <div className="sidebar-trove-filter-wrap">
+            <input
+              type="text"
+              value={troveFilter}
+              onChange={(e) => setTroveFilter(e.target.value)}
+              placeholder="Filter troves…"
+              className="sidebar-trove-filter-input"
+              aria-label="Filter troves by name"
+            />
+            <span className="search-query-actions">
+              <button
+                type="button"
+                className="search-query-btn"
+                title="Select all"
+                onClick={selectAllTroves}
+                aria-label="Select all troves"
+              >
+                *
+              </button>
+              <button
+                type="button"
+                className="search-query-btn"
+                title="Clear"
+                onClick={() => {
+                  clearTroves()
+                  setTroveFilter('')
+                }}
+                aria-label="Clear selection and filter"
+              >
+                ×
+              </button>
+            </span>
           </div>
           <ul className="trove-list">
             {withHits.map((t) => (

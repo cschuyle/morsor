@@ -30,33 +30,44 @@
   font-weight: 600;
 }
 
-.sidebar-hint {
-  margin: 0 0 0.75rem;
+.sidebar-title-note {
   font-size: 0.8rem;
-  color: #666;
+  color: #888;
+  font-style: italic;
+  font-weight: 400;
 }
 
-.sidebar-actions {
-  margin-bottom: 1rem;
-  font-size: 0.9rem;
+.sidebar-trove-filter-wrap {
+  display: flex;
+  align-items: stretch;
+  border: 1px solid #e5e5e5;
+  border-radius: 6px;
+  overflow: hidden;
+  background: #fff;
+  margin-bottom: 0.75rem;
 }
 
-.sidebar-link {
-  background: none;
+.sidebar-trove-filter-input {
+  flex: 1;
+  min-width: 0;
+  padding: 0.4rem 0.5rem;
   border: none;
-  color: #646cff;
-  cursor: pointer;
-  padding: 0;
-  font-size: inherit;
+  border-radius: 0;
+  background: transparent;
+  font-size: 0.9rem;
+  box-sizing: border-box;
 }
 
-.sidebar-link:hover {
-  text-decoration: underline;
-}
-
-.sidebar-sep {
-  margin: 0 0.35rem;
+.sidebar-trove-filter-input::placeholder {
   color: #999;
+}
+
+.sidebar-trove-filter-input:focus {
+  outline: none;
+}
+
+.sidebar-trove-filter-wrap:focus-within {
+  border-color: #646cff;
 }
 
 .trove-list {
