@@ -57,13 +57,13 @@ npm install
 npm run dev
 ```
 
-Option 2. You can also use AWS S3 as a data store:
+## Option 2. You can use AWS S3 as a data store:
 
-You'll have to put your trove data in place. See <./DATA.md> for some info in this. If you need help go ahead and contact me!
+You'll have to put your trove data in place. See [DATA.md](./DATA.md) for some info in this. If you need help go ahead and contact me!
 
 Once this is done, you'll need to set your AWS credentials, then do the same as a canned data run with tow extra pieces of configuration:
 ```
 SPRING_PROFILES_ACTIVE=prod MOOCHO_BUCKET_NAME=your-bucket ./gradlew bootRun
 ```
 
-See `envrc-template` for a description of the configuration environment variables.
+See [envrc-template](./envrc-template) for a description of the configuration environment variables.
