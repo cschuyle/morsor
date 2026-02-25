@@ -3,7 +3,14 @@
   text-align: left;
   width: 900px;
   max-width: 100%;
+  min-width: 0;
   box-sizing: border-box;
+}
+
+@media (max-width: 1400px) {
+  .search-results-grid {
+    width: 100%;
+  }
 }
 
 .grid-toolbar {

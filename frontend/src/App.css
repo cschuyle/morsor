@@ -1,8 +1,35 @@
 #root {
   max-width: 1400px;
+  width: 100%;
   margin: 0 auto;
   padding: 2rem;
   text-align: center;
+  box-sizing: border-box;
+}
+
+@media (max-width: 1920px) {
+  #root {
+    padding: 1.5rem;
+  }
+}
+
+@media (max-width: 1400px) {
+  #root {
+    padding: 1rem;
+  }
+  .app-layout {
+    gap: 1.5rem;
+  }
+}
+
+@media (max-width: 1200px) {
+  .app-layout {
+    flex-wrap: wrap;
+  }
+  .sidebar {
+    width: 100%;
+    max-width: 100%;
+  }
 }
 
 .app-title {
@@ -187,6 +214,7 @@
 .main {
   flex: 1;
   min-width: 0;
+  max-width: 100%;
 }
 
 .card {
