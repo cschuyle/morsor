@@ -201,10 +201,31 @@ function App() {
             {searchError && <p className="search-error">{searchError}</p>}
             {searchResult != null && (() => {
               const results = Array.isArray(searchResult.results) ? searchResult.results : []
+              const hasQuery = query.trim() !== ''
+              if (!hasQuery) {
+                return (
+                  <>
+                    <p className="search-count search-count-detail">
+                      Enter a query to search. Optionally, select troves.
+                    </p>
+                    <SearchResultsGrid data={results} />
+                  </>
+                )
+              }
               const count = typeof searchResult.count === 'number' ? searchResult.count : results.length
+              const trovesWithResults = new Set(
+                results.map((r) => r.troveId).filter(Boolean)
+              ).size
+              const trovesInScope =
+                selectedTroveIds.size > 0 ? selectedTroveIds.size : troves.length
+              const scopeLabel =
+                selectedTroveIds.size > 0 ? 'selected troves' : 'troves'
               return (
                 <>
-                  <p className="search-count">{count} result{count !== 1 ? 's' : ''}</p>
+                  <p className="search-count search-count-detail">
+                    {count} result{count !== 1 ? 's' : ''} in {trovesWithResults} trove
+                    {trovesWithResults !== 1 ? 's' : ''} out of {trovesInScope} {scopeLabel}.
+                  </p>
                   <SearchResultsGrid data={results} />
                 </>
               )
