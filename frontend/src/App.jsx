@@ -14,6 +14,7 @@ function App() {
   const [pageSize, setPageSize] = useState(500)
   const [troveFilter, setTroveFilter] = useState('')
   const [showFilter, setShowFilter] = useState('all')
+  const [sidebarOpen, setSidebarOpen] = useState(true)
   const queryRef = useRef(query)
   const skipCheckboxSearchRef = useRef(true)
   const abortControllerRef = useRef(null)
@@ -155,8 +156,9 @@ function App() {
         <span className="search-title-brand">Morsor</span> <span className="sidebar-title-note">More lists than you needed</span>
       </h1>
       <div className="app-layout">
-        <aside className="sidebar">
-          <h2 className="sidebar-title">Troves <span className="sidebar-title-note">(<button type="button" className="sidebar-title-link" onClick={clearTroves}>clear selections</button> to search all)</span></h2>
+        <div className={`sidebar-wrapper ${sidebarOpen ? 'sidebar-wrapper--open' : ''}`}>
+          <aside className="sidebar">
+            <h2 className="sidebar-title">Troves <span className="sidebar-title-note">(<button type="button" className="sidebar-title-link" onClick={clearTroves}>clear selections</button> to search all)</span></h2>
           <p className="sidebar-selection-message" aria-live="polite">
             {selectedTroveIds.size === 0
               ? 'All troves will be searched'
@@ -239,7 +241,21 @@ function App() {
               </li>
             ))}
           </ul>
-        </aside>
+          </aside>
+          <button
+            type="button"
+            className="sidebar-toggle"
+            onClick={() => setSidebarOpen((v) => !v)}
+            aria-label={sidebarOpen ? 'Collapse sidebar' : 'Expand sidebar'}
+            title={sidebarOpen ? 'Collapse sidebar' : 'Expand sidebar'}
+          >
+            {sidebarOpen ? (
+              <span aria-hidden="true">‹</span>
+            ) : (
+              <span aria-hidden="true">›</span>
+            )}
+          </button>
+        </div>
         <main className="main">
           <section className="card search-section">
             <h2 className="search-section-title">Query Console</h2>

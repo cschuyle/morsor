@@ -26,9 +26,17 @@
   .app-layout {
     flex-wrap: wrap;
   }
-  .sidebar {
+  .sidebar-wrapper {
     width: 100%;
     max-width: 100%;
+  }
+  .sidebar-wrapper--open {
+    width: 100%;
+  }
+  .sidebar-wrapper .sidebar {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
   }
 }
 
@@ -96,6 +104,64 @@
   margin: 0;
   font-size: 1.1rem;
   color: #333;
+}
+
+.sidebar-wrapper {
+  flex-shrink: 0;
+  display: flex;
+  align-items: flex-start;
+  position: relative;
+  width: 2.5rem;
+  transition: width 0.25s ease;
+  overflow: hidden;
+}
+
+.sidebar-wrapper--open {
+  width: calc(320px + 2.5rem);
+}
+
+.sidebar-wrapper .sidebar {
+  flex-shrink: 0;
+  width: 320px;
+  min-width: 320px;
+  margin-right: 0;
+  transition: transform 0.25s ease;
+  transform: translateX(-100%);
+}
+
+.sidebar-wrapper--open .sidebar {
+  transform: translateX(0);
+}
+
+.sidebar-toggle {
+  flex-shrink: 0;
+  width: 2.5rem;
+  min-width: 2.5rem;
+  height: 3rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 1px solid #e5e5e5;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #333;
+  font-size: 1.25rem;
+  cursor: pointer;
+  position: absolute;
+  top: 1rem;
+  right: 0;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+.sidebar-toggle:hover {
+  background: #f5f5f5;
+  border-color: #ccc;
+}
+
+.sidebar-toggle:focus {
+  outline: none;
+  border-color: #646cff;
 }
 
 .sidebar {
