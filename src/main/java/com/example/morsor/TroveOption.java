@@ -1,3 +1,3 @@
 package com.example.morsor;
 
-public record TroveOption(String id, String name) {}
+public record TroveOption(String id, String name, int count) {}

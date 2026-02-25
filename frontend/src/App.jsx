@@ -98,7 +98,7 @@ function App() {
                     checked={selectedTroveIds.has(t.id)}
                     onChange={() => toggleTrove(t.id)}
                   />
-                  <span className="trove-name">{t.name}</span>
+                  <span className="trove-name">{t.name} ({t.count})</span>
                 </label>
               </li>
             ))}

@@ -200,9 +200,14 @@ public class SearchDataService {
     public List<TroveOption> getTroveOptions() {
         return allResults.stream()
                 .filter(r -> r.troveId() != null && !r.troveId().isBlank())
-                .map(r -> new TroveOption(r.troveId(), r.trove() != null ? r.trove() : r.troveId()))
-                .collect(java.util.stream.Collectors.toMap(TroveOption::id, o -> o, (a, b) -> a))
-                .values().stream()
+                .collect(Collectors.groupingBy(SearchResult::troveId))
+                .entrySet().stream()
+                .map(e -> {
+                    String id = e.getKey();
+                    List<SearchResult> items = e.getValue();
+                    String name = items.isEmpty() ? id : (items.get(0).trove() != null ? items.get(0).trove() : id);
+                    return new TroveOption(id, name, items.size());
+                })
                 .sorted(java.util.Comparator.comparing(TroveOption::name, String.CASE_INSENSITIVE_ORDER))
                 .toList();
     }
