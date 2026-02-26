@@ -8,11 +8,11 @@ The REAL goal: Vibe-code the whole thing. This is my first experience vibe-codin
 
 But, as for what the app DOES:
 
-I'm a list-maker. I have a few dozen lists which I want to be able to easily search and do some analysis on. That's what the app does.
+I'm a list-maker. I have a few dozen lists which I want to be able to easily browse, search and do some analysis on. That's what the app does.
 
 ## What's the name?
 
-This is a re-implementation of a previous app I called Moocho.me.
+This is a re-write of a previous app I built, called Moocho.me.
 
 I like Walruses.
 

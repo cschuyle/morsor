@@ -14,11 +14,11 @@ function About() {
           </p>
           <p>But, as for what the app DOES:</p>
           <p>
-            I&apos;m a list-maker. I have a few dozen lists which I want to be able to easily search
+            I&apos;m a list-maker. I have a few dozen lists which I want to be able to easily browse, search
             and do some analysis on. That&apos;s what the app does.
           </p>
           <h2>What&apos;s the name?</h2>
-          <p>This is a re-implementation of a previous app I called Moocho.me.</p>
+          <p>This is a re-write of a previous app I built, called Moocho.me.</p>
           <p>I like Walruses.</p>
           <p>I speak Spanish.</p>
           <p>Morsa is Walrus in Spanish.</p>
