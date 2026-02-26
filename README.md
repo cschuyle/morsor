@@ -75,3 +75,40 @@ SPRING_PROFILES_ACTIVE=prod MOOCHO_BUCKET_NAME=your-bucket ./gradlew bootRun
 ```
 
 See [envrc-template](./envrc-template) for a description of the configuration environment variables.
+
+## Deploy to Heroku
+
+1. **Install the [Heroku CLI](https://devcenter.heroku.com/articles/heroku-cli)** and log in: `heroku login`.
+
+2. **Create the app** (from the project root):
+   ```bash
+   heroku create your-app-name
+   ```
+
+3. **Use two buildpacks** so Node is available when Gradle builds the frontend:
+   ```bash
+   heroku buildpacks:add heroku/nodejs
+   heroku buildpacks:add heroku/java
+   ```
+   Order matters: Node first, then Java.
+
+4. **Optional – use canned data (dev profile)**  
+   Nothing else required. The app will use the JSON files in `src/main/resources/data/` (bundled in the jar).
+
+5. **Optional – use S3 (prod profile)**  
+   Set config vars:
+   ```bash
+   heroku config:set SPRING_PROFILES_ACTIVE=prod
+   heroku config:set MOOCHO_BUCKET_NAME=your-bucket-name
+   ```
+   Ensure the dyno can access S3 (e.g. set `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY`, or use IAM role if you add a Heroku add-on that provides it).
+
+6. **Deploy**:
+   ```bash
+   git push heroku main
+   ```
+   (Use `git push heroku master` if your branch is `master`.)
+
+7. **Open the app**: `heroku open`, or visit `https://your-app-name.herokuapp.com`.
+
+The repo includes `system.properties` (Java 21), a root `package.json` (Node 20 for the buildpack), and `server.port=${PORT:8080}` in `application.properties` so the app listens on Heroku’s port.
