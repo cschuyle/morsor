@@ -8,12 +8,17 @@
 }
 
 .grid-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
   margin-bottom: 0.75rem;
+  flex-wrap: wrap;
 }
 
 .grid-filter-input {
   width: 100%;
   max-width: 20rem;
+  flex-shrink: 0;
   padding: 0.5rem 0.75rem;
   border: 1px solid #ddd;
   border-radius: 6px;
@@ -30,6 +35,13 @@
   outline: none;
   border-color: #646cff;
   box-shadow: 0 0 0 2px rgba(100, 108, 255, 0.2);
+}
+
+.grid-toolbar-note {
+  font-size: 0.85rem;
+  color: #666;
+  flex: 1;
+  min-width: 0;
 }
 
 .grid-wrapper {

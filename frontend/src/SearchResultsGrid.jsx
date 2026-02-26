@@ -61,6 +61,9 @@ export function SearchResultsGrid({ data, sortBy = null, sortDir = 'asc', onSort
           onChange={(e) => setGlobalFilter(e.target.value)}
           className="grid-filter-input"
         />
+        <span className="grid-toolbar-note">
+          <strong>Filtering</strong> is for the current page only. <strong>Sorting by column</strong> re-executes the search.
+        </span>
       </div>
       <div className="grid-wrapper">
         <table className="grid-table">
