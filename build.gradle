@@ -42,4 +42,6 @@ tasks.register('buildFrontend', Exec) {
     workingDir = file('frontend')
     commandLine 'npm', 'run', 'build'
 }
-processResources.dependsOn buildFrontend
+if (!project.hasProperty('skipFrontendBuild')) {
+    processResources.dependsOn buildFrontend
+}

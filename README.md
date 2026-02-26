@@ -76,48 +76,35 @@ SPRING_PROFILES_ACTIVE=prod MOOCHO_BUCKET_NAME=your-bucket ./gradlew bootRun
 
 See [envrc-template](./envrc-template) for a description of the configuration environment variables.
 
-## Deploy to Heroku
+## Build Docker Image
 
-1. **Install the [Heroku CLI](https://devcenter.heroku.com/articles/heroku-cli)** and log in: `heroku login`.
+1. Build and run with canned data (dev profile):
 
-2. **Create the app** (from the project root):
-   ```bash
-   heroku create your-app-name
-   ```
+```bash
+docker build -t morsor .
+# or if you need a different architecture (which if you're on a Mac, your PROBABLY DO), maybe something like this:
+docker build --platform linux/amd64 -t morsor .
+```
 
-2a. **Add the heroku git remote to your local repo**
-   ```
-   heroku git:remote -a your-app-name
-   ```
+Note: The image is a multi-stage build: Node builds the frontend, then Gradle builds the Spring Boot jar (with `-PskipFrontendBuild=true` so the pre-built static is used), and the final image runs only the JAR on Eclipse Temurin 21 JRE.
 
-2b. **Make sure your package.json has the correct app name**
-   
-   Look in `package.json` and make sure the `"name"` field is correct.
+2. Test it
 
-3. **Use two buildpacks** so Node is available when Gradle builds the frontend:
-   ```bash
-   heroku buildpacks:add heroku/nodejs
-   heroku buildpacks:add heroku/gradle
-   ```
-   Order matters: Node first, then Java.
+To use the canned data:
+```
+docker run -p 8080:8080 morsor
+```
 
-4. **Optional – use canned data (dev profile)**  
-   Nothing else required. The app will use the JSON files in `src/main/resources/data/` (bundled in the jar).
+To use S3 (prod profile) insteead of canned data, then pass env vars:
 
-5. **Optional – use S3 (prod profile)**  
-   Set config vars:
-   ```bash
-   heroku config:set SPRING_PROFILES_ACTIVE=prod
-   heroku config:set MOOCHO_BUCKET_NAME=your-bucket-name
-   ```
-   Ensure the dyno can access S3 (e.g. set `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY`, or use IAM role if you add a Heroku add-on that provides it).
+```bash
+docker run -p 8080:8080 \
+  -e SPRING_PROFILES_ACTIVE=prod \
+  -e MOOCHO_BUCKET_NAME=your-bucket \
+  -e AWS_ACCESS_KEY_ID=... \
+  -e AWS_SECRET_ACCESS_KEY=... \
+  morsor
+```
 
-6. **Deploy**:
-   ```bash
-   git push heroku main
-   ```
-   (Use `git push heroku master` if your branch is `master`.)
+After you run the image, open http://localhost:8080.
 
-7. **Open the app**: `heroku open`, or visit `https://your-app-name.herokuapp.com`.
-
-The repo includes `system.properties` (Java 21), a root `package.json` (Node 20 for the buildpack), and `server.port=${PORT:8080}` in `application.properties` so the app listens on Heroku’s port.
