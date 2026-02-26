@@ -15,13 +15,15 @@ function App() {
   const [troveFilter, setTroveFilter] = useState('')
   const [showFilter, setShowFilter] = useState('all')
   const [sidebarOpen, setSidebarOpen] = useState(true)
+  const [sortBy, setSortBy] = useState(null)
+  const [sortDir, setSortDir] = useState('asc')
   const queryRef = useRef(query)
   const skipCheckboxSearchRef = useRef(true)
   const abortControllerRef = useRef(null)
   const PAGE_SIZE_OPTIONS = [10, 25, 100, 500, 1000, 5000, 10000]
   queryRef.current = query
 
-  function fetchSearch(pageNum, sizeOverride = null, troveIdsOverride = null) {
+  function fetchSearch(pageNum, sizeOverride = null, troveIdsOverride = null, sortByOverride = null, sortDirOverride = null) {
     const size = sizeOverride ?? pageSize
     const q = queryRef.current
     if (!q.trim()) {
@@ -34,12 +36,22 @@ function App() {
     setSearching(true)
     setSearchError(null)
     const troveIds = troveIdsOverride ?? selectedTroveIds
+    const nextSortBy = sortByOverride !== undefined && sortByOverride !== null ? sortByOverride : sortBy
+    const nextSortDir = sortDirOverride !== undefined && sortDirOverride !== null ? sortDirOverride : sortDir
     const params = new URLSearchParams({
       query: q.trim(),
       page: String(pageNum),
       size: String(size),
     })
     troveIds.forEach((id) => params.append('trove', id))
+    if (sortByOverride !== undefined || sortDirOverride !== undefined) {
+      setSortBy(nextSortBy || null)
+      setSortDir(nextSortDir)
+    }
+    if (nextSortBy) {
+      params.set('sortBy', nextSortBy)
+      params.set('sortDir', nextSortDir)
+    }
     fetch(`/api/search?${params}`, { signal: controller.signal })
       .then((res) => {
         if (!res.ok) throw new Error(res.statusText)
@@ -134,6 +146,11 @@ function App() {
 
   function goToPage(nextPage) {
     fetchSearch(nextPage)
+  }
+
+  function handleGridSortChange(newSortBy, newSortDir) {
+    const pageNum = searchResult != null && typeof searchResult.page === 'number' ? searchResult.page : 0
+    fetchSearch(pageNum, null, null, newSortBy, newSortDir)
   }
 
   const { selected: selectedTroves, notSelected: notSelectedTroves } = useMemo(() => {
@@ -360,7 +377,12 @@ function App() {
                     <p className="search-count search-count-detail">
                       Enter a query to search. Optionally, select troves.
                     </p>
-                    <SearchResultsGrid data={results} />
+                    <SearchResultsGrid
+                      data={results}
+                      sortBy={sortBy}
+                      sortDir={sortDir}
+                      onSortChange={handleGridSortChange}
+                    />
                   </>
                 )
               }
@@ -482,7 +504,12 @@ function App() {
                       )
                     })()}
                   </div>
-                  <SearchResultsGrid data={results} />
+                  <SearchResultsGrid
+                    data={results}
+                    sortBy={sortBy}
+                    sortDir={sortDir}
+                    onSortChange={handleGridSortChange}
+                  />
                 </>
               )
             })()}

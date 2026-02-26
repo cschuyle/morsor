@@ -1,8 +1,7 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import {
   useReactTable,
   getCoreRowModel,
-  getSortedRowModel,
   getFilteredRowModel,
   flexRender,
 } from '@tanstack/react-table'
@@ -23,9 +22,12 @@ const columns = [
   },
 ]
 
-export function SearchResultsGrid({ data }) {
-  const [sorting, setSorting] = useState([])
+export function SearchResultsGrid({ data, sortBy = null, sortDir = 'asc', onSortChange }) {
   const [globalFilter, setGlobalFilter] = useState('')
+  const sorting = useMemo(
+    () => (sortBy ? [{ id: sortBy, desc: sortDir === 'desc' }] : []),
+    [sortBy, sortDir]
+  )
 
   const table = useReactTable({
     data: data ?? [],
@@ -34,10 +36,18 @@ export function SearchResultsGrid({ data }) {
       sorting,
       globalFilter,
     },
-    onSortingChange: setSorting,
+    onSortingChange: (updater) => {
+      if (typeof updater !== 'function' || !onSortChange) return
+      const next = updater(sorting)
+      if (next.length > 0) {
+        onSortChange(next[0].id, next[0].desc ? 'desc' : 'asc')
+      } else {
+        onSortChange(null, 'asc')
+      }
+    },
     onGlobalFilterChange: setGlobalFilter,
+    manualSorting: true,
     getCoreRowModel: getCoreRowModel(),
-    getSortedRowModel: getSortedRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
   })
 

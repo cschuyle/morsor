@@ -61,7 +61,7 @@ In a terminal:
 In another terminal:
 ```
 cd frontend
-npm install
+npm install # Needed on the first run, or if dependencies change
 npm run dev
 ```
 
@@ -86,7 +86,15 @@ docker build -t morsor .
 docker build --platform linux/amd64 -t morsor .
 ```
 
-Note: The image is a multi-stage build: Node builds the frontend, then Gradle builds the Spring Boot jar (with `-PskipFrontendBuild=true` so the pre-built static is used), and the final image runs only the JAR on Eclipse Temurin 21 JRE.
+This may not work because of "buildx / multi-platform issues" (sorry, no further details here).
+
+A symptom of this would be your web host telling you that the architecture is incorrect. If this happens, AND the default builder supports multi-platform, you can use it:
+```
+docker buildx create --use --name multiarch  # only if needed
+docker buildx build --platform linux/amd64 -t cschuyle/morsor:latest --push .
+```
+
+_Note_: The image is a multi-stage build: Node builds the frontend, then Gradle builds the Spring Boot jar (with `-PskipFrontendBuild=true` so the pre-built static is used), and the final image runs only the JAR on Eclipse Temurin 21 JRE.
 
 2. Test it
 
@@ -108,3 +116,7 @@ docker run -p 8080:8080 \
 
 After you run the image, open http://localhost:8080.
 
+## Build and Push Docker Image all at a\once
+```
+docker buildx build --platform linux/amd64 -t ypour-usernname/morsor:latest --push .
+```
