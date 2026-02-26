@@ -69,7 +69,7 @@ npm run dev
 
 You'll have to put your trove data in place. See [DATA.md](./DATA.md) for some info in this. If you need help go ahead and contact me!
 
-Once this is done, you'll need to set your AWS credentials, then do the same as a canned data run with tow extra pieces of configuration:
+Once this is done, you'll need to set your AWS credentials, then do the same as a canned data run with two extra pieces of configuration:
 ```
 SPRING_PROFILES_ACTIVE=prod MOOCHO_BUCKET_NAME=your-bucket ./gradlew bootRun
 ```
