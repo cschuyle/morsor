@@ -22,6 +22,8 @@ function App() {
   const [sortDir, setSortDir] = useState('asc')
   const [searchMode, setSearchMode] = useState('search')
   const [primaryTroveId, setPrimaryTroveId] = useState('')
+  const [primaryTroveFilter, setPrimaryTroveFilter] = useState('')
+  const [duplicatesTroveTab, setDuplicatesTroveTab] = useState('primary')
   const [duplicatesResult, setDuplicatesResult] = useState(null)
   const [duplicatesPage, setDuplicatesPage] = useState(0)
   const queryRef = useRef(query)
@@ -218,6 +220,16 @@ function App() {
     fetchSearch(pageNum, null, null, newSortBy, newSortDir)
   }
 
+  const primaryTrovesFiltered = useMemo(() => {
+    const q = primaryTroveFilter.trim().toLowerCase()
+    if (!q) return troves
+    return troves.filter(
+      (t) =>
+        (t.name && t.name.toLowerCase().includes(q)) ||
+        (t.id && t.id.toLowerCase().includes(q))
+    )
+  }, [troves, primaryTroveFilter])
+
   const { selected: selectedTroves, notSelected: notSelectedTroves } = useMemo(() => {
     const hasResults = searchResult?.results != null && Array.isArray(searchResult.results)
     const troveCounts = searchResult?.troveCounts != null && typeof searchResult.troveCounts === 'object'
@@ -254,40 +266,195 @@ function App() {
       <div className="app-layout">
         <div className={`sidebar-wrapper ${sidebarOpen ? 'sidebar-wrapper--open' : ''}`}>
           <aside className="sidebar">
-            {searchMode === 'duplicates' ? (
-              <>
-                <div className="primary-trove-select-wrap">
-                  <label htmlFor="primary-trove-select">Primary trove</label>
-                  <select
-                    id="primary-trove-select"
-                    value={primaryTroveId}
-                    onChange={(e) => setPrimaryTroveId(e.target.value)}
-                    aria-label="Primary trove"
-                  >
-                    <option value="">Select one…</option>
-                    {troves.map((t) => (
-                      <option key={t.id} value={t.id}>{t.name}</option>
-                    ))}
-                  </select>
-                </div>
-                <h2 className="sidebar-title">Compare troves <span className="sidebar-title-note">(<button type="button" className="sidebar-title-link" onClick={clearTroves}>clear</button>)</span></h2>
-                <p className="sidebar-selection-message" aria-live="polite">
-                  {selectedTroveIds.size === 0
-                    ? 'Select at least one compare trove'
-                    : `${selectedTroveIds.size} compare trove${selectedTroveIds.size !== 1 ? 's' : ''} selected`}
-                </p>
-              </>
-            ) : (
-              <>
-                <h2 className="sidebar-title">Troves <span className="sidebar-title-note">(<button type="button" className="sidebar-title-link" onClick={clearTroves}>clear selections</button> to search all)</span></h2>
-                <p className="sidebar-selection-message" aria-live="polite">
-                  {selectedTroveIds.size === 0
-                    ? 'All troves will be searched'
-                    : `${selectedTroveIds.size} of ${troves.length} troves selected`}
-                </p>
-              </>
-            )}
-          <div className="sidebar-show-wrap">
+            <div className="trove-picker-panel">
+              {searchMode === 'duplicates' ? (
+                <>
+                  <div className="trove-picker-tabs" role="tablist" aria-label="Trove selection">
+                    <button
+                      type="button"
+                      role="tab"
+                      aria-selected={duplicatesTroveTab === 'primary'}
+                      className={`trove-picker-tab ${duplicatesTroveTab === 'primary' ? 'trove-picker-tab--active' : ''}`}
+                      onClick={() => setDuplicatesTroveTab('primary')}
+                    >
+                      Primary
+                    </button>
+                    <button
+                      type="button"
+                      role="tab"
+                      aria-selected={duplicatesTroveTab === 'compare'}
+                      className={`trove-picker-tab ${duplicatesTroveTab === 'compare' ? 'trove-picker-tab--active' : ''}`}
+                      onClick={() => setDuplicatesTroveTab('compare')}
+                    >
+                      Compare
+                    </button>
+                  </div>
+                  {duplicatesTroveTab === 'primary' && (
+                    <div className="primary-trove-select-wrap" role="tabpanel">
+                      <label htmlFor="primary-trove-filter">Filter by name</label>
+                      <input
+                        id="primary-trove-filter"
+                        type="text"
+                        value={primaryTroveFilter}
+                        onChange={(e) => setPrimaryTroveFilter(e.target.value)}
+                        placeholder="Filter by name…"
+                        className="sidebar-trove-filter-input primary-trove-filter-input"
+                        aria-label="Filter primary troves by name"
+                      />
+                      <ul className="primary-trove-list" aria-label="Primary trove options">
+                        {primaryTrovesFiltered.map((t) => (
+                          <li key={t.id}>
+                            <button
+                              type="button"
+                              className={`primary-trove-option ${primaryTroveId === t.id ? 'primary-trove-option--selected' : ''}`}
+                              onClick={() => setPrimaryTroveId(t.id)}
+                              aria-pressed={primaryTroveId === t.id}
+                            >
+                              {t.name}
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                  {duplicatesTroveTab === 'compare' && (
+                    <div role="tabpanel">
+                      <p className="trove-picker-summary" aria-live="polite">
+                        {selectedTroveIds.size === 0
+                          ? 'Select at least one compare trove'
+                          : `${selectedTroveIds.size} selected`}
+                      </p>
+                      <div className="trove-picker-actions">
+                        <button
+                          type="button"
+                          className="trove-picker-clear"
+                          onClick={clearTroves}
+                          aria-label="Clear selection"
+                        >
+                          Clear
+                        </button>
+                      </div>
+                      <div className="sidebar-show-wrap">
+                        <label className="sidebar-show-label">
+                          Show
+                          <select
+                            value={showFilter}
+                            onChange={(e) => setShowFilter(e.target.value)}
+                            className="sidebar-show-select"
+                            aria-label="Show troves: all, selected, or not selected"
+                          >
+                            <option value="all">All</option>
+                            <option value="selected">Selected</option>
+                            <option value="notSelected">Not Selected</option>
+                          </select>
+                        </label>
+                      </div>
+                      <div className="sidebar-trove-filter-wrap">
+                        <input
+                          type="text"
+                          value={troveFilter}
+                          onChange={(e) => setTroveFilter(e.target.value)}
+                          placeholder="Filter compare troves…"
+                          className="sidebar-trove-filter-input"
+                          aria-label="Filter compare troves by name"
+                        />
+                        <span className="search-query-actions">
+                          <button
+                            type="button"
+                            className="search-query-btn"
+                            title="Clear filter"
+                            onClick={() => setTroveFilter('')}
+                            aria-label="Clear filter"
+                          >
+                            ×
+                          </button>
+                        </span>
+                      </div>
+                      <ul className="trove-list">
+                        {selectedTroves.map((t) => (
+                          <li
+                            key={t.id}
+                            className={`trove-item trove-item--selected ${searchResult != null && t.resultCount > 0 ? 'trove-item--has-results' : ''}`}
+                          >
+                            <label className="trove-checkbox">
+                              <input
+                                type="checkbox"
+                                checked={selectedTroveIds.has(t.id)}
+                                onChange={() => toggleTrove(t.id)}
+                              />
+                              <span className="trove-name">
+                                {t.name} ({searchResult != null ? `${t.resultCount}/${t.count}` : t.count})
+                              </span>
+                            </label>
+                            {(selectedTroveIds.size !== 1 || !selectedTroveIds.has(t.id)) && (
+                              <button
+                                type="button"
+                                className="trove-only-link"
+                                onClick={(e) => { e.preventDefault(); handleOnlyClick(t.id) }}
+                                aria-label={`Search only ${t.name}`}
+                                title="Select only this trove"
+                              >
+                                only
+                              </button>
+                            )}
+                          </li>
+                        ))}
+                        {selectedTroves.length > 0 && notSelectedTroves.length > 0 && (
+                          <li className="trove-list-separator" aria-hidden="true">
+                            <hr className="sidebar-separator" />
+                          </li>
+                        )}
+                        {notSelectedTroves.map((t) => (
+                          <li
+                            key={t.id}
+                            className={`trove-item ${selectedTroveIds.has(t.id) ? 'trove-item--selected' : ''} ${searchResult != null && t.resultCount > 0 ? 'trove-item--has-results' : ''}`}
+                          >
+                            <label className="trove-checkbox">
+                              <input
+                                type="checkbox"
+                                checked={selectedTroveIds.has(t.id)}
+                                onChange={() => toggleTrove(t.id)}
+                              />
+                              <span className="trove-name">
+                                {t.name} ({searchResult != null ? `${t.resultCount}/${t.count}` : t.count})
+                              </span>
+                            </label>
+                            {(selectedTroveIds.size !== 1 || !selectedTroveIds.has(t.id)) && (
+                              <button
+                                type="button"
+                                className="trove-only-link"
+                                onClick={(e) => { e.preventDefault(); handleOnlyClick(t.id) }}
+                                aria-label={`Search only ${t.name}`}
+                                title="Select only this trove"
+                              >
+                                only
+                              </button>
+                            )}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </>
+              ) : (
+                <>
+                  <h2 className="trove-picker-heading">Troves</h2>
+                  <p className="trove-picker-summary" aria-live="polite">
+                    {selectedTroveIds.size === 0
+                      ? 'All troves will be searched'
+                      : `${selectedTroveIds.size} of ${troves.length} selected`}
+                  </p>
+                  <div className="trove-picker-actions">
+                    <button
+                      type="button"
+                      className="trove-picker-clear"
+                      onClick={clearTroves}
+                      aria-label="Clear selection"
+                    >
+                      Clear
+                    </button>
+                  </div>
+                  <div className="sidebar-show-wrap">
             <label className="sidebar-show-label">
               Show
               <select
@@ -307,9 +474,9 @@ function App() {
               type="text"
               value={troveFilter}
               onChange={(e) => setTroveFilter(e.target.value)}
-              placeholder="Filter troves…"
+              placeholder={searchMode === 'duplicates' ? 'Filter compare troves…' : 'Filter troves…'}
               className="sidebar-trove-filter-input"
-              aria-label="Filter troves by name"
+              aria-label={searchMode === 'duplicates' ? 'Filter compare troves by name' : 'Filter troves by name'}
             />
             <span className="search-query-actions">
               <button
@@ -327,7 +494,7 @@ function App() {
             {selectedTroves.map((t) => (
               <li
                 key={t.id}
-                className={`trove-item ${searchResult != null && t.resultCount > 0 ? 'trove-item--has-results' : ''}`}
+                className={`trove-item trove-item--selected ${searchResult != null && t.resultCount > 0 ? 'trove-item--has-results' : ''}`}
               >
                 <label className="trove-checkbox">
                   <input
@@ -360,7 +527,7 @@ function App() {
             {notSelectedTroves.map((t) => (
               <li
                 key={t.id}
-                className={`trove-item ${searchResult != null && t.resultCount > 0 ? 'trove-item--has-results' : ''}`}
+                className={`trove-item ${selectedTroveIds.has(t.id) ? 'trove-item--selected' : ''} ${searchResult != null && t.resultCount > 0 ? 'trove-item--has-results' : ''}`}
               >
                 <label className="trove-checkbox">
                   <input
@@ -386,6 +553,9 @@ function App() {
               </li>
             ))}
           </ul>
+                </>
+              )}
+            </div>
           </aside>
           <button
             type="button"
