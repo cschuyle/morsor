@@ -147,17 +147,22 @@ function MobileApp() {
               </button>
             </span>
           </div>
-          <button type="submit" className="mobile-search-btn" disabled={searching}>
-            {searching ? '…' : 'Search'}
+          <button type="submit" className="mobile-search-btn" disabled={searching} aria-label="Search">
+            {searching ? '…' : (
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <circle cx="11" cy="11" r="8" />
+                <path d="m21 21-4.35-4.35" />
+              </svg>
+            )}
           </button>
         </form>
 
         <div className="mobile-troves-row">
           <span className="mobile-troves-label">
             {searchResult != null && count > 0 && (
-              <>{count} result{count !== 1 ? 's' : ''} · </>
+              <>{count} item{count !== 1 ? 's' : ''} · </>
             )}
-            In: {troveLabel}
+            {troveLabel}
           </span>
           {searchResult != null && totalPages > 1 && (
             <nav className="mobile-pagination" aria-label="Pages">
@@ -232,7 +237,7 @@ function MobileApp() {
         {searchResult != null && (
           <>
             {results.length === 0 && query.trim() && !searching && (
-              <p className="mobile-no-results">No results.</p>
+              <p className="mobile-no-results">No items.</p>
             )}
             <ul className="mobile-result-list">
               {results.map((r) => (

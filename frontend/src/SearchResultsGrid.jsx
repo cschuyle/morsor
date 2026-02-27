@@ -56,7 +56,7 @@ export function SearchResultsGrid({ data, sortBy = null, sortDir = 'asc', onSort
       <div className="grid-toolbar">
         <input
           type="search"
-          placeholder="Filter results…"
+          placeholder="Filter items…"
           value={globalFilter}
           onChange={(e) => setGlobalFilter(e.target.value)}
           className="grid-filter-input"
@@ -92,7 +92,7 @@ export function SearchResultsGrid({ data, sortBy = null, sortDir = 'asc', onSort
             {table.getRowModel().rows.length === 0 ? (
               <tr>
                 <td colSpan={columns.length} className="grid-empty">
-                  {globalFilter ? 'No rows match the filter.' : 'No results.'}
+                  {globalFilter ? 'No rows match the filter.' : 'No items.'}
                 </td>
               </tr>
             ) : (

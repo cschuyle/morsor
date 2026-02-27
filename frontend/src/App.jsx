@@ -412,7 +412,7 @@ function App() {
               return (
                 <>
                   <p className="search-count search-count-detail">
-                    {count} result{count !== 1 ? 's' : ''} in {trovesWithResults} out of {trovesInScope} {scopeLabel}.
+                    {count} item{count !== 1 ? 's' : ''} in {trovesWithResults} out of {trovesInScope} {scopeLabel}.
                     {totalPages > 1 && ` Showing ${from}–${to}.`}
                   </p>
                   <div className="search-results-options">

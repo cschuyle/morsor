@@ -59,7 +59,7 @@
 .mobile-search-input {
   flex: 1;
   min-width: 0;
-  padding: 0.75rem 1rem;
+  padding: 0.5rem 1rem;
   border: none;
   border-radius: 0;
   font-size: 1rem;
@@ -78,9 +78,9 @@
 }
 
 .mobile-search-query-btn {
-  width: 2.25rem;
-  min-width: 2.25rem;
-  min-height: 2.25rem;
+  width: 2rem;
+  min-width: 2rem;
+  min-height: 2rem;
   padding: 0;
   display: inline-flex;
   align-items: center;
@@ -101,9 +101,9 @@
 
 .mobile-search-query-btn:first-child {
   font-weight: 600;
-  width: 2.925rem;
-  min-width: 2.925rem;
-  min-height: 2.925rem;
+  width: 2.5rem;
+  min-width: 2.5rem;
+  min-height: 2rem;
   font-size: 1.235rem;
 }
 
@@ -112,7 +112,7 @@
 }
 
 .mobile-search-btn {
-  padding: 0.75rem 1.25rem;
+  padding: 0.75rem 1rem;
   border: 1px solid #646cff;
   border-radius: 8px;
   background: #646cff;
@@ -120,7 +120,10 @@
   font-size: 1rem;
   font-weight: 500;
   cursor: pointer;
-  min-width: 5rem;
+  min-width: 3rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .mobile-search-btn:disabled {
