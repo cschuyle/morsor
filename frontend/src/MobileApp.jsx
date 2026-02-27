@@ -66,6 +66,16 @@ function MobileApp() {
     setSelectedTroveIds(new Set())
   }
 
+  function handleOnlyClick(troveId) {
+    if (!query.trim()) {
+      queryRef.current = '*'
+      setQuery('*')
+    }
+    setSelectedTroveIds(new Set([troveId]))
+    setPage(0)
+    setShowTrovePicker(false)
+  }
+
   function handleSearch(e) {
     e?.preventDefault()
     if (!query.trim()) return
@@ -167,6 +177,15 @@ function MobileApp() {
                     />
                     <span>{t.name}</span>
                   </label>
+                  <button
+                    type="button"
+                    className="mobile-trove-only-link"
+                    onClick={(e) => { e.preventDefault(); handleOnlyClick(t.id) }}
+                    aria-label={`Search only ${t.name}`}
+                    title="Select only this trove"
+                  >
+                    only
+                  </button>
                 </li>
               ))}
             </ul>
