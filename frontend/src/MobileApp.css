@@ -272,6 +272,7 @@
   display: flex;
   flex-direction: column;
   gap: 0.1rem;
+  text-align: left;
 }
 
 .mobile-result-title {
@@ -279,11 +280,13 @@
   font-size: 0.9rem;
   line-height: 1.3;
   color: #213547;
+  text-align: left;
 }
 
 .mobile-result-trove {
   font-size: 0.8rem;
   color: #666;
+  text-align: left;
 }
 
 .mobile-pagination {
