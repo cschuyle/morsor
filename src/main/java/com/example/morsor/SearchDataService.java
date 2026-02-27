@@ -95,17 +95,41 @@ public class SearchDataService {
         List<SearchResult> combined = new ArrayList<>();
         boolean useS3 = environment.acceptsProfiles(Profiles.of("s3troves"));
         log.info("Trove load: useS3={}, bucketName={}", useS3, bucketName != null ? bucketName : "(null)");
-        if (useS3 && bucketName != null && !bucketName.isBlank()) {
+        if (useS3) {
+            requireS3EnvVars();
             loadFromS3(combined, onlyIds);
         } else {
-            if (useS3 && (bucketName == null || bucketName.isBlank())) {
-                log.warn("s3troves profile active but moocho.bucket.name is empty; loading from classpath");
-            }
             loadFromClasspath(combined, onlyIds);
         }
         allResults = combined;
         buildLuceneIndex();
         log.info("SearchDataService.loadData() finished: {} results, {} trove options", allResults.size(), getTroveOptions().size());
+    }
+
+    /** When s3troves profile is active, fail fast if any required env var is missing. */
+    private void requireS3EnvVars() {
+        List<String> missing = new ArrayList<>();
+        if (bucketName == null || bucketName.isBlank()) {
+            missing.add("MOOCHO_BUCKET_NAME");
+        }
+        if (blank(environment.getProperty("AWS_ACCESS_KEY_ID"))) {
+            missing.add("AWS_ACCESS_KEY_ID");
+        }
+        if (blank(environment.getProperty("AWS_SECRET_ACCESS_KEY"))) {
+            missing.add("AWS_SECRET_ACCESS_KEY");
+        }
+        if (blank(environment.getProperty("AWS_REGION"))) {
+            missing.add("AWS_REGION");
+        }
+        if (!missing.isEmpty()) {
+            throw new IllegalStateException(
+                "s3troves profile is active but required environment variables are not set: " + missing
+                + ". Set them before starting the application.");
+        }
+    }
+
+    private static boolean blank(String s) {
+        return s == null || s.isBlank();
     }
 
     private void buildLuceneIndex() {

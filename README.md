@@ -220,7 +220,11 @@ Env var `SPRING_PROFILES_ACTIVE` is a comma-delimited list of profiles to activa
   - Env vars: `SPRING_DATASOURCE_PASSWORD`
 
 - Spring profile **s3troves**: Trove data loaded from S3; set `MOOCHO_BUCKET_NAME`. Use with `dev` (H2) or `postgres` (Postgres), e.g. `postgres,s3troves`.
-  - Env vars: `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_REGION` (optional)
+  - Env vars: 
+    - `AWS_ACCESS_KEY_ID`
+    - `AWS_SECRET_ACCESS_KEY`
+    - `AWS_REGION`
+    - `MOOCHO_BUCKET_NAME`
 
 So-called "Production" mode: You would normally activate **postgres** and **s3troves** profiles, which forces you to provide your own trove data in S3, and create at least one user.
 
