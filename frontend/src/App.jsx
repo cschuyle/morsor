@@ -2,6 +2,7 @@ import { useMemo, useState, useEffect, useRef } from 'react'
 import { Link } from 'react-router-dom'
 import { SearchResultsGrid } from './SearchResultsGrid'
 import { getApiAuthHeaders } from './apiAuth'
+import { getCsrfToken } from './getCsrfToken'
 import './App.css'
 
 function App() {
@@ -524,6 +525,20 @@ function App() {
       <hr className="backend-status-divider" />
       <footer className="app-footer">
         <Link to="/about" className="app-footer-link">About</Link>
+        <button
+          type="button"
+          className="app-footer-link app-footer-logout-btn"
+          onClick={() => {
+            const token = getCsrfToken()
+            const headers = { 'Content-Type': 'application/x-www-form-urlencoded' }
+            if (token) headers['X-XSRF-TOKEN'] = token
+            fetch('/logout', { method: 'POST', credentials: 'include', headers })
+              .then(() => { window.location.href = '/login' })
+              .catch(() => { window.location.href = '/login' })
+          }}
+        >
+          Log Out
+        </button>
         <Link to="/mobile" className="app-footer-link">Mobile</Link>
         {message && <p className="backend-message" data-status={message === 'Status: Backend is up' ? 'up' : 'down'}>{message}</p>}
       </footer>

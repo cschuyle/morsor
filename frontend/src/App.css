@@ -112,7 +112,12 @@
   padding: 0;
   cursor: pointer;
   font-family: inherit;
-  font-size: inherit;
+  font-size: 0.9rem;
+  color: #646cff;
+  text-decoration: none;
+}
+.app-footer-logout-btn:hover {
+  text-decoration: underline;
 }
 
 .backend-message {
