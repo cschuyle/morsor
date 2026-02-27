@@ -10,17 +10,22 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 
+import javax.sql.DataSource;
+import java.sql.SQLException;
+
 /**
- * Seeds H2 in dev: creates auth tables (H2-compatible DDL) and inserts a single user
- * plus hardwired API token so you can log in (form: dev / dev) or use Authorization: Bearer dev-token.
+ * Seeds H2 when postgres profile is not active: creates auth tables (H2-compatible DDL) and inserts
+ * a single user plus hardwired API token (form: dev / dev or Authorization: Bearer dev-token).
+ * Skips if the datasource is not H2 (e.g. postgres profile overrides to Postgres).
  */
 @Component
-@Profile("dev")
+@Profile("!postgres")
 public class DevDataSeeder implements ApplicationRunner {
 
     private static final Logger log = LoggerFactory.getLogger(DevDataSeeder.class);
 
     private final JdbcTemplate jdbc;
+    private final DataSource dataSource;
     private final UserRepository userRepository;
     private final ApiTokenRepository apiTokenRepository;
     private final PasswordEncoder passwordEncoder;
@@ -36,11 +41,13 @@ public class DevDataSeeder implements ApplicationRunner {
     private String devApiToken;
 
     public DevDataSeeder(JdbcTemplate jdbc,
+                         DataSource dataSource,
                          UserRepository userRepository,
                          ApiTokenRepository apiTokenRepository,
                          PasswordEncoder passwordEncoder,
                          TokenHashService tokenHashService) {
         this.jdbc = jdbc;
+        this.dataSource = dataSource;
         this.userRepository = userRepository;
         this.apiTokenRepository = apiTokenRepository;
         this.passwordEncoder = passwordEncoder;
@@ -49,6 +56,10 @@ public class DevDataSeeder implements ApplicationRunner {
 
     @Override
     public void run(ApplicationArguments args) {
+        if (!isH2()) {
+            log.debug("DevDataSeeder skipped: datasource is not H2 (postgres profile active)");
+            return;
+        }
         createTablesIfNeeded();
         if (userRepository.findByUsername(devUsername).isPresent()) {
             return;
@@ -62,6 +73,16 @@ public class DevDataSeeder implements ApplicationRunner {
         String tokenHash = tokenHashService.hash(devApiToken);
         apiTokenRepository.save(user.getId(), tokenHash, "dev");
         log.info("Dev data seeded: user '{}' / password '{}', API token '{}' (use Authorization: Bearer <token>)", devUsername, devPassword, devApiToken);
+    }
+
+    private boolean isH2() {
+        try (var conn = dataSource.getConnection()) {
+            String url = conn.getMetaData().getURL();
+            return url != null && url.startsWith("jdbc:h2:");
+        } catch (SQLException e) {
+            log.warn("DevDataSeeder could not determine datasource URL: {}", e.getMessage());
+            return false;
+        }
     }
 
     private void createTablesIfNeeded() {

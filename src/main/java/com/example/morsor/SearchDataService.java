@@ -93,13 +93,13 @@ public class SearchDataService {
             log.info("Loading only trove IDs: {}", onlyIds);
         }
         List<SearchResult> combined = new ArrayList<>();
-        boolean useS3 = environment.acceptsProfiles(Profiles.of("prod"));
+        boolean useS3 = environment.acceptsProfiles(Profiles.of("s3troves"));
         log.info("Trove load: useS3={}, bucketName={}", useS3, bucketName != null ? bucketName : "(null)");
         if (useS3 && bucketName != null && !bucketName.isBlank()) {
             loadFromS3(combined, onlyIds);
         } else {
             if (useS3 && (bucketName == null || bucketName.isBlank())) {
-                log.warn("Prod profile active but moocho.bucket.name is empty; loading from classpath");
+                log.warn("s3troves profile active but moocho.bucket.name is empty; loading from classpath");
             }
             loadFromClasspath(combined, onlyIds);
         }

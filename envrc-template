@@ -1,7 +1,7 @@
 # The app will run out of the box using the canned data. All configuration variables are optional.
 
-# For prod (which just means the data comes from AWS S3 rather than the canned data in the classpath resources)
-export SPRING_PROFILES_ACTIVE=prod
+# For production: postgres = Postgres, no dev seeding; s3troves = trove data from S3. Use both for postgres + S3.
+export SPRING_PROFILES_ACTIVE=postgres,s3troves
 
 export AWS_ACCESS_KEY_ID=...
 export AWS_SECRET_ACCESS_KEY=...
