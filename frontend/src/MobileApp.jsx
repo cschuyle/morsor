@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { Link } from 'react-router-dom'
+import { getApiAuthHeaders } from './apiAuth'
 import './MobileApp.css'
 
 const MOBILE_PAGE_SIZE = 25
@@ -29,16 +30,22 @@ function MobileApp() {
       size: String(MOBILE_PAGE_SIZE),
     })
     selectedTroveIds.forEach((id) => params.append('trove', id))
-    fetch(`/api/search?${params}`)
-      .then((res) => (res.ok ? res.json() : Promise.reject(new Error(res.statusText))))
+    fetch(`/api/search?${params}`, { credentials: 'include', headers: { ...getApiAuthHeaders() } })
+      .then((res) => {
+        if (res.status === 401) { window.location.href = '/login'; return Promise.reject() }
+        return res.ok ? res.json() : Promise.reject(new Error(res.statusText))
+      })
       .then(setSearchResult)
       .catch(() => setSearchResult({ count: 0, results: [], page: 0, size: MOBILE_PAGE_SIZE }))
       .finally(() => setSearching(false))
   }
 
   useEffect(() => {
-    fetch('/api/troves')
-      .then((res) => (res.ok ? res.json() : Promise.resolve([])))
+    fetch('/api/troves', { credentials: 'include', headers: { ...getApiAuthHeaders() } })
+      .then((res) => {
+        if (res.status === 401) { window.location.href = '/login'; return null }
+        return res.ok ? res.json() : Promise.resolve([])
+      })
       .then((data) => (Array.isArray(data) ? data : []))
       .then(setTroves)
       .catch(() => setTroves([]))

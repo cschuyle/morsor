@@ -1,6 +1,7 @@
 import { useMemo, useState, useEffect, useRef } from 'react'
 import { Link } from 'react-router-dom'
 import { SearchResultsGrid } from './SearchResultsGrid'
+import { getApiAuthHeaders } from './apiAuth'
 import './App.css'
 
 function App() {
@@ -52,8 +53,9 @@ function App() {
       params.set('sortBy', nextSortBy)
       params.set('sortDir', nextSortDir)
     }
-    fetch(`/api/search?${params}`, { signal: controller.signal })
+    fetch(`/api/search?${params}`, { credentials: 'include', headers: { ...getApiAuthHeaders() }, signal: controller.signal })
       .then((res) => {
+        if (res.status === 401) { window.location.href = '/login'; return Promise.reject() }
         if (!res.ok) throw new Error(res.statusText)
         return res.json()
       })
@@ -65,15 +67,18 @@ function App() {
   }
 
   useEffect(() => {
-    fetch('/actuator/health')
-      .then((res) => res.json())
-      .then((data) => setMessage(data.status === 'UP' ? 'Status: Backend is up' : `Status: Backend: ${data.status}`))
+    fetch('/actuator/health', { credentials: 'include', headers: { ...getApiAuthHeaders() } })
+      .then((res) => { if (res.status === 401) { window.location.href = '/login'; return }; return res.json() })
+      .then((data) => data && setMessage(data.status === 'UP' ? 'Status: Backend is up' : `Status: Backend: ${data.status}`))
       .catch(() => setMessage('Status: Backend unreachable'))
   }, [])
 
   useEffect(() => {
-    fetch('/api/troves')
-      .then((res) => (res.ok ? res.json() : Promise.resolve([])))
+    fetch('/api/troves', { credentials: 'include', headers: { ...getApiAuthHeaders() } })
+      .then((res) => {
+        if (res.status === 401) { window.location.href = '/login'; return null }
+        return res.ok ? res.json() : Promise.resolve([])
+      })
       .then((data) => Array.isArray(data) ? data : [])
       .then(setTroves)
       .catch(() => setTroves([]))

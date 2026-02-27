@@ -56,7 +56,7 @@ import org.apache.lucene.util.BytesRef;
 @Service
 public class SearchDataService {
 
-    private static final String DATA_LOCATION = "classpath:data/*.json";
+    private static final String DATA_LOCATION = "classpath*:data/*.json";
     private static final String TROVES_LIST_KEY = "troves";
 
     private static final Logger log = LoggerFactory.getLogger(SearchDataService.class);
@@ -105,6 +105,7 @@ public class SearchDataService {
         }
         allResults = combined;
         buildLuceneIndex();
+        log.info("SearchDataService.loadData() finished: {} results, {} trove options", allResults.size(), getTroveOptions().size());
     }
 
     private void buildLuceneIndex() {
@@ -221,9 +222,10 @@ public class SearchDataService {
     }
 
     private void loadFromClasspath(List<SearchResult> combined, Set<String> onlyIds) {
-        log.info("Loading from classpath");
+        log.info("Loading from classpath: {}", DATA_LOCATION);
         try {
             Resource[] resources = resourceResolver.getResources(DATA_LOCATION);
+            log.info("Classpath data resources found: {}", resources.length);
             Arrays.sort(resources, (a, b) -> String.CASE_INSENSITIVE_ORDER.compare(
                     a.getFilename() != null ? a.getFilename() : "",
                     b.getFilename() != null ? b.getFilename() : ""));

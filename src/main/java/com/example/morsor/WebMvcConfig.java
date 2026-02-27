@@ -30,6 +30,7 @@ public class WebMvcConfig implements WebMvcConfigurer {
                             return resource;
                         }
                         if ("".equals(resourcePath) || "index.html".equals(resourcePath)
+                                || "login".equals(resourcePath)
                                 || "mobile".equals(resourcePath) || resourcePath.startsWith("mobile/")) {
                             resource = location.createRelative("index.html");
                             if (resource.exists() && resource.isReadable()) {

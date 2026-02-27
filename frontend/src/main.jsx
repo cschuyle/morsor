@@ -6,6 +6,7 @@ import App from './App.jsx'
 import About from './About.jsx'
 import MobileApp from './MobileApp.jsx'
 import MobileAbout from './MobileAbout.jsx'
+import Login from './Login.jsx'
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>
@@ -13,6 +14,7 @@ createRoot(document.getElementById('root')).render(
       <Routes>
         <Route path="/" element={<App />} />
         <Route path="/about" element={<About />} />
+        <Route path="/login" element={<Login />} />
         <Route path="/mobile" element={<MobileApp />} />
         <Route path="/mobile/about" element={<MobileAbout />} />
       </Routes>
