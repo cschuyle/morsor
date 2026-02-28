@@ -2,7 +2,7 @@ package com.example.morsor;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import org.apache.lucene.analysis.standard.StandardAnalyzer;
+import com.example.morsor.AccentInsensitiveAnalyzer;
 import org.apache.lucene.document.Document;
 import org.apache.lucene.document.Field;
 import org.apache.lucene.document.StoredField;
@@ -44,6 +44,7 @@ import org.apache.lucene.queryparser.classic.ParseException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
+import java.text.Normalizer;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -76,7 +77,7 @@ public class SearchDataService {
     private List<SearchResult> allResults = List.of();
     private Directory luceneDirectory;
     private IndexSearcher luceneSearcher;
-    private final StandardAnalyzer luceneAnalyzer = new StandardAnalyzer();
+    private final AccentInsensitiveAnalyzer luceneAnalyzer = new AccentInsensitiveAnalyzer();
 
     public SearchDataService(ResourcePatternResolver resourceResolver, ObjectMapper objectMapper,
             Environment environment) {
@@ -434,10 +435,20 @@ public class SearchDataService {
     }
 
     private static boolean coreTextMatch(String a, String b) {
-        String na = (a != null ? a : "").trim().toLowerCase();
-        String nb = (b != null ? b : "").trim().toLowerCase();
+        String na = normalizeForComparison(a != null ? a : "");
+        String nb = normalizeForComparison(b != null ? b : "");
         if (na.isEmpty() || nb.isEmpty()) return false;
         return na.equals(nb) || nb.contains(na) || na.contains(nb);
+    }
+
+    /** Lowercase and strip accents so "Léon" and "Leon" compare equal. */
+    private static String normalizeForComparison(String s) {
+        if (s == null) return "";
+        String t = s.trim();
+        if (t.isEmpty()) return "";
+        String nfd = Normalizer.normalize(t, Normalizer.Form.NFD);
+        String noAccents = nfd.replaceAll("\\p{M}", "");
+        return noAccents.toLowerCase();
     }
 
     /** Search for items similar to the given item, restricted to the given trove IDs. Returns top N by score. */
