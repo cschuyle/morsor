@@ -370,6 +370,31 @@ public class SearchDataService {
     }
 
     /**
+     * Find items in the primary trove that have no match in the compare troves (converse of duplicates).
+     * Uses the same similarity and year heuristic as searchDuplicates; returns primary items with zero matches.
+     */
+    public List<SearchResult> searchUniques(String primaryTroveId, Set<String> compareTroveIds, String query) {
+        if (primaryTroveId == null || primaryTroveId.isBlank()) return List.of();
+        Set<String> compareSet = compareTroveIds == null ? Set.of() : compareTroveIds.stream()
+                .filter(t -> t != null && !t.isBlank())
+                .collect(Collectors.toUnmodifiableSet());
+        if (compareSet.isEmpty()) return List.of();
+
+        List<SearchResult> primaryItems = search(List.of(primaryTroveId), query != null ? query.trim() : "");
+        if (primaryItems.isEmpty()) return List.of();
+
+        List<SearchResult> uniques = new ArrayList<>(primaryItems.size());
+        for (SearchResult primary : primaryItems) {
+            List<ScoredSearchResult> matches = findSimilarInTroves(primary, compareSet, 50);
+            matches = filterMatchesByYearHeuristic(primary, matches);
+            if (matches.isEmpty()) {
+                uniques.add(primary);
+            }
+        }
+        return uniques;
+    }
+
+    /**
      * Heuristic: if a title ends with (YYYY), the year alone does not make a match.
      * - Both have years and they differ → reject.
      * - Primary has year: candidate core text must match primary core (one contains the other or equal).

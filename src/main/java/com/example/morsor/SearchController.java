@@ -83,6 +83,26 @@ public class SearchController {
         return new DuplicatesResponse(total, page, size, rows);
     }
 
+    @GetMapping("/search/uniques")
+    public UniquesResponse searchUniques(
+            @RequestParam(required = true) String primaryTrove,
+            @RequestParam(required = false) List<String> compareTrove,
+            @RequestParam(required = false, defaultValue = "*") String query,
+            @RequestParam(required = false, defaultValue = "0") int page,
+            @RequestParam(required = false, defaultValue = "50") int size) {
+        page = Math.max(0, page);
+        size = Math.min(500, Math.max(1, size));
+        Set<String> compareSet = compareTrove == null ? Set.of() : compareTrove.stream()
+                .filter(t -> t != null && !t.isBlank())
+                .collect(Collectors.toUnmodifiableSet());
+        List<SearchResult> all = searchDataService.searchUniques(primaryTrove.trim(), compareSet, query);
+        long total = all.size();
+        int from = (int) Math.min((long) page * size, total);
+        int to = (int) Math.min(from + size, total);
+        List<SearchResult> results = from < to ? all.subList(from, to) : List.of();
+        return new UniquesResponse(total, page, size, results);
+    }
+
     private static Comparator<SearchResult> comparatorFor(String sortBy) {
         return switch (sortBy.toLowerCase()) {
             case "title" -> Comparator.comparing(

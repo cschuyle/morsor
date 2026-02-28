@@ -2,6 +2,7 @@ import { useMemo, useState, useEffect, useRef } from 'react'
 import { Link } from 'react-router-dom'
 import { SearchResultsGrid } from './SearchResultsGrid'
 import { DuplicateResultsView } from './DuplicateResultsView'
+import { UniquesResultsView } from './UniquesResultsView'
 import { getApiAuthHeaders } from './apiAuth'
 import { getCsrfToken } from './getCsrfToken'
 import './App.css'
@@ -26,6 +27,8 @@ function App() {
   const [duplicatesTroveTab, setDuplicatesTroveTab] = useState('primary')
   const [duplicatesResult, setDuplicatesResult] = useState(null)
   const [duplicatesPage, setDuplicatesPage] = useState(0)
+  const [uniquesResult, setUniquesResult] = useState(null)
+  const [uniquesPage, setUniquesPage] = useState(0)
   const queryRef = useRef(query)
   const skipCheckboxSearchRef = useRef(true)
   const abortControllerRef = useRef(null)
@@ -182,6 +185,44 @@ function App() {
       .finally(() => setSearching(false))
   }
 
+  function fetchUniques(pageNum) {
+    const q = queryRef.current.trim() || '*'
+    if (!primaryTroveId.trim()) {
+      setUniquesResult({ total: 0, page: 0, size: 50, results: [] })
+      return
+    }
+    if (selectedTroveIds.size === 0) {
+      setUniquesResult({ total: 0, page: 0, size: 50, results: [] })
+      return
+    }
+    abortControllerRef.current?.abort()
+    const controller = new AbortController()
+    abortControllerRef.current = controller
+    setSearching(true)
+    setSearchError(null)
+    const params = new URLSearchParams({
+      primaryTrove: primaryTroveId.trim(),
+      query: q,
+      page: String(pageNum),
+      size: '50',
+    })
+    selectedTroveIds.forEach((id) => params.append('compareTrove', id))
+    fetch(`/api/search/uniques?${params}`, { credentials: 'include', headers: { ...getApiAuthHeaders() }, signal: controller.signal })
+      .then((res) => {
+        if (res.status === 401) { window.location.href = '/login'; return Promise.reject() }
+        if (!res.ok) throw new Error(res.statusText)
+        return res.json()
+      })
+      .then((data) => {
+        setUniquesResult(data)
+        setUniquesPage(pageNum)
+      })
+      .catch((err) => {
+        if (err.name !== 'AbortError') setSearchError(err.message)
+      })
+      .finally(() => setSearching(false))
+  }
+
   function handleSearch(e) {
     e?.preventDefault()
     if (searchMode === 'duplicates') {
@@ -193,7 +234,21 @@ function App() {
       }
       setSearchError(null)
       setSearchResult(null)
+      setUniquesResult(null)
       fetchDuplicates(0)
+      return
+    }
+    if (searchMode === 'uniques') {
+      if (!primaryTroveId.trim()) return
+      if (selectedTroveIds.size === 0) return
+      if (primaryTroveId && selectedTroveIds.has(primaryTroveId)) {
+        setSearchError('Primary trove cannot be in compare list. Remove it from compare troves.')
+        return
+      }
+      setSearchError(null)
+      setSearchResult(null)
+      setDuplicatesResult(null)
+      fetchUniques(0)
       return
     }
     if (!query.trim()) {
@@ -267,7 +322,7 @@ function App() {
         <div className={`sidebar-wrapper ${sidebarOpen ? 'sidebar-wrapper--open' : ''}`}>
           <aside className="sidebar">
             <div className="trove-picker-panel">
-              {searchMode === 'duplicates' ? (
+              {(searchMode === 'duplicates' || searchMode === 'uniques') ? (
                 <>
                   <div className="trove-picker-tabs" role="tablist" aria-label="Trove selection">
                     <button
@@ -558,7 +613,7 @@ function App() {
                 role="tab"
                 aria-selected={searchMode === 'search'}
                 className={searchMode === 'search' ? 'active' : ''}
-                onClick={() => { setSearchMode('search'); setDuplicatesResult(null) }}
+                onClick={() => { setSearchMode('search'); setDuplicatesResult(null); setUniquesResult(null) }}
               >
                 Search
               </button>
@@ -567,9 +622,18 @@ function App() {
                 role="tab"
                 aria-selected={searchMode === 'duplicates'}
                 className={searchMode === 'duplicates' ? 'active' : ''}
-                onClick={() => { setSearchMode('duplicates'); setSearchResult(null) }}
+                onClick={() => { setSearchMode('duplicates'); setSearchResult(null); setUniquesResult(null) }}
               >
                 Find duplicates
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={searchMode === 'uniques'}
+                className={searchMode === 'uniques' ? 'active' : ''}
+                onClick={() => { setSearchMode('uniques'); setSearchResult(null); setDuplicatesResult(null) }}
+              >
+                Find uniques
               </button>
             </div>
             <form onSubmit={handleSearch} className="search-form">
@@ -623,15 +687,15 @@ function App() {
               </div>
             </form>
             {searchError && <p className="search-error">{searchError}</p>}
-            {searchMode === 'duplicates' && duplicatesResult == null && !searching && (
+            {(searchMode === 'duplicates' || searchMode === 'uniques') && duplicatesResult == null && uniquesResult == null && !searching && (
               <p className="search-count search-count-detail">
                 Select <strong>primary trove</strong> and at least one <strong>compare trove</strong>. Use query <strong>*</strong> for all items, or type a filter.
               </p>
             )}
-            {searchMode === 'duplicates' && searching && (
+            {(searchMode === 'duplicates' || searchMode === 'uniques') && searching && (
               <div className="duplicates-search-loading" aria-live="polite">
                 <span className="search-spinner" aria-hidden="true" />
-                <span>Finding duplicates…</span>
+                <span>{searchMode === 'duplicates' ? 'Finding duplicates…' : 'Finding uniques…'}</span>
               </div>
             )}
             {searchMode === 'duplicates' && duplicatesResult != null && !searching && (() => {
@@ -672,6 +736,47 @@ function App() {
                     </nav>
                   )}
                   <DuplicateResultsView rows={rows} />
+                </>
+              )
+            })()}
+            {searchMode === 'uniques' && uniquesResult != null && !searching && (() => {
+              const total = uniquesResult.total ?? 0
+              const pageNum = uniquesResult.page ?? 0
+              const size = uniquesResult.size ?? 50
+              const results = Array.isArray(uniquesResult.results) ? uniquesResult.results : []
+              const totalPages = size > 0 ? Math.ceil(total / size) : 0
+              return (
+                <>
+                  <p className="search-count search-count-detail">
+                    {total} item{total !== 1 ? 's' : ''} in primary with no match in compare troves.
+                    {totalPages > 1 && ` Page ${pageNum + 1} of ${totalPages}.`}
+                  </p>
+                  {totalPages > 1 && (
+                    <nav className="pagination" aria-label="Uniques results pages">
+                      <button
+                        type="button"
+                        className="pagination-btn"
+                        disabled={pageNum <= 0 || searching}
+                        onClick={() => fetchUniques(pageNum - 1)}
+                        aria-label="Previous page"
+                      >
+                        ←
+                      </button>
+                      <span className="pagination-info">
+                        {pageNum + 1} / {totalPages}
+                      </span>
+                      <button
+                        type="button"
+                        className="pagination-btn"
+                        disabled={pageNum >= totalPages - 1 || searching}
+                        onClick={() => fetchUniques(pageNum + 1)}
+                        aria-label="Next page"
+                      >
+                        →
+                      </button>
+                    </nav>
+                  )}
+                  <UniquesResultsView results={results} />
                 </>
               )
             })()}
