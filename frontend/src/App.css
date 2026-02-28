@@ -863,10 +863,21 @@
   font-size: 0.95rem;
 }
 
+.duplicate-results-table .col-trove {
+  width: 1%;
+  min-width: 6rem;
+  white-space: nowrap;
+}
+
+.duplicate-results-table .col-score {
+  width: 1%;
+  white-space: nowrap;
+}
+
 .col-uniques-help {
-  width: 2.5rem;
-  padding: 0.4rem 0.5rem;
-  text-align: center;
+  width: 1%;
+  padding: 0.4rem 0.15rem 0.4rem 0.25rem;
+  text-align: right;
   vertical-align: middle;
 }
 
@@ -874,23 +885,23 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 1.5rem;
-  height: 1.5rem;
+  width: 1.15rem;
+  height: 1.15rem;
   padding: 0;
-  border: 1px solid #bbb;
+  border: 1px solid royalblue;
   border-radius: 50%;
   background: #f5f5f5;
-  color: #555;
-  font-size: 0.85rem;
-  font-weight: 600;
+  color: royalblue;
+  font-size: 0.7rem;
+  font-weight: 700;
   cursor: pointer;
   line-height: 1;
 }
 
 .uniques-help-btn:hover {
-  background: #e8e8e8;
-  color: #333;
-  border-color: #999;
+  background: #e8eeff;
+  color: #2c4bc9;
+  border-color: #2c4bc9;
 }
 
 .uniques-dialog-backdrop {
