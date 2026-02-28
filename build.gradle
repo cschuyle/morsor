@@ -30,6 +30,7 @@ dependencies {
     implementation 'org.apache.lucene:lucene-queryparser:9.10.0'
     implementation 'org.apache.lucene:lucene-analysis-common:9.10.0'
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
+    testImplementation 'org.springframework.security:spring-security-test'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 }
 
