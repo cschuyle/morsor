@@ -1,12 +1,11 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { getCsrfToken } from './getCsrfToken'
 import './Login.css'
 
 export default function Login() {
-  const [username, setUsername] = useState('')
-  const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [submitting, setSubmitting] = useState(false)
+  const formRef = useRef(null)
 
   useEffect(() => {
     if (new URLSearchParams(window.location.search).has('error')) {
@@ -16,11 +15,16 @@ export default function Login() {
 
   function handleSubmit(e) {
     e.preventDefault()
-    if (!username.trim() || !password) return
+    const form = formRef.current
+    if (!form) return
+    const fd = new FormData(form)
+    const user = (fd.get('username') ?? '').toString().trim()
+    const pass = (fd.get('password') ?? '').toString()
+    if (!user || !pass) return
     setError('')
     setSubmitting(true)
     const csrf = getCsrfToken()
-    const body = new URLSearchParams({ username: username.trim(), password })
+    const body = new URLSearchParams({ username: user, password: pass })
     const headers = { 'Content-Type': 'application/x-www-form-urlencoded' }
     if (csrf) headers['X-XSRF-TOKEN'] = csrf
     fetch('/login', {
@@ -51,15 +55,14 @@ export default function Login() {
       <main className="login-main">
         <h1 className="login-title">Morsor</h1>
         <p className="login-subtitle">Sign in</p>
-        <form onSubmit={handleSubmit} className="login-form">
+        <form ref={formRef} onSubmit={handleSubmit} className="login-form">
           <label className="login-label">
             Username
             <input
               type="text"
               name="username"
               autoComplete="username"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
+              defaultValue=""
               className="login-input"
               required
             />
@@ -70,8 +73,7 @@ export default function Login() {
               type="password"
               name="password"
               autoComplete="current-password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
+              defaultValue=""
               className="login-input"
               required
             />
