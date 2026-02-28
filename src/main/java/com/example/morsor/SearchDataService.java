@@ -441,14 +441,16 @@ public class SearchDataService {
         return na.equals(nb) || nb.contains(na) || na.contains(nb);
     }
 
-    /** Lowercase and strip accents so "Léon" and "Leon" compare equal. */
+    /** Lowercase, strip accents, and normalize punctuation so "Léon" vs "Leon" and "2001-" vs "2001:" compare equal. */
     private static String normalizeForComparison(String s) {
         if (s == null) return "";
         String t = s.trim();
         if (t.isEmpty()) return "";
         String nfd = Normalizer.normalize(t, Normalizer.Form.NFD);
         String noAccents = nfd.replaceAll("\\p{M}", "");
-        return noAccents.toLowerCase();
+        String noPunct = noAccents.replaceAll("\\p{P}", " ");
+        String collapsed = noPunct.replaceAll("\\s+", " ").trim();
+        return collapsed.toLowerCase();
     }
 
     /** Search for items similar to the given item, restricted to the given trove IDs. Returns top N by score. */
