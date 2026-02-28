@@ -23,6 +23,7 @@ FROM eclipse-temurin:21-jre-alpine
 WORKDIR /app
 RUN adduser -D -s /bin/sh appuser
 COPY --from=builder /app/build/libs/*.jar app.jar
+COPY fixtures fixtures
 USER appuser
 EXPOSE 8080
 ENTRYPOINT ["java", "-jar", "app.jar"]

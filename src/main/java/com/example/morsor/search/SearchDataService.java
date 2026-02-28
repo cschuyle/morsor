@@ -62,7 +62,10 @@ import org.apache.lucene.util.BytesRef;
 @Service
 public class SearchDataService {
 
-    private static final String DATA_LOCATION = "classpath*:data/*.json";
+    /** Trove JSON files; default is repo-root fixtures (run from project root). */
+    @Value("${moocho.data.location:file:./fixtures/data/*.json}")
+    private String dataLocation;
+
     private static final String TROVES_LIST_KEY = "troves";
 
     private static final Logger log = LoggerFactory.getLogger(SearchDataService.class);
@@ -252,10 +255,10 @@ public class SearchDataService {
     }
 
     private void loadFromClasspath(List<SearchResult> combined, Set<String> onlyIds) {
-        log.info("Loading from classpath: {}", DATA_LOCATION);
+        log.info("Loading trove data from: {}", dataLocation);
         try {
-            Resource[] resources = resourceResolver.getResources(DATA_LOCATION);
-            log.info("Classpath data resources found: {}", resources.length);
+            Resource[] resources = resourceResolver.getResources(dataLocation);
+            log.info("Trove data resources found: {}", resources.length);
             Arrays.sort(resources, (a, b) -> String.CASE_INSENSITIVE_ORDER.compare(
                     a.getFilename() != null ? a.getFilename() : "",
                     b.getFilename() != null ? b.getFilename() : ""));
@@ -277,7 +280,7 @@ public class SearchDataService {
                 }
             }
         } catch (Exception e) {
-            log.error("Failed to resolve data resources {}: {}", DATA_LOCATION, e.getMessage(), e);
+            log.error("Failed to resolve trove data from {}: {}", dataLocation, e.getMessage(), e);
         }
     }
 

@@ -19,7 +19,7 @@ _Fun Fact_: This is I use on my [Le Petit Prince International](https://lepetitp
 
 ## Canned data
 
-See [resources/data](./src/main/resources/data) for examples.
+See [fixtures/data](./fixtures/data) for examples.
 
 ## AWS S3
 
@@ -34,7 +34,7 @@ See [resources/data](./src/main/resources/data) for examples.
 }
 ```
 
-`BUCKET/private/$trove_id.json` and `BUCKET/private/$trove_id.json` are the same format as the examples in [resources/data](./src/main/resources/data)
+`BUCKET/private/$trove_id.json` and `BUCKET/private/$trove_id.json` are the same format as the examples in [fixtures/data](./fixtures/data)
 
 
 

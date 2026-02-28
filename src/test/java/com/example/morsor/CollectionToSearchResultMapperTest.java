@@ -5,7 +5,7 @@ import com.example.morsor.search.SearchResult;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
-import org.springframework.core.io.ClassPathResource;
+import org.springframework.core.io.FileSystemResource;
 
 import java.io.InputStream;
 import java.util.List;
@@ -18,7 +18,7 @@ class CollectionToSearchResultMapperTest {
 
     @Test
     void mapsCollectionJsonToSearchResults() throws Exception {
-        try (InputStream in = new ClassPathResource("data/little-prince.json").getInputStream()) {
+        try (InputStream in = new FileSystemResource("fixtures/data/little-prince.json").getInputStream()) {
             JsonNode root = objectMapper.readTree(in);
             List<SearchResult> results = CollectionToSearchResultMapper.mapRootToSearchResults(root);
             assertThat(results).hasSize(1561);
@@ -61,7 +61,7 @@ class CollectionToSearchResultMapperTest {
 
     @Test
     void mapsScreeningListFormatToSearchResults() throws Exception {
-        try (InputStream in = new ClassPathResource("data/screening-list.json").getInputStream()) {
+        try (InputStream in = new FileSystemResource("fixtures/data/screening-list.json").getInputStream()) {
             JsonNode root = objectMapper.readTree(in);
             List<SearchResult> results = CollectionToSearchResultMapper.mapRootToSearchResults(root);
             assertThat(results).hasSize(8);

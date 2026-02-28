@@ -74,7 +74,7 @@ npm run test
 ```
 Watch mode (re-run on file changes): `npm run test:watch`. Run a single test file: `npm run test -- src/RequireAuth.test.jsx`.
 
-**Tests with canned data:** To run frontend tests against the same data shape as the dev backend (e.g. Little Prince trove, "The Little Prince, in Ancient Greek"), use the fixture-based mocks. Fixtures live in `frontend/src/test/fixtures/` (troves, search response, health). In tests, call `mockFetchWithCannedData()` and stub `fetch` with it so requests return that data without starting the backend. See `App.cannedData.test.jsx` and `mockFetchWithCannedData.js`.
+**Tests with canned data:** To run frontend tests against the same data shape as the dev backend (e.g. Little Prince trove, "The Little Prince, in Ancient Greek"), use the fixture-based mocks. Fixtures live in `frontend/src/fixtures/` (troves, search response, health). In tests, call `mockFetchWithCannedData()` and stub `fetch` with it so requests return that data without starting the backend. See `App.cannedData.test.jsx` and `mockFetchWithCannedData.js`. Trove JSON for the backend lives in **`fixtures/data/`** at the repo root; run `./gradlew bootRun` from the project root so the app loads from `file:./fixtures/data/*.json`. Override with `moocho.data.location` if needed.
 
 ## Option 2. You can use AWS S3 as a data store:
 

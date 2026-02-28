@@ -7,9 +7,9 @@
  *   import { mockFetchWithCannedData } from './test/mockFetchWithCannedData'
  *   beforeEach(() => { vi.stubGlobal('fetch', mockFetchWithCannedData()) })
  */
-import trovesFixture from './fixtures/troves.json'
-import searchResponseFixture from './fixtures/searchResponse.json'
-import healthFixture from './fixtures/health.json'
+import trovesFixture from '../fixtures/troves.json'
+import searchResponseFixture from '../fixtures/searchResponse.json'
+import healthFixture from '../fixtures/health.json'
 
 export function mockFetchWithCannedData() {
   return (url, _options) => {

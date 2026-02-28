@@ -1,6 +1,6 @@
 /**
  * Frontend tests that use canned data fixtures (same shape as backend dev data).
- * Fixtures live in src/test/fixtures/; mock fetch via mockFetchWithCannedData().
+ * Fixtures live in src/fixtures/; mock fetch via mockFetchWithCannedData().
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, waitFor, fireEvent } from '@testing-library/react'
