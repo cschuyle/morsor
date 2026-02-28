@@ -1,5 +1,5 @@
 import { useMemo, useState, useEffect, useRef } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { SearchResultsGrid } from './SearchResultsGrid'
 import { DuplicateResultsView } from './DuplicateResultsView'
 import { UniquesResultsView } from './UniquesResultsView'
@@ -23,7 +23,11 @@ function App() {
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [sortBy, setSortBy] = useState(null)
   const [sortDir, setSortDir] = useState('asc')
-  const [searchMode, setSearchMode] = useState('search')
+  const [searchParams, setSearchParams] = useSearchParams()
+  const searchMode = (() => {
+    const m = searchParams.get('mode')
+    return (m === 'duplicates' || m === 'uniques') ? m : 'search'
+  })()
   const [dupPrimaryTroveId, setDupPrimaryTroveId] = useState('')
   const [uniqPrimaryTroveId, setUniqPrimaryTroveId] = useState('')
   const [primaryTroveFilter, setPrimaryTroveFilter] = useState('')
@@ -103,6 +107,60 @@ function App() {
       .then(setTroves)
       .catch(() => setTroves([]))
   }, [])
+
+  // Restore query and trove selection from URL (bookmark / back button).
+  // Restore raw param values so pasted URLs are preserved even before troves have loaded.
+  useEffect(() => {
+    const q = searchParams.get('q')
+    setQuery(q != null ? q : '')
+    const mode = searchParams.get('mode')
+    if (mode !== 'duplicates' && mode !== 'uniques') {
+      setSearchSelectedTroveIds(new Set(searchParams.getAll('trove')))
+    } else if (mode === 'duplicates') {
+      setDupPrimaryTroveId(searchParams.get('primary') ?? '')
+      setDupCompareTroveIds(new Set(searchParams.getAll('compare')))
+    } else {
+      setUniqPrimaryTroveId(searchParams.get('primary') ?? '')
+      setUniqCompareTroveIds(new Set(searchParams.getAll('compare')))
+    }
+  }, [searchParams])
+
+  function buildSearchParams(mode, q, searchTroves, dupPrimary, dupCompare, uniqPrimary, uniqCompare) {
+    const next = new URLSearchParams()
+    if (mode !== 'search') next.set('mode', mode)
+    const qTrim = (q ?? '').trim()
+    if (qTrim) next.set('q', qTrim)
+    if (mode === 'search') {
+      searchTroves.forEach((id) => next.append('trove', id))
+    } else if (mode === 'duplicates') {
+      if (dupPrimary) next.set('primary', dupPrimary)
+      dupCompare.forEach((id) => next.append('compare', id))
+    } else {
+      if (uniqPrimary) next.set('primary', uniqPrimary)
+      uniqCompare.forEach((id) => next.append('compare', id))
+    }
+    return next
+  }
+
+  // Persist current tab, query, and trove selection to URL (bookmarkable).
+  // Skip overwriting when the URL has primary/compare but state is still empty (pasted URL, URL→state not applied yet).
+  useEffect(() => {
+    const urlHasPrimaryOrCompare = searchParams.get('primary') || searchParams.getAll('compare').length > 0
+    const stateHasNone = !primaryTroveId && (searchMode === 'duplicates' ? !dupCompareTroveIds.size : !uniqCompareTroveIds.size)
+    if (urlHasPrimaryOrCompare && stateHasNone) return
+    const next = buildSearchParams(
+      searchMode,
+      query,
+      searchSelectedTroveIds,
+      dupPrimaryTroveId,
+      dupCompareTroveIds,
+      uniqPrimaryTroveId,
+      uniqCompareTroveIds
+    )
+    if (next.toString() !== searchParams.toString()) {
+      setSearchParams(next, { replace: true })
+    }
+  }, [query, searchMode, searchSelectedTroveIds, primaryTroveId, dupCompareTroveIds, uniqCompareTroveIds])
 
   useEffect(() => {
     if (searchMode !== 'search') return
@@ -693,7 +751,11 @@ function App() {
                 role="tab"
                 aria-selected={searchMode === 'search'}
                 className={searchMode === 'search' ? 'active' : ''}
-                onClick={() => { setSearchMode('search'); setDuplicatesResult(null); setUniquesResult(null) }}
+                onClick={() => {
+                  setSearchParams(buildSearchParams('search', query, searchSelectedTroveIds, dupPrimaryTroveId, dupCompareTroveIds, uniqPrimaryTroveId, uniqCompareTroveIds), { replace: true })
+                  setDuplicatesResult(null)
+                  setUniquesResult(null)
+                }}
               >
                 Search
               </button>
@@ -702,7 +764,11 @@ function App() {
                 role="tab"
                 aria-selected={searchMode === 'duplicates'}
                 className={searchMode === 'duplicates' ? 'active' : ''}
-                onClick={() => { setSearchMode('duplicates'); setSearchResult(null); setUniquesResult(null) }}
+                onClick={() => {
+                  setSearchParams(buildSearchParams('duplicates', query, searchSelectedTroveIds, dupPrimaryTroveId, dupCompareTroveIds, uniqPrimaryTroveId, uniqCompareTroveIds), { replace: true })
+                  setSearchResult(null)
+                  setUniquesResult(null)
+                }}
               >
                 Find duplicates
               </button>
@@ -711,7 +777,11 @@ function App() {
                 role="tab"
                 aria-selected={searchMode === 'uniques'}
                 className={searchMode === 'uniques' ? 'active' : ''}
-                onClick={() => { setSearchMode('uniques'); setSearchResult(null); setDuplicatesResult(null) }}
+                onClick={() => {
+                  setSearchParams(buildSearchParams('uniques', query, searchSelectedTroveIds, dupPrimaryTroveId, dupCompareTroveIds, uniqPrimaryTroveId, uniqCompareTroveIds), { replace: true })
+                  setSearchResult(null)
+                  setDuplicatesResult(null)
+                }}
               >
                 Find uniques
               </button>
