@@ -234,26 +234,29 @@
   align-items: center;
   justify-content: center;
   padding: 0;
-  border: 1px solid #e5e5e5;
-  border-radius: 8px;
-  background: #ffffff;
+  border: none;
+  background: transparent;
   color: #333;
   font-size: 1.25rem;
   cursor: pointer;
   position: absolute;
   top: 1rem;
   right: 0;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
 }
 
 .sidebar-toggle:hover {
   background: #f5f5f5;
-  border-color: #ccc;
+  border-radius: 6px;
 }
 
 .sidebar-toggle:focus {
   outline: none;
-  border-color: #646cff;
+}
+
+.sidebar-toggle:focus-visible {
+  outline: 2px solid #646cff;
+  outline-offset: 2px;
+  border-radius: 6px;
 }
 
 .sidebar {
@@ -261,9 +264,7 @@
   width: 320px;
   min-width: 320px;
   padding: 1.25rem 1rem;
-  background: #ffffff;
-  border: 1px solid #e5e5e5;
-  border-radius: 12px;
+  background: #fff5f0;
   position: sticky;
   top: 1rem;
 }
