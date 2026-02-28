@@ -1,9 +1,22 @@
+import { useState, useEffect } from 'react'
+
 /**
  * Renders "find uniques" results: items in primary trove that have no match in compare troves.
- * Each result has item (SearchResult) and score (nearest-miss uniqueness score).
+ * Each result has item (SearchResult), score (nearest-miss), and nearMisses (top possible duplicates).
  * sortBy / sortDir / onSortChange: optional column sort (title, trove, score).
  */
 export function UniquesResultsView({ results = [], sortBy = null, sortDir = 'asc', onSortChange }) {
+  const [dialogRow, setDialogRow] = useState(null)
+
+  useEffect(() => {
+    if (dialogRow == null) return
+    const onKeyDown = (e) => {
+      if (e.key === 'Escape') setDialogRow(null)
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [dialogRow])
+
   const handleSort = (columnId) => {
     if (!onSortChange) return
     const nextDir = sortBy === columnId && sortDir === 'asc' ? 'desc' : 'asc'
@@ -15,6 +28,10 @@ export function UniquesResultsView({ results = [], sortBy = null, sortDir = 'asc
       <p className="duplicate-results-empty">No unique items. Every primary item has a match in the compare troves.</p>
     )
   }
+
+  const nearMisses = dialogRow != null ? (results[dialogRow]?.nearMisses ?? []) : []
+  const primaryTitle = dialogRow != null ? (results[dialogRow]?.item ?? results[dialogRow])?.title : ''
+
   return (
     <div className="duplicate-results uniques-results">
       <table className="duplicate-results-table">
@@ -41,6 +58,7 @@ export function UniquesResultsView({ results = [], sortBy = null, sortDir = 'asc
               Score
               {sortBy === 'score' && <span className="sort-indicator">{sortDir === 'asc' ? ' ↑' : ' ↓'}</span>}
             </th>
+            <th className="col-uniques-help" aria-label="Possible duplicates" />
           </tr>
         </thead>
         <tbody>
@@ -52,11 +70,59 @@ export function UniquesResultsView({ results = [], sortBy = null, sortDir = 'asc
                 <td className="col-title">{item?.title ?? '—'}</td>
                 <td className="col-trove">{item?.trove ?? item?.troveId ?? ''}</td>
                 <td className="col-score">{score != null ? score.toFixed(2) : '—'}</td>
+                <td className="col-uniques-help">
+                  <button
+                    type="button"
+                    className="uniques-help-btn"
+                    onClick={() => setDialogRow(idx)}
+                    title="Show top possible duplicates"
+                    aria-label="Show top possible duplicates"
+                  >
+                    ?
+                  </button>
+                </td>
               </tr>
             )
           })}
         </tbody>
       </table>
+
+      {dialogRow != null && (
+        <div className="uniques-dialog-backdrop" onClick={() => setDialogRow(null)}>
+          <div className="uniques-dialog" role="dialog" aria-modal="true" aria-labelledby="uniques-dialog-title" onClick={(e) => e.stopPropagation()}>
+            <div className="uniques-dialog-header">
+              <h3 id="uniques-dialog-title" className="uniques-dialog-title">Possible duplicates (top 5)</h3>
+              <button
+                type="button"
+                className="uniques-dialog-close"
+                onClick={() => setDialogRow(null)}
+                aria-label="Close"
+              >
+                ×
+              </button>
+            </div>
+            {primaryTitle && <p className="uniques-dialog-primary">For: {primaryTitle}</p>}
+            <ul className="uniques-dialog-list">
+              {nearMisses.map((m, i) => {
+                const r = m?.result ?? m
+                const s = typeof m?.score === 'number' ? m.score : null
+                return (
+                  <li key={i} className="uniques-dialog-item">
+                    <span className="uniques-dialog-item-title">{r?.title ?? '—'}</span>
+                    <span className="uniques-dialog-item-meta">
+                      {r?.trove ?? r?.troveId ?? ''}
+                      {s != null && ` · ${s.toFixed(2)}`}
+                    </span>
+                  </li>
+                )
+              })}
+            </ul>
+            {nearMisses.length === 0 && (
+              <p className="uniques-dialog-empty">No similar items found in compare troves.</p>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   )
 }
