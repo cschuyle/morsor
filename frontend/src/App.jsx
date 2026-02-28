@@ -10,7 +10,9 @@ import './App.css'
 function App() {
   const [message, setMessage] = useState('')
   const [troves, setTroves] = useState([])
-  const [selectedTroveIds, setSelectedTroveIds] = useState(() => new Set())
+  const [searchSelectedTroveIds, setSearchSelectedTroveIds] = useState(() => new Set())
+  const [dupCompareTroveIds, setDupCompareTroveIds] = useState(() => new Set())
+  const [uniqCompareTroveIds, setUniqCompareTroveIds] = useState(() => new Set())
   const [query, setQuery] = useState('')
   const [searchResult, setSearchResult] = useState(null)
   const [searchError, setSearchError] = useState(null)
@@ -22,8 +24,13 @@ function App() {
   const [sortBy, setSortBy] = useState(null)
   const [sortDir, setSortDir] = useState('asc')
   const [searchMode, setSearchMode] = useState('search')
-  const [primaryTroveId, setPrimaryTroveId] = useState('')
+  const [dupPrimaryTroveId, setDupPrimaryTroveId] = useState('')
+  const [uniqPrimaryTroveId, setUniqPrimaryTroveId] = useState('')
   const [primaryTroveFilter, setPrimaryTroveFilter] = useState('')
+  const selectedTroveIds = searchMode === 'search' ? searchSelectedTroveIds : searchMode === 'duplicates' ? dupCompareTroveIds : uniqCompareTroveIds
+  const setSelectedTroveIds = searchMode === 'search' ? setSearchSelectedTroveIds : searchMode === 'duplicates' ? setDupCompareTroveIds : setUniqCompareTroveIds
+  const primaryTroveId = searchMode === 'duplicates' ? dupPrimaryTroveId : uniqPrimaryTroveId
+  const setPrimaryTroveId = searchMode === 'duplicates' ? setDupPrimaryTroveId : setUniqPrimaryTroveId
   const [duplicatesTroveTab, setDuplicatesTroveTab] = useState('primary')
   const [duplicatesResult, setDuplicatesResult] = useState(null)
   const [duplicatesPage, setDuplicatesPage] = useState(0)
