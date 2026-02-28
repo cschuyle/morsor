@@ -373,8 +373,10 @@ public class SearchDataService {
     /**
      * Find items in the primary trove that have no match in the compare troves (converse of duplicates).
      * Uses the same similarity and year heuristic as searchDuplicates; returns primary items with zero matches.
+     * Results are ranked by uniqueness: ascending "nearest miss" score (lowest score = most unique first).
+     * The nearest miss is the best similarity score among compare-trove items that were rejected by the year heuristic.
      */
-    public List<SearchResult> searchUniques(String primaryTroveId, Set<String> compareTroveIds, String query) {
+    public List<UniqueResult> searchUniques(String primaryTroveId, Set<String> compareTroveIds, String query) {
         if (primaryTroveId == null || primaryTroveId.isBlank()) return List.of();
         Set<String> compareSet = compareTroveIds == null ? Set.of() : compareTroveIds.stream()
                 .filter(t -> t != null && !t.isBlank())
@@ -384,15 +386,18 @@ public class SearchDataService {
         List<SearchResult> primaryItems = search(List.of(primaryTroveId), query != null ? query.trim() : "");
         if (primaryItems.isEmpty()) return List.of();
 
-        List<SearchResult> uniques = new ArrayList<>(primaryItems.size());
+        List<UniqueResult> uniquesWithScore = new ArrayList<>(primaryItems.size());
         for (SearchResult primary : primaryItems) {
-            List<ScoredSearchResult> matches = findSimilarInTroves(primary, compareSet, 50);
-            matches = filterMatchesByYearHeuristic(primary, matches);
-            if (matches.isEmpty()) {
-                uniques.add(primary);
+            List<ScoredSearchResult> rawMatches = findSimilarInTroves(primary, compareSet, 50);
+            List<ScoredSearchResult> filtered = filterMatchesByYearHeuristic(primary, rawMatches);
+            if (filtered.isEmpty()) {
+                double nearestMiss = rawMatches.isEmpty() ? 0.0
+                        : rawMatches.stream().mapToDouble(ScoredSearchResult::score).max().orElse(0.0);
+                uniquesWithScore.add(new UniqueResult(primary, nearestMiss));
             }
         }
-        return uniques;
+        uniquesWithScore.sort(java.util.Comparator.comparingDouble(UniqueResult::score));
+        return uniquesWithScore;
     }
 
     /**

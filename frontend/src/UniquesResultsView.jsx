@@ -1,7 +1,7 @@
 /**
  * Renders "find uniques" results: items in primary trove that have no match in compare troves.
- * Simple table of primary items (same row style as duplicate primary rows).
- * sortBy / sortDir / onSortChange: optional column sort (title, trove).
+ * Each result has item (SearchResult) and score (nearest-miss uniqueness score).
+ * sortBy / sortDir / onSortChange: optional column sort (title, trove, score).
  */
 export function UniquesResultsView({ results = [], sortBy = null, sortDir = 'asc', onSortChange }) {
   const handleSort = (columnId) => {
@@ -34,15 +34,27 @@ export function UniquesResultsView({ results = [], sortBy = null, sortDir = 'asc
               Trove
               {sortBy === 'trove' && <span className="sort-indicator">{sortDir === 'asc' ? ' ↑' : ' ↓'}</span>}
             </th>
+            <th
+              className={`col-score ${onSortChange ? 'sortable' : ''}`}
+              onClick={onSortChange ? () => handleSort('score') : undefined}
+            >
+              Score
+              {sortBy === 'score' && <span className="sort-indicator">{sortDir === 'asc' ? ' ↑' : ' ↓'}</span>}
+            </th>
           </tr>
         </thead>
         <tbody>
-          {results.map((row, idx) => (
-            <tr key={idx} className="duplicate-row-primary">
-              <td className="col-title">{row?.title ?? '—'}</td>
-              <td className="col-trove">{row?.trove ?? row?.troveId ?? ''}</td>
-            </tr>
-          ))}
+          {results.map((row, idx) => {
+            const item = row?.item ?? row
+            const score = typeof row?.score === 'number' ? row.score : null
+            return (
+              <tr key={idx} className="duplicate-row-primary">
+                <td className="col-title">{item?.title ?? '—'}</td>
+                <td className="col-trove">{item?.trove ?? item?.troveId ?? ''}</td>
+                <td className="col-score">{score != null ? score.toFixed(2) : '—'}</td>
+              </tr>
+            )
+          })}
         </tbody>
       </table>
     </div>

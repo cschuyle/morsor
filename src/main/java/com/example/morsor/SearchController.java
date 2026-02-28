@@ -97,10 +97,10 @@ public class SearchController {
         Set<String> compareSet = compareTrove == null ? Set.of() : compareTrove.stream()
                 .filter(t -> t != null && !t.isBlank())
                 .collect(Collectors.toUnmodifiableSet());
-        List<SearchResult> all = searchDataService.searchUniques(primaryTrove.trim(), compareSet, query);
+        List<UniqueResult> all = searchDataService.searchUniques(primaryTrove.trim(), compareSet, query);
         boolean descending = "desc".equalsIgnoreCase(sortDir != null ? sortDir : "asc");
         if (sortBy != null && !sortBy.isBlank()) {
-            Comparator<SearchResult> cmp = comparatorFor(sortBy);
+            Comparator<UniqueResult> cmp = uniquesComparatorFor(sortBy);
             if (cmp != null) {
                 if (descending) cmp = cmp.reversed();
                 all = all.stream().sorted(cmp).toList();
@@ -109,8 +109,19 @@ public class SearchController {
         long total = all.size();
         int from = (int) Math.min((long) page * size, total);
         int to = (int) Math.min(from + size, total);
-        List<SearchResult> results = from < to ? all.subList(from, to) : List.of();
+        List<UniqueResult> results = from < to ? all.subList(from, to) : List.of();
         return new UniquesResponse(total, page, size, results);
+    }
+
+    private static Comparator<UniqueResult> uniquesComparatorFor(String sortBy) {
+        return switch (sortBy.toLowerCase()) {
+            case "title" -> Comparator.comparing(
+                    u -> u.item().title() != null ? u.item().title().toLowerCase() : "");
+            case "trove" -> Comparator.comparing(
+                    u -> u.item().trove() != null ? u.item().trove().toLowerCase() : "");
+            case "score" -> Comparator.comparingDouble(UniqueResult::score);
+            default -> null;
+        };
     }
 
     private static Comparator<SearchResult> comparatorFor(String sortBy) {
