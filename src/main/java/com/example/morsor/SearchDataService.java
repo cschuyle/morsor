@@ -361,6 +361,7 @@ public class SearchDataService {
         for (SearchResult primary : primaryItems) {
             List<ScoredSearchResult> matches = findSimilarInTroves(primary, compareSet, maxMatch);
             matches = filterMatchesByYearHeuristic(primary, matches);
+            matches = matches.stream().limit(5).toList();
             rows.add(new DuplicateMatchRow(primary, matches));
         }
         return rows;
