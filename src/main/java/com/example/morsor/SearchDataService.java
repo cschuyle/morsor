@@ -393,7 +393,13 @@ public class SearchDataService {
             if (filtered.isEmpty()) {
                 double nearestMiss = rawMatches.isEmpty() ? 0.0
                         : rawMatches.stream().mapToDouble(ScoredSearchResult::score).max().orElse(0.0);
-                uniquesWithScore.add(new UniqueResult(primary, nearestMiss));
+                TitleWithYear primaryParsed = parseTitleWithYear(primary.title() != null ? primary.title() : "");
+                List<ScoredSearchResult> topNearMisses = rawMatches.stream()
+                        .sorted(java.util.Comparator.comparingDouble(ScoredSearchResult::score).reversed())
+                        .filter(m -> !isYearOnlyMatch(primaryParsed, m.result().title() != null ? m.result().title() : ""))
+                        .limit(5)
+                        .toList();
+                uniquesWithScore.add(new UniqueResult(primary, nearestMiss, topNearMisses));
             }
         }
         uniquesWithScore.sort(java.util.Comparator.comparingDouble(UniqueResult::score));
@@ -437,6 +443,15 @@ public class SearchDataService {
             return coreTextMatch(primary.core, candidate.core);
         }
         return true;
+    }
+
+    /** True if candidate matches only on year (same year, core text does not match). Exclude from near-miss UI. */
+    private static boolean isYearOnlyMatch(TitleWithYear primary, String candidateTitle) {
+        TitleWithYear candidate = parseTitleWithYear(candidateTitle);
+        if (primary.year == null || candidate.year == null || !primary.year.equals(candidate.year)) {
+            return false;
+        }
+        return !coreTextMatch(primary.core, candidate.core);
     }
 
     private static boolean coreTextMatch(String a, String b) {
