@@ -488,7 +488,29 @@ function MobileApp() {
 
         {showTrovePicker && (
           <div className="mobile-trove-picker">
-            <div className="mobile-trove-picker-header">
+            {isDupOrUniques && (
+              <div className="mobile-primary-compare-tabs" role="tablist">
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={trovePickerSubTab === 'primary'}
+                  className={`mobile-primary-compare-tab ${trovePickerSubTab === 'primary' ? 'mobile-primary-compare-tab--active' : ''}`}
+                  onClick={() => setTrovePickerSubTab('primary')}
+                >
+                  Primary
+                </button>
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={trovePickerSubTab === 'compare'}
+                  className={`mobile-primary-compare-tab ${trovePickerSubTab === 'compare' ? 'mobile-primary-compare-tab--active' : ''}`}
+                  onClick={() => setTrovePickerSubTab('compare')}
+                >
+                  Compare
+                </button>
+              </div>
+            )}
+            <div className="mobile-trove-filter-row">
               <div className="mobile-trove-filter-wrap">
                 <input
                   type="text"
@@ -512,28 +534,6 @@ function MobileApp() {
                 Done
               </button>
             </div>
-            {isDupOrUniques && (
-              <div className="mobile-primary-compare-tabs" role="tablist">
-                <button
-                  type="button"
-                  role="tab"
-                  aria-selected={trovePickerSubTab === 'primary'}
-                  className={`mobile-primary-compare-tab ${trovePickerSubTab === 'primary' ? 'mobile-primary-compare-tab--active' : ''}`}
-                  onClick={() => setTrovePickerSubTab('primary')}
-                >
-                  Primary
-                </button>
-                <button
-                  type="button"
-                  role="tab"
-                  aria-selected={trovePickerSubTab === 'compare'}
-                  className={`mobile-primary-compare-tab ${trovePickerSubTab === 'compare' ? 'mobile-primary-compare-tab--active' : ''}`}
-                  onClick={() => setTrovePickerSubTab('compare')}
-                >
-                  Compare
-                </button>
-              </div>
-            )}
             <button type="button" onClick={clearTroves} className="mobile-trove-clear">Clear all</button>
             <ul className="mobile-trove-list">
               {isDupOrUniques && trovePickerSubTab === 'primary'
