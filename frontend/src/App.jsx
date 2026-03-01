@@ -831,6 +831,8 @@ function App() {
                       onClick={() => {
                         setQuery('')
                         setSearchResult({ count: 0, results: [], page: 0, size: pageSize })
+                        setDuplicatesResult(null)
+                        setUniquesResult(null)
                       }}
                     >
                       ×

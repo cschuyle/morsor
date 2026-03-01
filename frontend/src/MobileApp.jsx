@@ -350,6 +350,8 @@ function MobileApp() {
                 onClick={() => {
                   setQuery('')
                   setSearchResult({ count: 0, results: [], page: 0, size: MOBILE_PAGE_SIZE })
+                  setDuplicatesResult(null)
+                  setUniquesResult(null)
                 }}
               >
                 ×
