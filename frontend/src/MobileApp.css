@@ -581,6 +581,12 @@
 }
 
 /* Duplicate / Uniques results (base styles; mobile doesn't load App.css) */
+.mobile-search-results-grid {
+  margin-top: 1rem;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
 .mobile-dup-uniques-results {
   margin-top: 1rem;
   overflow-x: auto;

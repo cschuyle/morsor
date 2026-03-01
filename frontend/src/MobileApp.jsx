@@ -1,9 +1,10 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import { getApiAuthHeaders } from './apiAuth'
 import { getCsrfToken } from './getCsrfToken'
 import { queryCache } from './queryCache'
 import { formatCount, formatCacheBytes } from './formatCount'
+import { SearchResultsGrid } from './SearchResultsGrid'
 import { DuplicateResultsView } from './DuplicateResultsView'
 import { UniquesResultsView } from './UniquesResultsView'
 import './MobileApp.css'
@@ -20,9 +21,13 @@ function MobileApp() {
   const [trovePickerSubTab, setTrovePickerSubTab] = useState('primary') // 'primary' | 'compare' when dup/uniques
   const [query, setQuery] = useState('')
   const [searchResult, setSearchResult] = useState(null)
+  const [searchSortBy, setSearchSortBy] = useState(null)
+  const [searchSortDir, setSearchSortDir] = useState('asc')
   const [searching, setSearching] = useState(false)
   const [page, setPage] = useState(0)
   const [duplicatesResult, setDuplicatesResult] = useState(null)
+  const [duplicatesSortBy, setDuplicatesSortBy] = useState(null)
+  const [duplicatesSortDir, setDuplicatesSortDir] = useState('asc')
   const [duplicatesPage, setDuplicatesPage] = useState(0)
   const [uniquesResult, setUniquesResult] = useState(null)
   const [uniquesPage, setUniquesPage] = useState(0)
@@ -54,11 +59,17 @@ function MobileApp() {
       .catch(() => setStatusMessage('Status: Backend unreachable'))
   }
 
-  function fetchSearch(pageNum) {
+  function fetchSearch(pageNum, sortByOverride = null, sortDirOverride = null) {
     const q = queryRef.current.trim()
     if (!q) {
       setSearchResult({ count: 0, results: [], page: 0, size: MOBILE_PAGE_SIZE })
       return
+    }
+    const sortBy = sortByOverride ?? searchSortBy
+    const sortDir = sortDirOverride ?? searchSortDir
+    if (sortByOverride != null || sortDirOverride != null) {
+      setSearchSortBy(sortBy || null)
+      setSearchSortDir(sortDir)
     }
     const params = new URLSearchParams({
       query: q,
@@ -66,6 +77,10 @@ function MobileApp() {
       size: String(MOBILE_PAGE_SIZE),
     })
     selectedTroveIds.forEach((id) => params.append('trove', id))
+    if (sortBy) {
+      params.set('sortBy', sortBy)
+      params.set('sortDir', sortDir)
+    }
     const url = `/api/search?${params}`
     const cached = queryCache.get(url)
     if (cached) {
@@ -307,6 +322,31 @@ function MobileApp() {
     fetchSearch(nextPage)
     setPage(nextPage)
   }
+
+  const sortedDuplicateRows = useMemo(() => {
+    const raw = Array.isArray(duplicatesResult?.rows) ? duplicatesResult.rows : []
+    if (!duplicatesSortBy) return raw
+    const maxScore = (row) => {
+      if (!row?.matches?.length) return 0
+      return Math.max(...row.matches.map((m) => (typeof m?.score === 'number' ? m.score : 0)))
+    }
+    const dir = duplicatesSortDir === 'desc' ? -1 : 1
+    return [...raw].sort((a, b) => {
+      let cmp = 0
+      if (duplicatesSortBy === 'title') {
+        const ta = (a.primary?.title ?? '').toLowerCase()
+        const tb = (b.primary?.title ?? '').toLowerCase()
+        cmp = ta.localeCompare(tb, undefined, { sensitivity: 'base' })
+      } else if (duplicatesSortBy === 'trove') {
+        const ta = (a.primary?.trove ?? a.primary?.troveId ?? '').toLowerCase()
+        const tb = (b.primary?.trove ?? b.primary?.troveId ?? '').toLowerCase()
+        cmp = ta.localeCompare(tb, undefined, { sensitivity: 'base' })
+      } else if (duplicatesSortBy === 'score') {
+        cmp = maxScore(a) - maxScore(b)
+      }
+      return dir * cmp
+    })
+  }, [duplicatesResult?.rows, duplicatesSortBy, duplicatesSortDir])
 
   const results = searchResult?.results ?? []
   const count = searchResult?.count ?? 0
@@ -620,22 +660,30 @@ function MobileApp() {
             {results.length === 0 && query.trim() && !searching && (
               <p className="mobile-no-results">No items.</p>
             )}
-            <ul className="mobile-result-list">
-              {results.map((r) => (
-                <li key={r.id} className="mobile-result-card">
-                  <span className="mobile-result-title">{r.title || '—'}</span>
-                  {selectedTroveIds.size !== 1 && (
-                    <span className="mobile-result-trove">{r.trove || r.troveId || ''}</span>
-                  )}
-                </li>
-              ))}
-            </ul>
+            {results.length > 0 && (
+              <div className="mobile-search-results-grid">
+                <SearchResultsGrid
+                  data={results}
+                  sortBy={searchSortBy}
+                  sortDir={searchSortDir}
+                  onSortChange={(col, dir) => fetchSearch(0, col, dir)}
+                />
+              </div>
+            )}
           </>
         )}
 
         {searchMode === 'duplicates' && duplicatesResult != null && !searching && (
           <div className="mobile-dup-uniques-results">
-            <DuplicateResultsView rows={Array.isArray(duplicatesResult.rows) ? duplicatesResult.rows : []} />
+            <DuplicateResultsView
+              rows={sortedDuplicateRows}
+              sortBy={duplicatesSortBy}
+              sortDir={duplicatesSortDir}
+              onSortChange={(col, dir) => {
+                setDuplicatesSortBy(col)
+                setDuplicatesSortDir(dir)
+              }}
+            />
           </div>
         )}
 
