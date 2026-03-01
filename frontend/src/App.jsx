@@ -876,7 +876,8 @@ aria-label="Clear compare troves"
                 className={searchMode === 'uniques' ? 'active' : ''}
                 onClick={() => {
                   const uniqEmpty = !uniqPrimaryTroveId && !uniqCompareTroveIds.size
-                  if (uniqEmpty && (dupPrimaryTroveId || dupCompareTroveIds.size)) {
+                  const dupSelfCompare = dupCompareTroveIds.size === 1 && dupCompareTroveIds.has(dupPrimaryTroveId)
+                  if (uniqEmpty && (dupPrimaryTroveId || dupCompareTroveIds.size) && !dupSelfCompare) {
                     setUniqPrimaryTroveId(dupPrimaryTroveId)
                     setUniqCompareTroveIds(new Set(dupCompareTroveIds))
                     setSearchParams(buildSearchParams('uniques', query, searchSelectedTroveIds, dupPrimaryTroveId, dupCompareTroveIds, dupPrimaryTroveId, dupCompareTroveIds), { replace: true })

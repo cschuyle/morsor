@@ -16,9 +16,15 @@ function MobileApp() {
   const [troves, setTroves] = useState([])
   const [searchMode, setSearchMode] = useState('search') // 'search' | 'duplicates' | 'uniques'
   const [selectedTroveIds, setSelectedTroveIds] = useState(() => new Set())
-  const [primaryTroveId, setPrimaryTroveId] = useState('')
-  const [compareTroveIds, setCompareTroveIds] = useState(() => new Set())
+  const [dupPrimaryTroveId, setDupPrimaryTroveId] = useState('')
+  const [dupCompareTroveIds, setDupCompareTroveIds] = useState(() => new Set())
+  const [uniqPrimaryTroveId, setUniqPrimaryTroveId] = useState('')
+  const [uniqCompareTroveIds, setUniqCompareTroveIds] = useState(() => new Set())
   const [trovePickerSubTab, setTrovePickerSubTab] = useState('primary') // 'primary' | 'compare' when dup/uniques
+  const primaryTroveId = searchMode === 'duplicates' ? dupPrimaryTroveId : uniqPrimaryTroveId
+  const compareTroveIds = searchMode === 'duplicates' ? dupCompareTroveIds : uniqCompareTroveIds
+  const setPrimaryTroveId = searchMode === 'duplicates' ? setDupPrimaryTroveId : setUniqPrimaryTroveId
+  const setCompareTroveIds = searchMode === 'duplicates' ? setDupCompareTroveIds : setUniqCompareTroveIds
   const [query, setQuery] = useState('')
   const [searchResult, setSearchResult] = useState(null)
   const [searchSortBy, setSearchSortBy] = useState(null)
@@ -56,8 +62,15 @@ function MobileApp() {
       setSelectedTroveIds(new Set(searchParams.getAll('trove')))
     } else {
       setSearchMode(mode)
-      setPrimaryTroveId(searchParams.get('primary') ?? '')
-      setCompareTroveIds(new Set(searchParams.getAll('compare')))
+      const primary = searchParams.get('primary') ?? ''
+      const compare = new Set(searchParams.getAll('compare'))
+      if (mode === 'duplicates') {
+        setDupPrimaryTroveId(primary)
+        setDupCompareTroveIds(compare)
+      } else {
+        setUniqPrimaryTroveId(primary)
+        setUniqCompareTroveIds(compare)
+      }
     }
   }, [searchParams])
 
@@ -68,9 +81,26 @@ function MobileApp() {
     if (qTrim) next.set('q', qTrim)
     if (searchMode === 'search') {
       selectedTroveIds.forEach((id) => next.append('trove', id))
+    } else if (searchMode === 'duplicates') {
+      if (dupPrimaryTroveId) next.set('primary', dupPrimaryTroveId)
+      dupCompareTroveIds.forEach((id) => next.append('compare', id))
     } else {
-      if (primaryTroveId) next.set('primary', primaryTroveId)
-      compareTroveIds.forEach((id) => next.append('compare', id))
+      if (uniqPrimaryTroveId) next.set('primary', uniqPrimaryTroveId)
+      uniqCompareTroveIds.forEach((id) => next.append('compare', id))
+    }
+    return next
+  }
+
+  function buildSearchParamsForMode(mode, primary, compare) {
+    const next = new URLSearchParams()
+    if (mode !== 'search') next.set('mode', mode)
+    const qTrim = (query ?? '').trim()
+    if (qTrim) next.set('q', qTrim)
+    if (mode === 'search') {
+      selectedTroveIds.forEach((id) => next.append('trove', id))
+    } else {
+      if (primary) next.set('primary', primary)
+      compare.forEach((id) => next.append('compare', id))
     }
     return next
   }
@@ -85,7 +115,8 @@ function MobileApp() {
     const urlHasTrove = searchParams.getAll('trove').length > 0
     const stateNotYetSynced =
       (urlHasDupUniquesMode && searchMode === 'search') ||
-      (urlHasPrimaryOrCompare && !primaryTroveId && compareTroveIds.size === 0) ||
+      (urlHasPrimaryOrCompare && searchMode === 'duplicates' && !dupPrimaryTroveId && dupCompareTroveIds.size === 0) ||
+      (urlHasPrimaryOrCompare && searchMode === 'uniques' && !uniqPrimaryTroveId && uniqCompareTroveIds.size === 0) ||
       (urlHasQuery && (query ?? '') === '') ||
       (urlHasTrove && searchMode === 'search' && selectedTroveIds.size === 0)
     if (stateNotYetSynced) return
@@ -93,7 +124,7 @@ function MobileApp() {
     if (next.toString() !== searchParams.toString()) {
       setSearchParams(next, { replace: true })
     }
-  }, [query, searchMode, selectedTroveIds, primaryTroveId, compareTroveIds, searchParams])
+  }, [query, searchMode, selectedTroveIds, dupPrimaryTroveId, dupCompareTroveIds, uniqPrimaryTroveId, uniqCompareTroveIds, searchParams])
 
   function refreshStatusMessage() {
     fetch('/api/status', { credentials: 'include', headers: { ...getApiAuthHeaders() } })
@@ -440,26 +471,43 @@ function MobileApp() {
             role="tab"
             aria-selected={searchMode === 'duplicates'}
             className={`mobile-mode-tab ${searchMode === 'duplicates' ? 'mobile-mode-tab--active' : ''}`}
-            onClick={() => {
+onClick={() => {
+              const dupEmpty = !dupPrimaryTroveId && !dupCompareTroveIds.size
+              if (dupEmpty && (uniqPrimaryTroveId || uniqCompareTroveIds.size)) {
+                setDupPrimaryTroveId(uniqPrimaryTroveId)
+                setDupCompareTroveIds(new Set(uniqCompareTroveIds))
+                setSearchParams(buildSearchParamsForMode('duplicates', uniqPrimaryTroveId, uniqCompareTroveIds), { replace: true })
+              } else {
+                setSearchParams(buildSearchParamsForMode('duplicates', dupPrimaryTroveId, dupCompareTroveIds), { replace: true })
+              }
               setSearchMode('duplicates')
               setSearchResult(null)
               setUniquesResult(null)
             }}
           >
-            Duplicates
+          Duplicates
           </button>
           <button
             type="button"
             role="tab"
             aria-selected={searchMode === 'uniques'}
             className={`mobile-mode-tab ${searchMode === 'uniques' ? 'mobile-mode-tab--active' : ''}`}
-            onClick={() => {
+onClick={() => {
+              const uniqEmpty = !uniqPrimaryTroveId && !uniqCompareTroveIds.size
+              const dupSelfCompare = dupCompareTroveIds.size === 1 && dupCompareTroveIds.has(dupPrimaryTroveId)
+              if (uniqEmpty && (dupPrimaryTroveId || dupCompareTroveIds.size) && !dupSelfCompare) {
+                setUniqPrimaryTroveId(dupPrimaryTroveId)
+                setUniqCompareTroveIds(new Set(dupCompareTroveIds))
+                setSearchParams(buildSearchParamsForMode('uniques', dupPrimaryTroveId, dupCompareTroveIds), { replace: true })
+              } else {
+                setSearchParams(buildSearchParamsForMode('uniques', uniqPrimaryTroveId, uniqCompareTroveIds), { replace: true })
+              }
               setSearchMode('uniques')
               setSearchResult(null)
               setDuplicatesResult(null)
             }}
           >
-            Uniques
+          Uniques
           </button>
         </div>
 
@@ -533,7 +581,7 @@ function MobileApp() {
           </p>
         )}
 
-        {isDupOrUniques && !duplicatesResult && !uniquesResult && !searching && (
+        {isDupOrUniques && (!primaryTroveId || compareTroveIds.size === 0) && !searching && (
           <p className="mobile-search-hint">Select primary trove and at least one compare trove. Use * for all items.</p>
         )}
         {isDupOrUniques && searching && (
@@ -551,14 +599,17 @@ function MobileApp() {
               const total = duplicatesResult.total ?? 0
               const selfCompare = compareTroveIds.size === 1 && compareTroveIds.has(primaryTroveId)
               const name = troves.find((t) => t.id === primaryTroveId)?.name ?? primaryTroveId
-              if (selfCompare && total > 0) return <><strong>{name}</strong> · {formatCount(total)} possible dups</>
+              if (selfCompare && total > 0) return <>{name} · <strong>Self-compare</strong>. {formatCount(total)} item{total !== 1 ? 's' : ''} with possible duplicates.</>
               if (total > 0) return <>{formatCount(total)} dups · </>
               return null
             })()}
             {searchMode === 'uniques' && uniquesResult != null && (uniquesResult.total ?? 0) > 0 && (
               <>{formatCount(uniquesResult.total)} uniques · </>
             )}
-            {!(searchMode === 'duplicates' && duplicatesResult != null && (duplicatesResult.total ?? 0) > 0 && compareTroveIds.size === 1 && compareTroveIds.has(primaryTroveId)) && troveLabel}
+            {searchMode === 'uniques' && compareTroveIds.size === 1 && compareTroveIds.has(primaryTroveId) && (
+              <span className="mobile-search-error" role="alert">Primary trove cannot be in compare list.</span>
+            )}
+            {!(searchMode === 'duplicates' && duplicatesResult != null && (duplicatesResult.total ?? 0) > 0 && compareTroveIds.size === 1 && compareTroveIds.has(primaryTroveId)) && !(searchMode === 'uniques' && compareTroveIds.size === 1 && compareTroveIds.has(primaryTroveId)) && troveLabel}
           </span>
           {searchMode === 'search' && searchResult != null && totalPages > 1 && (
             <nav className="mobile-pagination" aria-label="Pages">
