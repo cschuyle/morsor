@@ -416,7 +416,14 @@ public class SearchDataService {
                 rows.add(new DuplicateMatchRow(primary, matches));
             }
         }
-        return deduplicateDuplicateRowsByGroup(rows);
+        List<DuplicateMatchRow> deduped = deduplicateDuplicateRowsByGroup(rows);
+        deduped.sort((a, b) -> Double.compare(maxMatchScore(b), maxMatchScore(a)));
+        return deduped;
+    }
+
+    private static double maxMatchScore(DuplicateMatchRow row) {
+        if (row.matches() == null || row.matches().isEmpty()) return 0.0;
+        return row.matches().stream().mapToDouble(ScoredSearchResult::score).max().orElse(0.0);
     }
 
     /**
