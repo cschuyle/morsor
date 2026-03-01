@@ -304,7 +304,7 @@ function MobileApp() {
   const totalPages = Math.ceil(count / MOBILE_PAGE_SIZE) || 0
   const troveLabel = isDupOrUniques
     ? (primaryTroveId
-        ? <><strong>Primary:</strong> {troves.find((t) => t.id === primaryTroveId)?.name ?? primaryTroveId} · <strong>Compare:</strong> {formatCount(compareTroveIds.size)}</>
+        ? <><strong>Primary:</strong> {troves.find((t) => t.id === primaryTroveId)?.name ?? primaryTroveId} · {compareTroveIds.size === 1 && compareTroveIds.has(primaryTroveId) ? <strong>Self-compare</strong> : <><strong>Compare:</strong> {formatCount(compareTroveIds.size)}</>}</>
         : 'Set primary & compare troves')
     : (selectedTroveIds.size === 0 ? 'All troves' : `${formatCount(selectedTroveIds.size)} trove${selectedTroveIds.size !== 1 ? 's' : ''}`)
   const filteredTroves = troves.filter((t) => {
@@ -437,9 +437,9 @@ function MobileApp() {
           <p className="mobile-search-hint">Select primary trove and at least one compare trove. Use * for all items.</p>
         )}
         {isDupOrUniques && searching && (
-          <p className="mobile-search-loading" aria-live="polite">
-            {searchMode === 'duplicates' ? 'Finding duplicates…' : 'Finding uniques…'}
-          </p>
+          <div className="mobile-search-loading" aria-live="polite" aria-busy="true">
+            <span className="mobile-search-spinner" aria-hidden="true" />
+          </div>
         )}
 
         <div className="mobile-troves-row">

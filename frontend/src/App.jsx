@@ -952,11 +952,14 @@ function App() {
               const size = duplicatesResult.size ?? 50
               const rows = sortedDuplicateRows
               const totalPages = size > 0 ? Math.ceil(total / size) : 0
+              const primaryName = troves.find((t) => t.id === primaryTroveId)?.name ?? primaryTroveId
+              const compareNamesList = [...selectedTroveIds].map((id) => troves.find((t) => t.id === id)?.name ?? id).join(', ')
+              const compareDisplay = compareNamesList.length < 50 ? compareNamesList : `${selectedTroveIds.size} troves`
+              const compareSummary = selectedTroveIds.size === 1 && selectedTroveIds.has(primaryTroveId) ? <strong>Self-compare</strong> : <><strong>Compare:</strong> {compareDisplay}</>
               return (
                 <>
                   <p className="search-count search-count-detail">
-                    {formatCount(total)} primary item{total !== 1 ? 's' : ''} with possible duplicates.
-                    {totalPages > 1 && ` Page ${formatCount(pageNum + 1)} of ${formatCount(totalPages)}.`}
+                    <><strong>Primary:</strong> {primaryName} · {compareSummary}. </>{formatCount(total)} {selectedTroveIds.size === 1 && selectedTroveIds.has(primaryTroveId) ? '' : 'primary '}item{total !== 1 ? 's' : ''} with possible duplicates.
                   </p>
                   {totalPages > 1 && (() => {
                     const maxShow = 5
@@ -1054,11 +1057,14 @@ function App() {
               const size = uniquesResult.size ?? 50
               const results = Array.isArray(uniquesResult.results) ? uniquesResult.results : []
               const totalPages = size > 0 ? Math.ceil(total / size) : 0
+              const primaryName = troves.find((t) => t.id === primaryTroveId)?.name ?? primaryTroveId
+              const compareNamesList = [...selectedTroveIds].map((id) => troves.find((t) => t.id === id)?.name ?? id).join(', ')
+              const compareDisplay = compareNamesList.length < 50 ? compareNamesList : `${selectedTroveIds.size} troves`
+              const compareSummary = selectedTroveIds.size === 1 && selectedTroveIds.has(primaryTroveId) ? <strong>Self-compare</strong> : <><strong>Compare:</strong> {compareDisplay}</>
               return (
                 <>
                   <p className="search-count search-count-detail">
-                    {formatCount(total)} item{total !== 1 ? 's' : ''} in primary with no match in compare troves.
-                    {totalPages > 1 && ` Page ${formatCount(pageNum + 1)} of ${formatCount(totalPages)}.`}
+                    <><strong>Primary:</strong> {primaryName} · {compareSummary}. </>{formatCount(total)} item{total !== 1 ? 's' : ''}{selectedTroveIds.size === 1 && selectedTroveIds.has(primaryTroveId) ? ' ' : ' in primary '}with no match in compare troves.
                   </p>
                   {totalPages > 1 && (() => {
                     const maxShow = 5

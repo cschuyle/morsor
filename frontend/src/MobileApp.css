@@ -543,11 +543,33 @@
   border-radius: 6px;
 }
 
-.mobile-search-hint,
-.mobile-search-loading {
+.mobile-search-hint {
   margin: 0 0 0.75rem;
   font-size: 0.9rem;
   color: #555;
+}
+
+.mobile-search-loading {
+  margin: 0 0 0.75rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.mobile-search-spinner {
+  display: inline-block;
+  width: 1.25rem;
+  height: 1.25rem;
+  border: 2px solid #e5e5e5;
+  border-top-color: #646cff;
+  border-radius: 50%;
+  animation: mobile-search-spinner 0.7s linear infinite;
+}
+
+@keyframes mobile-search-spinner {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 /* Duplicate / Uniques results (base styles; mobile doesn't load App.css) */
