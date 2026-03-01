@@ -914,31 +914,84 @@ function App() {
                     {total} primary item{total !== 1 ? 's' : ''} with possible duplicates.
                     {totalPages > 1 && ` Page ${pageNum + 1} of ${totalPages}.`}
                   </p>
-                  {totalPages > 1 && (
-                    <nav className="pagination" aria-label="Duplicate results pages">
-                      <button
-                        type="button"
-                        className="pagination-btn"
-                        disabled={pageNum <= 0 || searching}
-                        onClick={() => fetchDuplicates(pageNum - 1)}
-                        aria-label="Previous page"
-                      >
-                        ←
-                      </button>
-                      <span className="pagination-info">
-                        {pageNum + 1} / {totalPages}
-                      </span>
-                      <button
-                        type="button"
-                        className="pagination-btn"
-                        disabled={pageNum >= totalPages - 1 || searching}
-                        onClick={() => fetchDuplicates(pageNum + 1)}
-                        aria-label="Next page"
-                      >
-                        →
-                      </button>
-                    </nav>
-                  )}
+                  {totalPages > 1 && (() => {
+                    const maxShow = 5
+                    let start = Math.max(0, pageNum - Math.floor(maxShow / 2))
+                    let end = Math.min(totalPages, start + maxShow)
+                    if (end - start < maxShow) start = Math.max(0, end - maxShow)
+                    const pageNumbers = []
+                    for (let i = start; i < end; i++) pageNumbers.push(i)
+                    return (
+                      <nav className="pagination" aria-label="Duplicate results pages">
+                        <span className="pagination-info">
+                          Page {pageNum + 1} of {totalPages}
+                        </span>
+                        <button
+                          type="button"
+                          className="pagination-btn"
+                          disabled={pageNum <= 0 || searching}
+                          onClick={() => fetchDuplicates(pageNum - 1)}
+                          aria-label="Previous page"
+                        >
+                          ←
+                        </button>
+                        <span className="pagination-nums">
+                          {start > 0 && (
+                            <>
+                              <button
+                                type="button"
+                                className={`pagination-btn pagination-num ${0 === pageNum ? 'pagination-num--current' : ''}`}
+                                disabled={searching}
+                                onClick={() => fetchDuplicates(0)}
+                                aria-label="Page 1"
+                                aria-current={0 === pageNum ? 'page' : undefined}
+                              >
+                                1
+                              </button>
+                              <span className="pagination-ellipsis" aria-hidden="true">…</span>
+                            </>
+                          )}
+                          {pageNumbers.map((i) => (
+                            <button
+                              key={i}
+                              type="button"
+                              className={`pagination-btn pagination-num ${i === pageNum ? 'pagination-num--current' : ''}`}
+                              disabled={searching}
+                              onClick={() => fetchDuplicates(i)}
+                              aria-label={`Page ${i + 1}`}
+                              aria-current={i === pageNum ? 'page' : undefined}
+                            >
+                              {i + 1}
+                            </button>
+                          ))}
+                          {end < totalPages && (
+                            <>
+                              <span className="pagination-ellipsis" aria-hidden="true">…</span>
+                              <button
+                                type="button"
+                                className={`pagination-btn pagination-num ${totalPages - 1 === pageNum ? 'pagination-num--current' : ''}`}
+                                disabled={searching}
+                                onClick={() => fetchDuplicates(totalPages - 1)}
+                                aria-label={`Page ${totalPages}`}
+                                aria-current={totalPages - 1 === pageNum ? 'page' : undefined}
+                              >
+                                {totalPages}
+                              </button>
+                            </>
+                          )}
+                        </span>
+                        <button
+                          type="button"
+                          className="pagination-btn"
+                          disabled={pageNum >= totalPages - 1 || searching}
+                          onClick={() => fetchDuplicates(pageNum + 1)}
+                          aria-label="Next page"
+                        >
+                          →
+                        </button>
+                      </nav>
+                    )
+                  })()}
                   <DuplicateResultsView rows={rows} />
                 </>
               )
@@ -955,31 +1008,84 @@ function App() {
                     {total} item{total !== 1 ? 's' : ''} in primary with no match in compare troves.
                     {totalPages > 1 && ` Page ${pageNum + 1} of ${totalPages}.`}
                   </p>
-                  {totalPages > 1 && (
-                    <nav className="pagination" aria-label="Uniques results pages">
-                      <button
-                        type="button"
-                        className="pagination-btn"
-                        disabled={pageNum <= 0 || searching}
-                        onClick={() => fetchUniques(pageNum - 1)}
-                        aria-label="Previous page"
-                      >
-                        ←
-                      </button>
-                      <span className="pagination-info">
-                        {pageNum + 1} / {totalPages}
-                      </span>
-                      <button
-                        type="button"
-                        className="pagination-btn"
-                        disabled={pageNum >= totalPages - 1 || searching}
-                        onClick={() => fetchUniques(pageNum + 1)}
-                        aria-label="Next page"
-                      >
-                        →
-                      </button>
-                    </nav>
-                  )}
+                  {totalPages > 1 && (() => {
+                    const maxShow = 5
+                    let start = Math.max(0, pageNum - Math.floor(maxShow / 2))
+                    let end = Math.min(totalPages, start + maxShow)
+                    if (end - start < maxShow) start = Math.max(0, end - maxShow)
+                    const pageNumbers = []
+                    for (let i = start; i < end; i++) pageNumbers.push(i)
+                    return (
+                      <nav className="pagination" aria-label="Uniques results pages">
+                        <span className="pagination-info">
+                          Page {pageNum + 1} of {totalPages}
+                        </span>
+                        <button
+                          type="button"
+                          className="pagination-btn"
+                          disabled={pageNum <= 0 || searching}
+                          onClick={() => fetchUniques(pageNum - 1)}
+                          aria-label="Previous page"
+                        >
+                          ←
+                        </button>
+                        <span className="pagination-nums">
+                          {start > 0 && (
+                            <>
+                              <button
+                                type="button"
+                                className={`pagination-btn pagination-num ${0 === pageNum ? 'pagination-num--current' : ''}`}
+                                disabled={searching}
+                                onClick={() => fetchUniques(0)}
+                                aria-label="Page 1"
+                                aria-current={0 === pageNum ? 'page' : undefined}
+                              >
+                                1
+                              </button>
+                              <span className="pagination-ellipsis" aria-hidden="true">…</span>
+                            </>
+                          )}
+                          {pageNumbers.map((i) => (
+                            <button
+                              key={i}
+                              type="button"
+                              className={`pagination-btn pagination-num ${i === pageNum ? 'pagination-num--current' : ''}`}
+                              disabled={searching}
+                              onClick={() => fetchUniques(i)}
+                              aria-label={`Page ${i + 1}`}
+                              aria-current={i === pageNum ? 'page' : undefined}
+                            >
+                              {i + 1}
+                            </button>
+                          ))}
+                          {end < totalPages && (
+                            <>
+                              <span className="pagination-ellipsis" aria-hidden="true">…</span>
+                              <button
+                                type="button"
+                                className={`pagination-btn pagination-num ${totalPages - 1 === pageNum ? 'pagination-num--current' : ''}`}
+                                disabled={searching}
+                                onClick={() => fetchUniques(totalPages - 1)}
+                                aria-label={`Page ${totalPages}`}
+                                aria-current={totalPages - 1 === pageNum ? 'page' : undefined}
+                              >
+                                {totalPages}
+                              </button>
+                            </>
+                          )}
+                        </span>
+                        <button
+                          type="button"
+                          className="pagination-btn"
+                          disabled={pageNum >= totalPages - 1 || searching}
+                          onClick={() => fetchUniques(pageNum + 1)}
+                          aria-label="Next page"
+                        >
+                          →
+                        </button>
+                      </nav>
+                    )
+                  })()}
                   <UniquesResultsView
                     results={results}
                     sortBy={uniquesSortBy}

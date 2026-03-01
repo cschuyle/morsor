@@ -743,7 +743,7 @@
 .pagination-nums {
   display: inline-flex;
   align-items: center;
-  gap: 0.33rem;
+  gap: 0;
 }
 
 .pagination-btn {
