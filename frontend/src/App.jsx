@@ -1064,7 +1064,7 @@ function App() {
               return (
                 <>
                   <p className="search-count search-count-detail">
-                    <><strong>Primary:</strong> {primaryName} · {compareSummary}. </>{formatCount(total)} item{total !== 1 ? 's' : ''}{selectedTroveIds.size === 1 && selectedTroveIds.has(primaryTroveId) ? ' ' : ' in primary '}with no match in compare troves.
+                    <><strong>Primary:</strong> {primaryName} · {compareSummary}. </>{formatCount(total)} item{total !== 1 ? 's' : ''}{selectedTroveIds.size === 1 && selectedTroveIds.has(primaryTroveId) ? ' ' : ' in primary '}are either unique or have no obvious match.
                   </p>
                   {totalPages > 1 && (() => {
                     const maxShow = 5
