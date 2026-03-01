@@ -1,5 +1,5 @@
 import { useMemo, useState, useEffect, useRef } from 'react'
-import { Link, useSearchParams } from 'react-router-dom'
+import { Link, useSearchParams, useLocation } from 'react-router-dom'
 import { SearchResultsGrid } from './SearchResultsGrid'
 import { DuplicateResultsView } from './DuplicateResultsView'
 import { UniquesResultsView } from './UniquesResultsView'
@@ -26,6 +26,7 @@ function App() {
   const [sortBy, setSortBy] = useState(null)
   const [sortDir, setSortDir] = useState('asc')
   const [searchParams, setSearchParams] = useSearchParams()
+  const location = useLocation()
   const searchMode = (() => {
     const m = searchParams.get('mode')
     return (m === 'duplicates' || m === 'uniques') ? m : 'search'
@@ -1342,7 +1343,7 @@ aria-label="Clear compare troves"
         >
           Log Out
         </button>
-        <Link to="/mobile" className="app-footer-link" onClick={() => sessionStorage.removeItem('morsorPreferDesktop')}>Mobile</Link>
+        <Link to={`/mobile${location.search}`} className="app-footer-link" onClick={() => sessionStorage.removeItem('morsorPreferDesktop')}>Mobile</Link>
         {message && <p className="backend-message" data-status={message.startsWith('Status: Backend is up') ? 'up' : 'down'}>{message}</p>}
       </footer>
     </>

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams, useLocation } from 'react-router-dom'
 import { getApiAuthHeaders } from './apiAuth'
 import { getCsrfToken } from './getCsrfToken'
 import { queryCache } from './queryCache'
@@ -40,9 +40,60 @@ function MobileApp() {
   const queryRef = useRef(query)
   const skipSearchRef = useRef(true)
   const abortRef = useRef(null)
+  const [searchParams, setSearchParams] = useSearchParams()
+  const location = useLocation()
   queryRef.current = query
 
   const isDupOrUniques = searchMode === 'duplicates' || searchMode === 'uniques'
+
+  // Restore query and trove selection from URL (bookmark / desktop↔mobile toggle).
+  useEffect(() => {
+    const q = searchParams.get('q')
+    setQuery(q != null ? q : '')
+    const mode = searchParams.get('mode')
+    if (mode !== 'duplicates' && mode !== 'uniques') {
+      setSearchMode('search')
+      setSelectedTroveIds(new Set(searchParams.getAll('trove')))
+    } else {
+      setSearchMode(mode)
+      setPrimaryTroveId(searchParams.get('primary') ?? '')
+      setCompareTroveIds(new Set(searchParams.getAll('compare')))
+    }
+  }, [searchParams])
+
+  function buildSearchParams() {
+    const next = new URLSearchParams()
+    if (searchMode !== 'search') next.set('mode', searchMode)
+    const qTrim = (query ?? '').trim()
+    if (qTrim) next.set('q', qTrim)
+    if (searchMode === 'search') {
+      selectedTroveIds.forEach((id) => next.append('trove', id))
+    } else {
+      if (primaryTroveId) next.set('primary', primaryTroveId)
+      compareTroveIds.forEach((id) => next.append('compare', id))
+    }
+    return next
+  }
+
+  // Persist current tab, query, and trove selection to URL.
+  // Skip writing when URL has params we haven't applied yet (e.g. initial load or desktop→mobile with query string).
+  useEffect(() => {
+    const urlMode = searchParams.get('mode')
+    const urlHasDupUniquesMode = urlMode === 'duplicates' || urlMode === 'uniques'
+    const urlHasPrimaryOrCompare = searchParams.get('primary') || searchParams.getAll('compare').length > 0
+    const urlHasQuery = searchParams.get('q') != null && searchParams.get('q') !== ''
+    const urlHasTrove = searchParams.getAll('trove').length > 0
+    const stateNotYetSynced =
+      (urlHasDupUniquesMode && searchMode === 'search') ||
+      (urlHasPrimaryOrCompare && !primaryTroveId && compareTroveIds.size === 0) ||
+      (urlHasQuery && (query ?? '') === '') ||
+      (urlHasTrove && searchMode === 'search' && selectedTroveIds.size === 0)
+    if (stateNotYetSynced) return
+    const next = buildSearchParams()
+    if (next.toString() !== searchParams.toString()) {
+      setSearchParams(next, { replace: true })
+    }
+  }, [query, searchMode, selectedTroveIds, primaryTroveId, compareTroveIds, searchParams])
 
   function refreshStatusMessage() {
     fetch('/api/status', { credentials: 'include', headers: { ...getApiAuthHeaders() } })
@@ -722,7 +773,7 @@ function MobileApp() {
           <p className="mobile-status-message" role="status">{statusMessage}</p>
         )}
         <div className="mobile-footer-row">
-          <Link to="/" className="mobile-footer-link" onClick={() => sessionStorage.setItem('morsorPreferDesktop', 'true')}>Desktop site</Link>
+          <Link to={location.search ? `/?${location.search.slice(1)}` : '/'} className="mobile-footer-link" onClick={() => sessionStorage.setItem('morsorPreferDesktop', 'true')}>Desktop site</Link>
           <button
             type="button"
             className="mobile-footer-link mobile-footer-logout-btn"

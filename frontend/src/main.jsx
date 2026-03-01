@@ -1,6 +1,6 @@
 import { StrictMode, useState, useEffect } from 'react'
 import { createRoot } from 'react-dom/client'
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import './index.css'
 import App from './App.jsx'
 import About from './About.jsx'
@@ -26,6 +26,7 @@ function getPreferDesktop() {
 }
 
 function RootOrRedirect() {
+  const location = useLocation()
   const [mobile, setMobile] = useState(null)
   const [preferDesktop, setPreferDesktop] = useState(getPreferDesktop)
   useEffect(() => {
@@ -33,7 +34,7 @@ function RootOrRedirect() {
     setPreferDesktop(getPreferDesktop())
   }, [])
   if (mobile === null) return null
-  if (mobile && !preferDesktop) return <Navigate to="/mobile" replace />
+  if (mobile && !preferDesktop) return <Navigate to={`/mobile${location.search}`} replace />
   return <App />
 }
 
