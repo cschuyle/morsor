@@ -22,8 +22,8 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * Unit tests for prefix search (terms ending with *) using Lucene indexing.
- * Uses the same analyzer and field layout as SearchDataService.
+ * Unit tests for prefix search and fuzzy matching using Lucene indexing.
+ * Uses the same analyzer and field layout as SearchDataService (e.g. for compare-tabs similar-item matching).
  */
 class PrefixSearchTest {
 
@@ -92,5 +92,27 @@ class PrefixSearchTest {
         assertThat(query).isNotNull();
         TopDocs topDocs = searcher.search(query, 10);
         assertThat(topDocs.totalHits.value).isGreaterThanOrEqualTo(1);
+    }
+
+    @Test
+    void fuzzyQueryMatchesMinorSpellingDifferenceLikeDoolittleVsDolittle() throws IOException {
+        Directory dir = new ByteBuffersDirectory();
+        IndexWriterConfig config = new IndexWriterConfig(analyzer);
+        config.setOpenMode(IndexWriterConfig.OpenMode.CREATE);
+        try (IndexWriter writer = new IndexWriter(dir, config)) {
+            addDoc(writer, 0, "trove-a", "Dr Doolittle");
+            addDoc(writer, 1, "trove-b", "Other title");
+            writer.commit();
+        }
+        IndexSearcher search = new IndexSearcher(DirectoryReader.open(dir));
+
+        Query query = SearchQueryBuilder.buildQuery("Dr Dolittle", analyzer, CONTENT_FIELD);
+        assertThat(query).isNotNull();
+
+        TopDocs topDocs = search.search(query, 10);
+        assertThat(topDocs.totalHits.value).isEqualTo(1);
+        int hitDocId = topDocs.scoreDocs[0].doc;
+        int idx = search.storedFields().document(hitDocId).getField(IDX_FIELD).numericValue().intValue();
+        assertThat(idx).isEqualTo(0);
     }
 }

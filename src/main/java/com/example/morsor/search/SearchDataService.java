@@ -537,9 +537,12 @@ public class SearchDataService {
             BooleanQuery.Builder bq = new BooleanQuery.Builder();
             List<BytesRef> terms = troveIds.stream().map(BytesRef::new).toList();
             bq.add(new TermInSetQuery("troveId", terms), BooleanClause.Occur.FILTER);
-            QueryParser parser = new QueryParser("content", luceneAnalyzer);
-            parser.setDefaultOperator(QueryParser.Operator.OR);
-            Query textQuery = parser.parse(QueryParser.escape(queryStr));
+            Query textQuery = buildFuzzyQuery(queryStr);
+            if (textQuery == null) {
+                QueryParser parser = new QueryParser("content", luceneAnalyzer);
+                parser.setDefaultOperator(QueryParser.Operator.OR);
+                textQuery = parser.parse(QueryParser.escape(queryStr));
+            }
             bq.add(textQuery, BooleanClause.Occur.MUST);
             TopDocs topDocs = luceneSearcher.search(bq.build(), topN);
             List<ScoredSearchResult> out = new ArrayList<>(topDocs.scoreDocs.length);
