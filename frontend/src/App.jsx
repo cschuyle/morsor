@@ -487,9 +487,9 @@ function App() {
                               type="button"
                               className="trove-picker-clear"
                               onClick={() => setPrimaryTroveId('')}
-                              aria-label="Clear primary trove"
+                              aria-label="Clear Primary"
                             >
-                              Clear
+                              Clear Primary
                             </button>
                           )}
                         </div>
@@ -572,9 +572,9 @@ function App() {
                           type="button"
                           className="trove-picker-clear"
                           onClick={clearTroves}
-                          aria-label="Clear selection"
+                          aria-label="Clear Comparison troves"
                         >
-                          Clear
+                          Clear Comparison troves
                         </button>
                       </div>
                       <div className="sidebar-show-wrap">
