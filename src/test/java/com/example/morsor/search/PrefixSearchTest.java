@@ -115,4 +115,22 @@ class PrefixSearchTest {
         int idx = search.storedFields().document(hitDocId).getField(IDX_FIELD).numericValue().intValue();
         assertThat(idx).isEqualTo(0);
     }
+
+    @Test
+    void slashDelimitedQueryIsTreatedAsRegex() {
+        assertThat(SearchQueryBuilder.isRegexDelimited("/pattern/")).isTrue();
+        assertThat(SearchQueryBuilder.isRegexDelimited("/a/")).isTrue();
+        assertThat(SearchQueryBuilder.isRegexDelimited("/")).isFalse();
+        assertThat(SearchQueryBuilder.isRegexDelimited("")).isFalse();
+        assertThat(SearchQueryBuilder.isRegexDelimited("no slashes")).isFalse();
+        assertThat(SearchQueryBuilder.isRegexDelimited("leading/")).isFalse();
+        assertThat(SearchQueryBuilder.isRegexDelimited("/trailing")).isFalse();
+    }
+
+    @Test
+    void slashDelimitedQueryReturnsNullFromBuildQuery() throws IOException {
+        // Slash-delimited regex is handled by SearchDataService (full-text Java Pattern), not Lucene
+        Query query = SearchQueryBuilder.buildQuery("/other/", analyzer, CONTENT_FIELD);
+        assertThat(query).isNull();
+    }
 }

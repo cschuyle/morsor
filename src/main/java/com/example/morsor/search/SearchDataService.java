@@ -302,6 +302,30 @@ public class SearchDataService {
             return stream.map(r -> new ScoredSearchResult(r, 0.0)).toList();
         }
 
+        // Regex delimited by slashes: match full title+snippet with Java Pattern (not per-term Lucene regex)
+        if (SearchQueryBuilder.isRegexDelimited(queryTrimmed)) {
+            String patternStr = queryTrimmed.substring(1, queryTrimmed.length() - 1);
+            if (!patternStr.isEmpty()) {
+                try {
+                    Pattern pattern = Pattern.compile(patternStr, Pattern.CASE_INSENSITIVE);
+                    Stream<SearchResult> stream = allResults.stream();
+                    if (!troveIdSet.isEmpty()) {
+                        stream = stream.filter(r -> r.troveId() != null && troveIdSet.contains(r.troveId()));
+                    }
+                    List<ScoredSearchResult> out = stream
+                            .filter(r -> {
+                                String text = (r.title() != null ? r.title() : "") + " " + (r.snippet() != null ? r.snippet() : "");
+                                return pattern.matcher(text).find();
+                            })
+                            .map(r -> new ScoredSearchResult(r, 1.0))
+                            .toList();
+                    return out;
+                } catch (Exception e) {
+                    log.debug("Invalid regex \"{}\", falling back: {}", patternStr, e.getMessage());
+                }
+            }
+        }
+
         if (luceneSearcher == null) {
             return searchFallbackScored(troveIdSet, queryTrimmed);
         }

@@ -16,7 +16,8 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Builds Lucene queries for search (fuzzy + prefix terms). Package-private for use by SearchDataService and tests.
+ * Builds Lucene queries for search (fuzzy + prefix terms, or regex when delimited by slashes).
+ * Package-private for use by SearchDataService and tests.
  */
 final class SearchQueryBuilder {
 
@@ -26,10 +27,22 @@ final class SearchQueryBuilder {
     private SearchQueryBuilder() {}
 
     /**
-     * Build a query from the user string. Terms ending with {@code *} are prefix matches;
-     * others are fuzzy. Returns null if no clauses.
+     * True if the query is slash-delimited (e.g. {@code /pattern/}) for regex search.
+     */
+    static boolean isRegexDelimited(String queryTrimmed) {
+        if (queryTrimmed == null || queryTrimmed.length() < 2) return false;
+        return queryTrimmed.startsWith("/") && queryTrimmed.endsWith("/");
+    }
+
+    /**
+     * Build a query from the user string. Slash-delimited regex is not handled here
+     * (SearchDataService matches full text with Java Pattern). Terms ending with {@code *}
+     * are prefix matches; others are fuzzy. Returns null if no clauses.
      */
     static Query buildQuery(String queryTrimmed, Analyzer analyzer, String contentField) throws IOException {
+        if (isRegexDelimited(queryTrimmed)) {
+            return null;
+        }
         List<QueryTerm> terms = parseQueryTerms(queryTrimmed);
         if (terms.isEmpty()) return null;
         BooleanQuery.Builder bq = new BooleanQuery.Builder();
