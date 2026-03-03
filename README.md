@@ -247,3 +247,6 @@ So-called "Production" mode: You would normally activate **postgres** and **s3tr
 Search result cache ( See [envrc-template](./envrc-template) )
 - `MOOCHO_CACHE_TTL_MINUTES` (default 720 = 12 hours) 
 - `MOOCHO_CACHE_MAX_BYTES` (default 1073741824 = 1GB); when the cache is full, results are still returned but not cached and the UI shows a warning. 
+
+Login session (See [envrc-template](./envrc-template))
+- `MOOCHO_SESSION_TIMEOUT` (default `12h`; Spring Boot duration such as `30m`, `12h`, `1d`)

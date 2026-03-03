@@ -23,3 +23,7 @@ export MOOCHO_BUCKET_NAME=blah
 # When the cache is full, new results are still returned but not cached; the UI shows a warning.
 #export MOOCHO_CACHE_TTL_MINUTES=720
 #export MOOCHO_CACHE_MAX_BYTES=1073741824
+
+# Login session timeout (Spring Boot duration; default 12h).
+# Example values: 30m, 12h, 1d
+#export MOOCHO_SESSION_TIMEOUT=12h
