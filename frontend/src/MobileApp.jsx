@@ -851,7 +851,24 @@ onClick={() => {
 
       <footer className="mobile-footer">
         {statusMessage && (
-          <p className="mobile-status-message" role="status">{statusMessage}</p>
+          <p className="mobile-status-message" role="status">
+            {statusMessage}
+            {' · '}
+            <button
+              type="button"
+              className="mobile-footer-link mobile-clear-cache-btn"
+              onClick={() => {
+                const headers = { ...getApiAuthHeaders() }
+                const token = getCsrfToken()
+                if (token) headers['X-XSRF-TOKEN'] = token
+                fetch('/api/cache/clear', { method: 'POST', credentials: 'include', headers })
+                  .then((res) => { if (res.status === 401) { window.location.href = '/login'; return }; if (res.ok) refreshStatusMessage() })
+                  .catch(() => {})
+              }}
+            >
+              Clear Cache
+            </button>
+          </p>
         )}
         <div className="mobile-footer-row">
           <Link to={location.search ? `/?${location.search.slice(1)}` : '/'} className="mobile-footer-link" onClick={() => sessionStorage.setItem('morsorPreferDesktop', 'true')}>Desktop site</Link>

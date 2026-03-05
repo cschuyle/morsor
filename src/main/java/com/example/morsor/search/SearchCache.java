@@ -78,6 +78,14 @@ public class SearchCache {
         }
     }
 
+    /** Remove all entries from the cache. */
+    public void clear() {
+        synchronized (this) {
+            cache.clear();
+            totalBytes = 0;
+        }
+    }
+
     public record CacheResult<T>(List<T> data, boolean cached) {}
 
     private static class Entry<T> {

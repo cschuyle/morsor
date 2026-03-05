@@ -1532,7 +1532,26 @@ aria-label="Clear compare troves"
           Log Out
         </button>
         <Link to={`/mobile${location.search}`} className="app-footer-link" onClick={() => sessionStorage.removeItem('morsorPreferDesktop')}>Mobile</Link>
-        {message && <p className="backend-message" data-status={message.startsWith('Status: Backend is up') ? 'up' : 'down'}>{message}</p>}
+        {message && (
+          <p className="backend-message" data-status={message.startsWith('Status: Backend is up') ? 'up' : 'down'}>
+            {message}
+            {' · '}
+            <button
+              type="button"
+              className="app-footer-link app-footer-clear-cache"
+              onClick={() => {
+                const headers = { ...getApiAuthHeaders() }
+                const token = getCsrfToken()
+                if (token) headers['X-XSRF-TOKEN'] = token
+                fetch('/api/cache/clear', { method: 'POST', credentials: 'include', headers })
+                  .then((res) => { if (res.status === 401) { window.location.href = '/login'; return }; if (res.ok) refreshStatusMessage() })
+                  .catch(() => {})
+              }}
+            >
+              Clear Cache
+            </button>
+          </p>
+        )}
       </footer>
     </>
   )

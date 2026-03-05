@@ -428,7 +428,7 @@ public class SearchDataService {
             if (!matches.isEmpty()) {
                 rows.add(new DuplicateMatchRow(primary, matches));
             }
-            if (progress != null) progress.accept(i + 1, total);
+            if (progress != null && ((i + 1) % 31 == 0 || i + 1 == total)) progress.accept(i + 1, total);
         }
         List<DuplicateMatchRow> deduped = deduplicateDuplicateRowsByGroup(rows);
         deduped.sort((a, b) -> Double.compare(maxMatchScore(b), maxMatchScore(a)));
@@ -505,7 +505,7 @@ public class SearchDataService {
                         .toList();
                 uniquesWithScore.add(new UniqueResult(primary, nearestMiss, topNearMisses));
             }
-            if (progress != null) progress.accept(i + 1, total);
+            if (progress != null && ((i + 1) % 31 == 0 || i + 1 == total)) progress.accept(i + 1, total);
         }
         uniquesWithScore.sort(java.util.Comparator.comparingDouble(UniqueResult::score));
         return uniquesWithScore;

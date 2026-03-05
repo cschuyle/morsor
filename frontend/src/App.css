@@ -121,6 +121,21 @@
   text-decoration: underline;
 }
 
+.app-footer-clear-cache {
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: inherit;
+  color: #646cff;
+  text-decoration: none;
+}
+
+.app-footer-clear-cache:hover {
+  text-decoration: underline;
+}
+
 .backend-message {
   margin: 0;
   font-size: 0.9rem;

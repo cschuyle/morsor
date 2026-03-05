@@ -2,6 +2,7 @@ package com.example.morsor.search;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -44,6 +45,11 @@ public class SearchController {
 
     public record StatusResponse(String status, CacheStatus cache) {}
     public record CacheStatus(int entries, long estimatedBytes) {}
+
+    @PostMapping("/cache/clear")
+    public void clearCache() {
+        searchCache.clear();
+    }
 
     private static final int DEFAULT_PAGE_SIZE = 500;
     private static final int MAX_PAGE_SIZE = 10_000;
