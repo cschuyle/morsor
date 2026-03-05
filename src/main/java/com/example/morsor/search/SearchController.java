@@ -1,6 +1,8 @@
 package com.example.morsor.search;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.springframework.security.core.context.SecurityContext;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -196,8 +198,10 @@ public class SearchController {
                 + compareSet.stream().sorted().collect(Collectors.joining(",")) + ":"
                 + queryVal + ":" + maxMatchesVal;
         ObjectMapper om = this.objectMapper;
+        SecurityContext securityContext = SecurityContextHolder.getContext();
         StreamingResponseBody stream = out -> {
             try {
+                SecurityContextHolder.setContext(securityContext);
                 SearchCache.CacheResult<DuplicateMatchRow> cacheResult = searchCache.getOrCompute(cacheKey, () ->
                         searchDataService.searchDuplicates(primaryTrimmed, compareSet, queryVal, maxMatchesVal, (current, total) -> {
                             try {
@@ -221,6 +225,8 @@ public class SearchController {
             } catch (Exception e) {
                 if (e instanceof UncheckedIOException u) throw u;
                 throw new RuntimeException(e);
+            } finally {
+                SecurityContextHolder.clearContext();
             }
         };
         return org.springframework.http.ResponseEntity.ok()
@@ -283,8 +289,10 @@ public class SearchController {
         String cacheKey = "u:" + primaryTrimmed + ":"
                 + compareSet.stream().sorted().collect(Collectors.joining(",")) + ":" + queryVal;
         ObjectMapper om = this.objectMapper;
+        SecurityContext securityContext = SecurityContextHolder.getContext();
         StreamingResponseBody stream = out -> {
             try {
+                SecurityContextHolder.setContext(securityContext);
                 SearchCache.CacheResult<UniqueResult> cacheResult = searchCache.getOrCompute(cacheKey, () ->
                         searchDataService.searchUniques(primaryTrimmed, compareSet, queryVal, (current, total) -> {
                             try {
@@ -316,6 +324,8 @@ public class SearchController {
             } catch (Exception e) {
                 if (e instanceof UncheckedIOException u) throw u;
                 throw new RuntimeException(e);
+            } finally {
+                SecurityContextHolder.clearContext();
             }
         };
         return org.springframework.http.ResponseEntity.ok()
