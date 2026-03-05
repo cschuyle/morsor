@@ -1,6 +1,7 @@
 package com.example.morsor.search;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -75,7 +76,7 @@ public final class CollectionToSearchResultMapper {
             JsonNode titleNode = titlesArray.get(i);
             String title = titleNode != null && titleNode.isTextual() ? titleNode.asText() : (titleNode != null ? titleNode.toString() : "");
             String id = troveId != null && !troveId.isEmpty() ? troveId + "-" + i : "trove-" + i;
-            out.add(new SearchResult(id, title, title, troveName, troveId, null));
+            out.add(new SearchResult(id, title, title, troveName, troveId, null, null));
         }
     }
 
@@ -83,7 +84,12 @@ public final class CollectionToSearchResultMapper {
     private static JsonNode unwrapItem(JsonNode itemWrapper) {
         var it = itemWrapper.fields();
         if (!it.hasNext()) return null;
-        return it.next().getValue();
+        var entry = it.next();
+        JsonNode value = entry.getValue();
+        if (value != null && value.isObject()) {
+            ((ObjectNode) value).put("_itemType", entry.getKey());
+        }
+        return value;
     }
 
     private static SearchResult mapItemToSearchResult(JsonNode item, String troveName, String troveId, int index) {
@@ -105,8 +111,9 @@ public final class CollectionToSearchResultMapper {
 
         String snippet = buildSnippet(item);
         String thumbnailUrl = text(item, "smallImageUrl");
+        String itemType = text(item, "_itemType");
 
-        return new SearchResult(id, title, snippet, troveName, troveId, thumbnailUrl);
+        return new SearchResult(id, title, snippet, troveName, troveId, thumbnailUrl, itemType);
     }
 
     private static String buildSnippet(JsonNode item) {

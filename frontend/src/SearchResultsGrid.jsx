@@ -29,8 +29,8 @@ const thumbnailColumn = {
   cell: (info) => {
     const row = info.row.original
     const url = info.getValue()
-    const troveId = row?.troveId
-    if (!url || troveId !== 'little-prince') return null
+    const itemType = row?.itemType
+    if (!url || itemType !== 'littlePrinceItem') return null
     return (
       <img
         src={url}
@@ -54,7 +54,7 @@ const scoreColumn = {
 export function SearchResultsGrid({ data, sortBy = null, sortDir = 'asc', onSortChange, showScoreColumn = false }) {
   const [globalFilter, setGlobalFilter] = useState('')
   const hasThumbnails = useMemo(
-    () => Array.isArray(data) && data.some((row) => row && row.thumbnailUrl && row.troveId === 'little-prince'),
+    () => Array.isArray(data) && data.some((row) => row && row.thumbnailUrl && row.itemType === 'littlePrinceItem'),
     [data]
   )
   const baseColumns = useMemo(
