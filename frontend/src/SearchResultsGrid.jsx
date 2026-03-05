@@ -30,11 +30,11 @@ const thumbnailColumn = {
     const row = info.row.original
     const url = info.getValue()
     const itemType = row?.itemType
-    if (!url || itemType !== 'littlePrinceItem') return null
+    if (!url || itemType !== 'littlePrinceItem') return <span aria-hidden="true">&nbsp;</span>
     return (
       <img
         src={url}
-        alt={row?.title || 'Thumbnail'}
+        alt=""
         className="search-thumb"
         loading="lazy"
       />
