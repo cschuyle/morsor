@@ -9,6 +9,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeSet;
 import java.util.stream.Collectors;
 
 @RestController
@@ -45,6 +46,7 @@ public class SearchController {
     public SearchResponse search(
             @RequestParam(required = false) List<String> trove,
             @RequestParam(required = false, defaultValue = "") String query,
+            @RequestParam(required = false) String fileTypes,
             @RequestParam(required = false, defaultValue = "0") int page,
             @RequestParam(required = false, defaultValue = "500") int size,
             @RequestParam(required = false) String sortBy,
@@ -68,6 +70,21 @@ public class SearchController {
                 all = all.stream().sorted(cmp).toList();
             }
         }
+        // Multiple selected file types: disjunction (OR) — keep items that have at least one file of any selected type.
+        // Accept comma-separated (e.g. fileTypes=MP3,PDF) so all values are reliably received.
+        List<String> fileTypesFilter = fileTypes != null && !fileTypes.isBlank()
+                ? java.util.Arrays.stream(fileTypes.split(","))
+                        .map(String::trim)
+                        .filter(s -> !s.isBlank())
+                        .toList()
+                : List.of();
+        if (!fileTypesFilter.isEmpty()) {
+            Set<String> extSet = fileTypesFilter.stream().map(String::toUpperCase).collect(Collectors.toSet());
+            all = all.stream()
+                    .filter(r -> hasFileWithAnyExtension(r.result(), extSet))
+                    .toList();
+        }
+        List<String> availableFileTypes = collectFileTypes(all);
         long total = all.size();
         Map<String, Long> troveCounts = all.stream()
                 .filter(r -> r.result().troveId() != null && !r.result().troveId().isBlank())
@@ -76,7 +93,43 @@ public class SearchController {
         int to = (int) Math.min(from + size, total);
         List<SearchResultWithScore> pageResults = from < to ? all.subList(from, to) : List.of();
         String warning = cacheResult.cached() ? null : "Result not cached (cache memory limit reached). Pagination may be slower.";
-        return new SearchResponse(total, pageResults, page, size, troveCounts, warning);
+        return new SearchResponse(total, pageResults, page, size, troveCounts, availableFileTypes, warning);
+    }
+
+    /** Returns true if the result has at least one file whose extension is in the set (disjunction: any match). */
+    private static boolean hasFileWithAnyExtension(SearchResult result, Set<String> extensions) {
+        if (result.files() == null || extensions == null || extensions.isEmpty()) return false;
+        for (String url : result.files()) {
+            if (url != null) {
+                String ext = extractExtension(url);
+                if (ext != null && extensions.contains(ext)) return true;
+            }
+        }
+        return false;
+    }
+
+    private static String extractExtension(String url) {
+        if (url == null) return null;
+        int q = url.indexOf('?');
+        String path = q >= 0 ? url.substring(0, q) : url;
+        int lastDot = path.lastIndexOf('.');
+        if (lastDot >= 0 && lastDot < path.length() - 1) {
+            return path.substring(lastDot + 1).toUpperCase();
+        }
+        return null;
+    }
+
+    private static List<String> collectFileTypes(List<SearchResultWithScore> results) {
+        Set<String> types = new TreeSet<>();
+        for (SearchResultWithScore r : results) {
+            if (r.result().files() != null) {
+                for (String url : r.result().files()) {
+                    String ext = extractExtension(url);
+                    if (ext != null && !ext.isEmpty()) types.add(ext);
+                }
+            }
+        }
+        return List.copyOf(types);
     }
 
     private static final int DEFAULT_DUPLICATES_MAX_MATCHES = 20;

@@ -49,9 +49,12 @@ function App() {
   const [uniqPageSize, setUniqPageSize] = useState(50)
   const [uniquesSortBy, setUniquesSortBy] = useState(null)
   const [uniquesSortDir, setUniquesSortDir] = useState('asc')
+  const [fileTypeFilters, setFileTypeFilters] = useState(() => new Set())
+  const [fileTypeDropdownOpen, setFileTypeDropdownOpen] = useState(false)
   const queryRef = useRef(query)
   const skipCheckboxSearchRef = useRef(true)
   const abortControllerRef = useRef(null)
+  const fileTypeDropdownRef = useRef(null)
   const PAGE_SIZE_OPTIONS = [10, 25, 100, 500, 1000, 5000, 10000]
   queryRef.current = query
 
@@ -70,7 +73,7 @@ function App() {
       .catch(() => setMessage('Status: Backend unreachable'))
   }
 
-  function fetchSearch(pageNum, sizeOverride = null, troveIdsOverride = null, sortByOverride = null, sortDirOverride = null) {
+  function fetchSearch(pageNum, sizeOverride = null, troveIdsOverride = null, sortByOverride = null, sortDirOverride = null, fileTypesOverride = undefined) {
     const size = sizeOverride ?? pageSize
     const q = queryRef.current
     if (!q.trim()) {
@@ -80,12 +83,14 @@ function App() {
     const troveIds = troveIdsOverride ?? selectedTroveIds
     const nextSortBy = sortByOverride !== undefined && sortByOverride !== null ? sortByOverride : sortBy
     const nextSortDir = sortDirOverride !== undefined && sortDirOverride !== null ? sortDirOverride : sortDir
+    const fileTypesToUse = fileTypesOverride !== undefined ? fileTypesOverride : fileTypeFilters
     const params = new URLSearchParams({
       query: q.trim(),
       page: String(pageNum),
       size: String(size),
     })
     troveIds.forEach((id) => params.append('trove', id))
+    if (fileTypesToUse && fileTypesToUse.size > 0) params.set('fileTypes', [...fileTypesToUse].sort().join(','))
     if (sortByOverride !== undefined || sortDirOverride !== undefined) {
       setSortBy(nextSortBy || null)
       setSortDir(nextSortDir)
@@ -127,6 +132,17 @@ function App() {
   }, [])
 
   useEffect(() => {
+    if (!fileTypeDropdownOpen) return
+    function handleClickOutside(e) {
+      if (fileTypeDropdownRef.current && !fileTypeDropdownRef.current.contains(e.target)) {
+        setFileTypeDropdownOpen(false)
+      }
+    }
+    document.addEventListener('click', handleClickOutside)
+    return () => document.removeEventListener('click', handleClickOutside)
+  }, [fileTypeDropdownOpen])
+
+  useEffect(() => {
     fetch('/api/troves', { credentials: 'include', headers: { ...getApiAuthHeaders() } })
       .then((res) => {
         if (res.status === 401) { window.location.href = '/login'; return null }
@@ -142,6 +158,8 @@ function App() {
   useEffect(() => {
     const q = searchParams.get('q')
     setQuery(q != null ? q : '')
+    const ftAll = searchParams.getAll('fileTypes')
+    setFileTypeFilters(new Set(ftAll.filter((f) => f != null && f.trim()).map((f) => f.trim())))
     const mode = searchParams.get('mode')
     if (mode !== 'duplicates' && mode !== 'uniques') {
       setSearchSelectedTroveIds(new Set(searchParams.getAll('trove')))
@@ -154,13 +172,15 @@ function App() {
     }
   }, [searchParams])
 
-  function buildSearchParams(mode, q, searchTroves, dupPrimary, dupCompare, uniqPrimary, uniqCompare) {
+  function buildSearchParams(mode, q, searchTroves, dupPrimary, dupCompare, uniqPrimary, uniqCompare, fileTypesSet = null) {
     const next = new URLSearchParams()
     if (mode !== 'search') next.set('mode', mode)
     const qTrim = (q ?? '').trim()
     if (qTrim) next.set('q', qTrim)
     if (mode === 'search') {
       searchTroves.forEach((id) => next.append('trove', id))
+      const ft = fileTypesSet ?? fileTypeFilters
+      if (ft && ft.size > 0) ft.forEach((f) => next.append('fileTypes', f))
     } else if (mode === 'duplicates') {
       if (dupPrimary) next.set('primary', dupPrimary)
       dupCompare.forEach((id) => next.append('compare', id))
@@ -188,12 +208,13 @@ function App() {
       dupPrimaryTroveId,
       dupCompareTroveIds,
       uniqPrimaryTroveId,
-      uniqCompareTroveIds
+      uniqCompareTroveIds,
+      fileTypeFilters
     )
     if (next.toString() !== searchParams.toString()) {
       setSearchParams(next, { replace: true })
     }
-  }, [query, searchMode, searchSelectedTroveIds, primaryTroveId, dupCompareTroveIds, uniqCompareTroveIds])
+  }, [query, searchMode, searchSelectedTroveIds, primaryTroveId, dupCompareTroveIds, uniqCompareTroveIds, fileTypeFilters])
 
   useEffect(() => {
     if (searchMode !== 'search') return
@@ -860,7 +881,7 @@ aria-label="Clear compare troves"
                 aria-selected={searchMode === 'search'}
                 className={searchMode === 'search' ? 'active' : ''}
                 onClick={() => {
-                  setSearchParams(buildSearchParams('search', query, searchSelectedTroveIds, dupPrimaryTroveId, dupCompareTroveIds, uniqPrimaryTroveId, uniqCompareTroveIds), { replace: true })
+                  setSearchParams(buildSearchParams('search', query, searchSelectedTroveIds, dupPrimaryTroveId, dupCompareTroveIds, uniqPrimaryTroveId, uniqCompareTroveIds, fileTypeFilters), { replace: true })
                   setDuplicatesResult(null)
                   setUniquesResult(null)
                 }}
@@ -963,6 +984,45 @@ aria-label="Clear compare troves"
                 <button type="submit" disabled={searching} className="search-submit-btn" aria-label="Search" title="Search">
                   {searching ? 'Searching…' : 'Go!'}
                 </button>
+                {searchMode === 'search' && Array.isArray(searchResult?.availableFileTypes) && searchResult.availableFileTypes.length >= 2 && (
+                  <div className="search-filetype-dropdown-wrap" ref={fileTypeDropdownRef}>
+                    <button
+                      type="button"
+                      className="search-filetype-dropdown-trigger"
+                      onClick={() => setFileTypeDropdownOpen((o) => !o)}
+                      aria-haspopup="listbox"
+                      aria-expanded={fileTypeDropdownOpen}
+                      aria-label="Filter by file type"
+                    >
+                      File types: {fileTypeFilters.size === 0 ? 'All' : [...fileTypeFilters].sort().join(', ')}
+                    </button>
+                    {fileTypeDropdownOpen && (
+                      <div
+                        className="search-filetype-dropdown-panel"
+                        role="listbox"
+                        aria-label="File type filter"
+                      >
+                        {searchResult.availableFileTypes.map((ft) => (
+                          <label key={ft} className="search-filetype-option">
+                            <input
+                              type="checkbox"
+                              checked={fileTypeFilters.has(ft)}
+                              onChange={() => {
+                                const next = new Set(fileTypeFilters)
+                                if (next.has(ft)) next.delete(ft)
+                                else next.add(ft)
+                                setFileTypeFilters(next)
+                                setSearchParams(buildSearchParams('search', query, searchSelectedTroveIds, dupPrimaryTroveId, dupCompareTroveIds, uniqPrimaryTroveId, uniqCompareTroveIds, next), { replace: true })
+                                fetchSearch(0, null, null, null, null, next)
+                              }}
+                            />
+                            {ft}
+                          </label>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
                 {searching && (
                   <>
                     <span className="search-spinner" aria-hidden="true" />
