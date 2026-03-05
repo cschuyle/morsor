@@ -36,12 +36,13 @@ function thumbnailColumnDef(onThumbnailClick) {
       const pdfs = files.filter((u) => typeof u === 'string' && /\.pdf(\?|$)/i.test(u))
       const imageUrls = files.filter((u) => typeof u === 'string' && /\.(jpe?g|png|gif|webp|tiff?|bmp|svg)(\?|$)/i.test(u))
       const ebooks = files.filter((u) => typeof u === 'string' && /\.(mobi|epub)(\?|$)/i.test(u))
+      const videos = files.filter((u) => typeof u === 'string' && /\.(mp4|m4v|avi|mov|mkv|webm|wmv|flv)(\?|$)/i.test(u))
       if (!url || itemType !== 'littlePrinceItem') return <span aria-hidden="true">&nbsp;</span>
       return (
         <button
           type="button"
           className="search-thumb-btn"
-          onClick={() => (largeUrl || pdfs.length > 0 || imageUrls.length > 0 || ebooks.length > 0) && onThumbnailClick({ imageUrl: largeUrl, pdfs, imageUrls, ebooks })}
+          onClick={() => (largeUrl || pdfs.length > 0 || imageUrls.length > 0 || ebooks.length > 0 || videos.length > 0) && onThumbnailClick({ imageUrl: largeUrl, pdfs, imageUrls, ebooks, videos })}
           aria-label="View full size"
         >
           {largeUrl && (
@@ -150,6 +151,27 @@ export function SearchResultsGrid({ data, sortBy = null, sortDir = 'asc', onSort
                   <img src={imgUrl} alt="" />
                 </a>
               ))}
+            </div>
+          )}
+          {Array.isArray(lightbox.videos) && lightbox.videos.length > 0 && (
+            <div
+              className={`search-thumb-lightbox-videos ${!(lightbox.pdfs?.length) && !(lightbox.ebooks?.length) ? 'search-thumb-lightbox-videos-only' : ''}`}
+              onClick={(e) => e.stopPropagation()}
+            >
+              {lightbox.videos.map((url) => {
+                const ext = (url.match(/\.([a-z0-9]+)(\?|$)/i) || [])[1] || 'video'
+                return (
+                  <a
+                    key={url}
+                    href={url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="search-thumb-file-link"
+                  >
+                    {ext.toUpperCase()}
+                  </a>
+                )
+              })}
             </div>
           )}
           {Array.isArray(lightbox.ebooks) && lightbox.ebooks.length > 0 && (
