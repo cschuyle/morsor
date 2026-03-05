@@ -9,6 +9,7 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.access.intercept.AuthorizationFilter;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
 import org.springframework.security.web.authentication.HttpStatusEntryPoint;
@@ -67,7 +68,7 @@ public class SecurityConfig {
                 .csrfTokenRepository(csrfRepo)
                 .csrfTokenRequestHandler(requestHandler))
             .authorizeHttpRequests(auth -> auth
-                .requestMatchers("/api/**").authenticated()
+                .requestMatchers("/api/**").access(new StreamAwareAuthorizationManager())
                 .anyRequest().permitAll())
             .exceptionHandling(ex -> ex
                 .defaultAuthenticationEntryPointFor(
@@ -82,6 +83,7 @@ public class SecurityConfig {
                 .logoutSuccessUrl("/login")
                 .permitAll())
             .userDetailsService(userDetailsService)
+            .addFilterBefore(new ResponseCapturingFilter(), AuthorizationFilter.class)
             .addFilterBefore(apiTokenAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
