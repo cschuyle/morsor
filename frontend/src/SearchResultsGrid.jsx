@@ -32,12 +32,14 @@ function thumbnailColumnDef(onThumbnailClick) {
       const url = info.getValue()
       const itemType = row?.itemType
       const largeUrl = row?.largeImageUrl
+      const files = Array.isArray(row?.files) ? row.files : []
+      const pdfs = files.filter((u) => typeof u === 'string' && /\.pdf(\?|$)/i.test(u))
       if (!url || itemType !== 'littlePrinceItem') return <span aria-hidden="true">&nbsp;</span>
       return (
         <button
           type="button"
           className="search-thumb-btn"
-          onClick={() => largeUrl && onThumbnailClick(largeUrl)}
+          onClick={() => (largeUrl || pdfs.length > 0) && onThumbnailClick({ imageUrl: largeUrl, pdfs })}
           aria-label="View full size"
         >
           <img
@@ -63,22 +65,22 @@ const scoreColumn = {
 
 export function SearchResultsGrid({ data, sortBy = null, sortDir = 'asc', onSortChange, showScoreColumn = false }) {
   const [globalFilter, setGlobalFilter] = useState('')
-  const [lightboxUrl, setLightboxUrl] = useState(null)
+  const [lightbox, setLightbox] = useState(null)
 
-  const closeLightbox = useCallback(() => setLightboxUrl(null), [])
+  const closeLightbox = useCallback(() => setLightbox(null), [])
   useEffect(() => {
-    if (!lightboxUrl) return
+    if (!lightbox) return
     const onKey = (e) => { if (e.key === 'Escape') closeLightbox() }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [lightboxUrl, closeLightbox])
+  }, [lightbox, closeLightbox])
 
   const hasThumbnails = useMemo(
     () => Array.isArray(data) && data.some((row) => row && row.thumbnailUrl && row.itemType === 'littlePrinceItem'),
     [data]
   )
   const baseColumns = useMemo(
-    () => (hasThumbnails ? [thumbnailColumnDef(setLightboxUrl), ...textColumns] : textColumns),
+    () => (hasThumbnails ? [thumbnailColumnDef(setLightbox), ...textColumns] : textColumns),
     [hasThumbnails]
   )
   const columns = useMemo(
@@ -114,7 +116,7 @@ export function SearchResultsGrid({ data, sortBy = null, sortDir = 'asc', onSort
 
   return (
     <div className="search-results-grid">
-      {lightboxUrl && (
+      {lightbox && (
         <div
           className="search-thumb-lightbox"
           role="dialog"
@@ -123,7 +125,24 @@ export function SearchResultsGrid({ data, sortBy = null, sortDir = 'asc', onSort
           onClick={closeLightbox}
         >
           <button type="button" className="search-thumb-lightbox-close" onClick={closeLightbox} aria-label="Close">×</button>
-          <img src={lightboxUrl} alt="" onClick={(e) => e.stopPropagation()} />
+          {lightbox.imageUrl && (
+            <img src={lightbox.imageUrl} alt="" onClick={(e) => e.stopPropagation()} />
+          )}
+          {Array.isArray(lightbox.pdfs) && lightbox.pdfs.length > 0 && (
+            <div className="search-thumb-lightbox-files" onClick={(e) => e.stopPropagation()}>
+              {lightbox.pdfs.map((url, idx) => (
+                <a
+                  key={url}
+                  href={url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="search-thumb-file-link"
+                >
+                  {lightbox.pdfs.length > 1 ? `PDF ${idx + 1}` : 'PDF'}
+                </a>
+              ))}
+            </div>
+          )}
         </div>
       )}
       <div className="grid-toolbar">

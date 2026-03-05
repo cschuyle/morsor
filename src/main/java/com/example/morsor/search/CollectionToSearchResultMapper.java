@@ -76,7 +76,7 @@ public final class CollectionToSearchResultMapper {
             JsonNode titleNode = titlesArray.get(i);
             String title = titleNode != null && titleNode.isTextual() ? titleNode.asText() : (titleNode != null ? titleNode.toString() : "");
             String id = troveId != null && !troveId.isEmpty() ? troveId + "-" + i : "trove-" + i;
-            out.add(new SearchResult(id, title, title, troveName, troveId, null, null, null));
+            out.add(new SearchResult(id, title, title, troveName, troveId, null, null, List.of(), null));
         }
     }
 
@@ -112,9 +112,10 @@ public final class CollectionToSearchResultMapper {
         String snippet = buildSnippet(item);
         String thumbnailUrl = text(item, "smallImageUrl");
         String largeImageUrl = text(item, "largeImageUrl");
+        List<String> files = textArray(item, "files");
         String itemType = text(item, "_itemType");
 
-        return new SearchResult(id, title, snippet, troveName, troveId, thumbnailUrl, largeImageUrl, itemType);
+        return new SearchResult(id, title, snippet, troveName, troveId, thumbnailUrl, largeImageUrl, files, itemType);
     }
 
     private static String buildSnippet(JsonNode item) {
@@ -151,5 +152,21 @@ public final class CollectionToSearchResultMapper {
         if (v == null || v.isNull()) return null;
         if (!v.isTextual()) return v.toString();
         return v.asText();
+    }
+
+    private static List<String> textArray(JsonNode node, String field) {
+        if (node == null) return List.of();
+        JsonNode arr = node.get(field);
+        if (arr == null || !arr.isArray() || arr.isEmpty()) return List.of();
+        List<String> out = new ArrayList<>(arr.size());
+        for (JsonNode v : arr) {
+            if (v == null || v.isNull()) continue;
+            if (v.isTextual()) {
+                out.add(v.asText());
+            } else {
+                out.add(v.toString());
+            }
+        }
+        return out;
     }
 }
