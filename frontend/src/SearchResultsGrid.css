@@ -116,13 +116,15 @@
 }
 
 .grid-table .col-thumb {
-  width: 3.5rem;
+  width: 5rem;
+  padding-left: 0.25rem;
+  padding-right: 0.25rem;
 }
 
 .search-thumb {
   display: block;
-  max-width: 3rem;
-  max-height: 3rem;
+  max-width: 4.8rem;
+  max-height: 4.8rem;
   object-fit: cover;
   border-radius: 4px;
 }
