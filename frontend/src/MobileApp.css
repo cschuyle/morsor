@@ -598,6 +598,15 @@
   -webkit-overflow-scrolling: touch;
 }
 
+.mobile-search-results-grid .grid-table .col-thumb {
+  width: 2.75rem;
+}
+
+.mobile-search-results-grid .search-thumb {
+  max-width: 2.25rem;
+  max-height: 2.25rem;
+}
+
 .mobile-dup-uniques-results {
   margin-top: 1rem;
   overflow-x: auto;
