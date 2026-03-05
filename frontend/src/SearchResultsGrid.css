@@ -123,11 +123,34 @@
 
 .search-thumb-btn {
   display: block;
+  position: relative;
   padding: 0;
   border: none;
   background: none;
   cursor: pointer;
   line-height: 0;
+}
+
+.search-thumb-pop-icon {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 1.1rem;
+  height: 1.1rem;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.5);
+  color: #fff;
+  font-size: 0.7rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+  pointer-events: none;
+}
+
+.search-thumb-btn:hover .search-thumb-pop-icon {
+  opacity: 1;
 }
 
 .search-thumb {

@@ -42,6 +42,9 @@ function thumbnailColumnDef(onThumbnailClick) {
           onClick={() => (largeUrl || pdfs.length > 0) && onThumbnailClick({ imageUrl: largeUrl, pdfs })}
           aria-label="View full size"
         >
+          {largeUrl && (
+            <span className="search-thumb-pop-icon" aria-hidden="true">↗</span>
+          )}
           <img
             src={url}
             alt=""
