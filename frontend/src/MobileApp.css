@@ -446,6 +446,10 @@
   background: #e8eeff;
 }
 
+.mobile-trove-item--has-results .mobile-trove-label {
+  font-weight: 600;
+}
+
 .mobile-trove-list-separator {
   list-style: none;
   margin: 0;

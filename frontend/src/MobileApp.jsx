@@ -877,15 +877,27 @@ onClick={() => {
                     ))
                   : (() => {
                       const { selected, notSelected } = mobileSearchTrovesWithResults
-                      const renderTrove = (t) => (
-                        <li key={t.id} className={`mobile-trove-item${selectedTroveIds.has(t.id) ? ' mobile-trove-item--selected' : ''}`}>
-                          <label className="mobile-trove-label">
-                            <input type="checkbox" checked={selectedTroveIds.has(t.id)} onChange={() => toggleTrove(t.id)} />
-                            <span>{t.name}</span>
-                          </label>
-                          <button type="button" className="mobile-trove-only-link" onClick={(e) => { e.preventDefault(); handleOnlyClick(t.id) }} aria-label={`Search only ${t.name}`} title="Select only this trove">only</button>
-                        </li>
-                      )
+                      const renderTrove = (t) => {
+                        const resultCount =
+                          searchResult != null
+                            ? (searchResult.troveCounts != null && typeof searchResult.troveCounts === 'object'
+                              ? (searchResult.troveCounts[t.id] ?? 0)
+                              : (Array.isArray(results) ? results.filter((r) => r.troveId === t.id).length : 0))
+                            : 0
+                        return (
+                          <li key={t.id} className={`mobile-trove-item${selectedTroveIds.has(t.id) ? ' mobile-trove-item--selected' : ''}${searchResult != null && resultCount > 0 ? ' mobile-trove-item--has-results' : ''}`}>
+                            <label className="mobile-trove-label">
+                              <input type="checkbox" checked={selectedTroveIds.has(t.id)} onChange={() => toggleTrove(t.id)} />
+                              <span>
+                                {t.name} ({searchResult != null ? `${formatCount(resultCount)}/${formatCount(t.count ?? 0)}` : formatCount(t.count ?? 0)})
+                              </span>
+                            </label>
+                            {(selectedTroveIds.size !== 1 || !selectedTroveIds.has(t.id)) && (
+                              <button type="button" className="mobile-trove-only-link" onClick={(e) => { e.preventDefault(); handleOnlyClick(t.id) }} aria-label={`Search only ${t.name}`} title="Select only this trove">only</button>
+                            )}
+                          </li>
+                        )
+                      }
                       return (
                         <>
                           {selected.map(renderTrove)}
