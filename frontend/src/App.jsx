@@ -1578,7 +1578,7 @@ aria-label="Clear compare troves"
                 if (token) headers['X-XSRF-TOKEN'] = token
                 fetch('/api/troves/reload', { method: 'POST', credentials: 'include', headers })
                   .then((res) => { if (res.status === 401) { window.location.href = '/login'; return }; if (res.ok) return fetch('/api/troves', { credentials: 'include', headers: { ...getApiAuthHeaders() } }).then((r) => r.ok ? r.json() : []) })
-                  .then((data) => { if (Array.isArray(data)) setTroves(data) })
+                  .then((data) => { if (Array.isArray(data)) setTroves(data); refreshStatusMessage() })
                   .catch(() => {})
               }}
             >

@@ -41,6 +41,7 @@ public class SearchController {
     @PostMapping("/troves/reload")
     public void reloadTroves() {
         searchDataService.reloadData();
+        searchCache.clear();
     }
 
     /** Status and cache stats for the UI; avoids dependency on actuator health contributor API. */
