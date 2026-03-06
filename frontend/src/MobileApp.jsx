@@ -859,7 +859,7 @@ onClick={() => {
                         />
                         <span>{t.name}</span>
                       </label>
-                      <button type="button" className="mobile-trove-only-link" onClick={(e) => { e.preventDefault(); setPrimary(t.id); setShowTrovePicker(false) }} aria-label={`Set primary: ${t.name}`}>only</button>
+                      <button type="button" className="mobile-trove-only-link" onClick={(e) => { e.preventDefault(); setPrimary(t.id); setShowTrovePicker(false) }} aria-label={`Set primary: ${t.name}`} title="Only this trove"><img src="/target.png" alt="" className="mobile-trove-only-icon" /></button>
                     </li>
                   ))
                 : isDupOrUniques && trovePickerSubTab === 'compare'
@@ -893,7 +893,7 @@ onClick={() => {
                               </span>
                             </label>
                             {(selectedTroveIds.size !== 1 || !selectedTroveIds.has(t.id)) && (
-                              <button type="button" className="mobile-trove-only-link" onClick={(e) => { e.preventDefault(); handleOnlyClick(t.id) }} aria-label={`Search only ${t.name}`} title="Select only this trove">only</button>
+                              <button type="button" className="mobile-trove-only-link" onClick={(e) => { e.preventDefault(); handleOnlyClick(t.id) }} aria-label={`Search only ${t.name}`} title="Only this trove"><img src="/target.png" alt="" className="mobile-trove-only-icon" /></button>
                             )}
                           </li>
                         )

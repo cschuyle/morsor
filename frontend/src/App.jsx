@@ -875,9 +875,9 @@ aria-label="Clear compare troves"
                     className="trove-only-link"
                     onClick={(e) => { e.preventDefault(); handleOnlyClick(t.id) }}
                     aria-label={`Search only ${t.name}`}
-                    title="Select only this trove"
+                    title="Only this trove"
                   >
-                    only
+                    <img src="/target.png" alt="" className="trove-only-icon" />
                   </button>
                 )}
               </li>
@@ -908,9 +908,9 @@ aria-label="Clear compare troves"
                     className="trove-only-link"
                     onClick={(e) => { e.preventDefault(); handleOnlyClick(t.id) }}
                     aria-label={`Search only ${t.name}`}
-                    title="Select only this trove"
+                    title="Only this trove"
                   >
-                    only
+                    <img src="/target.png" alt="" className="trove-only-icon" />
                   </button>
                 )}
               </li>

@@ -510,21 +510,25 @@
 
 .trove-only-link {
   flex-shrink: 0;
-  padding: 0.25rem 0.5rem;
+  padding: 0.25rem 0.4rem;
   margin-right: 0.4rem;
-  border: 1px solid #c0c8e0;
-  border-radius: 4px;
-  background: #f0f4ff;
+  border: none;
+  background: none;
   font-family: inherit;
-  font-size: 0.75rem;
   color: #646cff;
   cursor: pointer;
-  font-weight: 500;
+  border-radius: 4px;
 }
 
 .trove-only-link:hover {
-  background: #e0e8ff;
-  border-color: #646cff;
+  opacity: 0.85;
+}
+
+.trove-only-link .trove-only-icon {
+  display: block;
+  width: 1.5rem;
+  height: 1.5rem;
+  object-fit: contain;
 }
 
 .trove-checkbox:hover {
