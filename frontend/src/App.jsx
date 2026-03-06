@@ -7,7 +7,7 @@ import { getApiAuthHeaders } from './apiAuth'
 import { getCsrfToken } from './getCsrfToken'
 import { queryCache } from './queryCache'
 import { formatCount, formatCacheBytes } from './formatCount'
-import { groupFileTypes, getGroupNameIfFullySelected } from './fileTypeGroups'
+import { groupFileTypes, getGroupNameIfFullySelected, getFullySelectedGroupNames } from './fileTypeGroups'
 import './App.css'
 
 function App() {
@@ -1056,7 +1056,11 @@ aria-label="Clear compare troves"
                       >
                         {fileTypeFilters.size === 0
                           ? 'File types: All'
-                          : `Only ${getGroupNameIfFullySelected(fileTypeFilters, allAvailableFileTypes) ?? [...fileTypeFilters].sort().join(', ')}`}
+                          : (() => {
+                              const groupNames = getFullySelectedGroupNames(fileTypeFilters, allAvailableFileTypes)
+                              const label = groupNames?.length > 0 ? groupNames.join(', ') : (getGroupNameIfFullySelected(fileTypeFilters, allAvailableFileTypes) ?? [...fileTypeFilters].sort().join(', '))
+                              return `Only ${label}`
+                            })()}
                       </button>
                       {fileTypeFilters.size > 0 && (
                         <>

@@ -8,7 +8,7 @@ const GROUPS = [
   { group: 'Images', types: IMAGE_TYPES },
   { group: 'Text', types: TEXT_TYPES },
   { group: 'Video', types: VIDEO_TYPES },
-  { group: 'AUDIO', types: AUDIO_TYPES }
+  { group: 'Audio', types: AUDIO_TYPES }
 ]
 
 /**
@@ -28,7 +28,7 @@ export function groupFileTypes(availableFileTypes) {
     if (inThisGroup.length > 0) result.push({ group, types: inThisGroup })
   }
   const others = available.filter((t) => !usedUpper.has(upper(t)))
-  if (others.length > 0) result.push({ group: 'OTHER', types: others })
+  if (others.length > 0) result.push({ group: 'Other', types: others })
   return result
 }
 
@@ -58,7 +58,46 @@ export function getGroupNameIfFullySelected(selectedFileTypes, allAvailableFileT
   const otherSet = new Set(available.map(upper).filter((t) => !usedUpper.has(t)))
   if (otherSet.size > 0 && otherSet.size === selectedUpper.size && [...otherSet].every((t) => selectedUpper.has(t))) {
     if (otherSet.size === 1) return null
-    return 'OTHER'
+    return 'Other'
   }
   return null
+}
+
+/**
+ * If the selection is only full groups (no group has some but not all of its types selected), return the list of those group names for display (e.g. ["Images", "Text"]).
+ * Used on desktop to show "Only Images, Text" instead of listing every child type.
+ * @param {Set<string>} selectedFileTypes
+ * @param {string[]} [allAvailableFileTypes]
+ * @returns {string[] | null} Comma-delimited list of group names, or null if any group is partially selected
+ */
+export function getFullySelectedGroupNames(selectedFileTypes, allAvailableFileTypes) {
+  if (!selectedFileTypes || selectedFileTypes.size === 0) return null
+  const upper = (s) => (s || '').toUpperCase()
+  const selectedUpper = new Set([...selectedFileTypes].map(upper))
+  const available = allAvailableFileTypes || []
+  const availableUpper = new Set(available.map(upper))
+  const usedUpper = new Set()
+  GROUPS.forEach(({ types }) => types.forEach((t) => usedUpper.add(t)))
+  const otherSet = new Set(available.map(upper).filter((t) => !usedUpper.has(t)))
+  const result = []
+  const unionSelected = new Set()
+  for (const { group, types } of GROUPS) {
+    const inDropdown = new Set(types.filter((t) => availableUpper.has(t)))
+    if (inDropdown.size === 0) continue
+    const selectedInGroup = [...inDropdown].filter((t) => selectedUpper.has(t))
+    if (selectedInGroup.length === 0) continue
+    if (selectedInGroup.length < inDropdown.size) return null
+    result.push(group)
+    inDropdown.forEach((t) => unionSelected.add(t))
+  }
+  if (otherSet.size > 0) {
+    const selectedInOther = [...otherSet].filter((t) => selectedUpper.has(t))
+    if (selectedInOther.length > 0) {
+      if (selectedInOther.length < otherSet.size) return null
+      result.push('Other')
+      otherSet.forEach((t) => unionSelected.add(t))
+    }
+  }
+  if (unionSelected.size !== selectedUpper.size || [...selectedUpper].some((t) => !unionSelected.has(t))) return null
+  return result.length > 0 ? result : null
 }
