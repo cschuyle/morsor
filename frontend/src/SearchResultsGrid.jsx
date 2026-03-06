@@ -72,7 +72,7 @@ const scoreColumn = {
   },
 }
 
-export function SearchResultsGrid({ data, sortBy = null, sortDir = 'asc', onSortChange, showScoreColumn = false }) {
+export function SearchResultsGrid({ data, sortBy = null, sortDir = 'asc', onSortChange, showScoreColumn = false, afterFilterSlot = null }) {
   const [globalFilter, setGlobalFilter] = useState('')
   const [lightbox, setLightbox] = useState(null)
 
@@ -198,14 +198,12 @@ export function SearchResultsGrid({ data, sortBy = null, sortDir = 'asc', onSort
       <div className="grid-toolbar">
         <input
           type="search"
-          placeholder="Filter items…"
+          placeholder="Filter this page"
           value={globalFilter}
           onChange={(e) => setGlobalFilter(e.target.value)}
           className="grid-filter-input"
         />
-        <span className="grid-toolbar-note">
-          <strong>Filtering</strong> is for the current page only. <strong>Sorting by column</strong> re-executes the search.
-        </span>
+        {afterFilterSlot}
       </div>
       <div className="grid-wrapper">
         <table className="grid-table">

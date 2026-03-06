@@ -37,13 +37,6 @@
   box-shadow: 0 0 0 2px rgba(100, 108, 255, 0.2);
 }
 
-.grid-toolbar-note {
-  font-size: 0.85rem;
-  color: #666;
-  flex: 1;
-  min-width: 0;
-}
-
 .grid-wrapper {
   overflow-x: auto;
   border: 1px solid #ddd;

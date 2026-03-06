@@ -45,9 +45,12 @@ function MobileApp() {
   const [statusMessage, setStatusMessage] = useState('')
   const [cacheEntries, setCacheEntries] = useState(0)
   const [compareProgress, setCompareProgress] = useState({ current: 0, total: 0 })
+  const [fileTypeFilters, setFileTypeFilters] = useState(() => new Set())
+  const [fileTypeDropdownOpen, setFileTypeDropdownOpen] = useState(false)
   const queryRef = useRef(query)
   const skipSearchRef = useRef(true)
   const abortRef = useRef(null)
+  const fileTypeDropdownRef = useRef(null)
   const [searchParams, setSearchParams] = useSearchParams()
   const location = useLocation()
   queryRef.current = query
@@ -58,6 +61,8 @@ function MobileApp() {
   useEffect(() => {
     const q = searchParams.get('q')
     setQuery(q != null ? q : '')
+    const ftAll = searchParams.getAll('fileTypes')
+    setFileTypeFilters(new Set(ftAll.filter((f) => f != null && f.trim()).map((f) => f.trim())))
     const mode = searchParams.get('mode')
     if (mode !== 'duplicates' && mode !== 'uniques') {
       setSearchMode('search')
@@ -76,13 +81,15 @@ function MobileApp() {
     }
   }, [searchParams])
 
-  function buildSearchParams() {
+  function buildSearchParams(fileTypesSet = null) {
     const next = new URLSearchParams()
     if (searchMode !== 'search') next.set('mode', searchMode)
     const qTrim = (query ?? '').trim()
     if (qTrim) next.set('q', qTrim)
     if (searchMode === 'search') {
       selectedTroveIds.forEach((id) => next.append('trove', id))
+      const ft = fileTypesSet ?? fileTypeFilters
+      ft.forEach((f) => next.append('fileTypes', f))
     } else if (searchMode === 'duplicates') {
       if (dupPrimaryTroveId) next.set('primary', dupPrimaryTroveId)
       dupCompareTroveIds.forEach((id) => next.append('compare', id))
@@ -126,7 +133,18 @@ function MobileApp() {
     if (next.toString() !== searchParams.toString()) {
       setSearchParams(next, { replace: true })
     }
-  }, [query, searchMode, selectedTroveIds, dupPrimaryTroveId, dupCompareTroveIds, uniqPrimaryTroveId, uniqCompareTroveIds, searchParams])
+  }, [query, searchMode, selectedTroveIds, dupPrimaryTroveId, dupCompareTroveIds, uniqPrimaryTroveId, uniqCompareTroveIds, fileTypeFilters, searchParams])
+
+  useEffect(() => {
+    if (!fileTypeDropdownOpen) return
+    function handleClickOutside(e) {
+      if (fileTypeDropdownRef.current && !fileTypeDropdownRef.current.contains(e.target)) {
+        setFileTypeDropdownOpen(false)
+      }
+    }
+    document.addEventListener('click', handleClickOutside)
+    return () => document.removeEventListener('click', handleClickOutside)
+  }, [fileTypeDropdownOpen])
 
   function refreshStatusMessage() {
     fetch('/api/status', { credentials: 'include', headers: { ...getApiAuthHeaders() } })
@@ -144,7 +162,7 @@ function MobileApp() {
       .catch(() => setStatusMessage('Status: Backend unreachable'))
   }
 
-  function fetchSearch(pageNum, sortByOverride = null, sortDirOverride = null) {
+  function fetchSearch(pageNum, sortByOverride = null, sortDirOverride = null, fileTypesOverride = undefined) {
     const q = queryRef.current.trim()
     if (!q) {
       setSearchResult({ count: 0, results: [], page: 0, size: MOBILE_PAGE_SIZE })
@@ -152,6 +170,7 @@ function MobileApp() {
     }
     const sortBy = sortByOverride ?? searchSortBy
     const sortDir = sortDirOverride ?? searchSortDir
+    const fileTypesToUse = fileTypesOverride !== undefined ? fileTypesOverride : fileTypeFilters
     if (sortByOverride != null || sortDirOverride != null) {
       setSearchSortBy(sortBy || null)
       setSearchSortDir(sortDir)
@@ -162,6 +181,7 @@ function MobileApp() {
       size: String(MOBILE_PAGE_SIZE),
     })
     selectedTroveIds.forEach((id) => params.append('trove', id))
+    if (fileTypesToUse && fileTypesToUse.size > 0) params.set('fileTypes', [...fileTypesToUse].sort().join(','))
     if (sortBy) {
       params.set('sortBy', sortBy)
       params.set('sortDir', sortDir)
@@ -834,6 +854,62 @@ onClick={() => {
                   sortBy={searchSortBy}
                   sortDir={searchSortDir}
                   onSortChange={(col, dir) => fetchSearch(0, col, dir)}
+                  afterFilterSlot={Array.isArray(searchResult?.availableFileTypes) && searchResult.availableFileTypes.length >= 2 ? (
+                    <div className="mobile-filetype-dropdown-wrap" ref={fileTypeDropdownRef}>
+                      <div className="mobile-filetype-trigger-wrap">
+                        <button
+                          type="button"
+                          className="mobile-filetype-trigger"
+                          onClick={() => setFileTypeDropdownOpen((o) => !o)}
+                          aria-haspopup="listbox"
+                          aria-expanded={fileTypeDropdownOpen}
+                          aria-label="Filter by file type"
+                        >
+                          {fileTypeFilters.size === 0 ? 'Types: All' : `Only ${[...fileTypeFilters].sort().join(', ')}`}
+                        </button>
+                        {fileTypeFilters.size > 0 && (
+                          <>
+                            <span className="mobile-filetype-divider" aria-hidden="true" />
+                            <button
+                              type="button"
+                              className="mobile-filetype-clear"
+                              title="Clear file type filter"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                setFileTypeFilters(new Set())
+                                setSearchParams(buildSearchParams(new Set()), { replace: true })
+                                fetchSearch(0, null, null, new Set())
+                              }}
+                              aria-label="Clear file type filter"
+                            >
+                              ×
+                            </button>
+                          </>
+                        )}
+                      </div>
+                      {fileTypeDropdownOpen && (
+                        <div className="mobile-filetype-panel" role="listbox" aria-label="File type filter">
+                          {searchResult.availableFileTypes.map((ft) => (
+                            <label key={ft} className="mobile-filetype-option">
+                              <input
+                                type="checkbox"
+                                checked={fileTypeFilters.has(ft)}
+                                onChange={() => {
+                                  const next = new Set(fileTypeFilters)
+                                  if (next.has(ft)) next.delete(ft)
+                                  else next.add(ft)
+                                  setFileTypeFilters(next)
+                                  setSearchParams(buildSearchParams(next), { replace: true })
+                                  fetchSearch(0, null, null, next)
+                                }}
+                              />
+                              {ft}
+                            </label>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  ) : null}
                 />
               </div>
             )}
