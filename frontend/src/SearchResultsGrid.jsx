@@ -22,6 +22,21 @@ const textColumns = [
   },
 ]
 
+function getLightboxPayload(row) {
+  if (!row) return null
+  const files = Array.isArray(row.files) ? row.files : []
+  const pdfs = files.filter((u) => typeof u === 'string' && /\.pdf(\?|$)/i.test(u))
+  const imageUrls = files.filter((u) => typeof u === 'string' && /\.(jpe?g|png|gif|webp|tiff?|bmp|svg)(\?|$)/i.test(u))
+  const ebooks = files.filter((u) => typeof u === 'string' && /\.(mobi|epub)(\?|$)/i.test(u))
+  const videos = files.filter((u) => typeof u === 'string' && /\.(mp4|m4v|avi|mov|mkv|webm|wmv|flv)(\?|$)/i.test(u))
+  const audios = files.filter((u) => typeof u === 'string' && /\.(mp3|m4a|wav|ogg|flac|aac|wma)(\?|$)/i.test(u))
+  const known = new Set([...pdfs, ...imageUrls, ...ebooks, ...videos, ...audios])
+  const otherFiles = files.filter((u) => typeof u === 'string' && !known.has(u))
+  const imageUrl = row.largeImageUrl || (imageUrls.length > 0 ? imageUrls[0] : null)
+  if (!imageUrl && pdfs.length === 0 && imageUrls.length === 0 && ebooks.length === 0 && videos.length === 0 && audios.length === 0 && otherFiles.length === 0) return null
+  return { imageUrl, pdfs, imageUrls, ebooks, videos, audios, otherFiles }
+}
+
 function getFileTypeTooltip(pdfs, imageUrls, ebooks, videos, audios, otherFiles) {
   const labels = new Set()
   if (pdfs.length > 0) labels.add('PDF')
@@ -101,7 +116,7 @@ const scoreColumn = {
   },
 }
 
-export function SearchResultsGrid({ data, sortBy = null, sortDir = 'asc', onSortChange, showScoreColumn = false, afterFilterSlot = null }) {
+export function SearchResultsGrid({ data, sortBy = null, sortDir = 'asc', onSortChange, showScoreColumn = false, afterFilterSlot = null, viewMode = 'list' }) {
   const [globalFilter, setGlobalFilter] = useState('')
   const [lightbox, setLightbox] = useState(null)
 
@@ -151,6 +166,19 @@ export function SearchResultsGrid({ data, sortBy = null, sortDir = 'asc', onSort
     getCoreRowModel: getCoreRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
   })
+
+  const filteredRowsForGallery = useMemo(() => {
+    const rows = data ?? []
+    const q = (globalFilter || '').trim().toLowerCase()
+    if (!q) return rows
+    return rows.filter((row) => {
+      const title = (row?.title ?? '').toLowerCase()
+      const trove = (row?.trove ?? '').toLowerCase()
+      return title.includes(q) || trove.includes(q)
+    })
+  }, [data, globalFilter])
+
+  const showGallery = viewMode === 'gallery'
 
   return (
     <div className="search-results-grid">
@@ -234,6 +262,43 @@ export function SearchResultsGrid({ data, sortBy = null, sortDir = 'asc', onSort
         />
         {afterFilterSlot}
       </div>
+      {showGallery ? (
+        <div className="search-results-gallery">
+          {filteredRowsForGallery.length === 0 ? (
+            <p className="search-results-gallery-empty">{globalFilter ? 'No rows match the filter.' : 'No items.'}</p>
+          ) : (
+            filteredRowsForGallery.map((row, idx) => {
+              const payload = getLightboxPayload(row)
+              const thumbUrl = row?.thumbnailUrl
+              const hasImage = thumbUrl && row?.itemType === 'littlePrinceItem'
+              const title = row?.title ?? ''
+              const trove = row?.trove ?? ''
+              return (
+                <button
+                  key={row.id ?? idx}
+                  type="button"
+                  className="search-results-gallery-card"
+                  onClick={() => payload && setLightbox(payload)}
+                  disabled={!payload}
+                  title={payload ? 'View full size' : title}
+                >
+                  <span className="search-results-gallery-card-image">
+                    {hasImage ? (
+                      <img src={thumbUrl} alt="" loading="lazy" />
+                    ) : (
+                      <span className="search-results-gallery-card-placeholder" aria-hidden="true">
+                        {title ? title.charAt(0).toUpperCase() : '?'}
+                      </span>
+                    )}
+                  </span>
+                  <span className="search-results-gallery-card-title">{title || '\u00A0'}</span>
+                  <span className="search-results-gallery-card-trove">{trove || '\u00A0'}</span>
+                </button>
+              )
+            })
+          )}
+        </div>
+      ) : (
       <div className="grid-wrapper">
         <table className="grid-table">
           <thead>
@@ -278,6 +343,7 @@ export function SearchResultsGrid({ data, sortBy = null, sortDir = 'asc', onSort
           </tbody>
         </table>
       </div>
+      )}
     </div>
   )
 }

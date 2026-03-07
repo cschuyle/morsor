@@ -55,6 +55,7 @@ function App() {
   const [fileTypeFilters, setFileTypeFilters] = useState(() => new Set())
   const [allAvailableFileTypes, setAllAvailableFileTypes] = useState([])
   const [fileTypeDropdownOpen, setFileTypeDropdownOpen] = useState(false)
+  const [searchResultsViewMode, setSearchResultsViewMode] = useState('list') // 'list' | 'gallery' (desktop only)
   const [compareProgress, setCompareProgress] = useState({ current: 0, total: 0 })
   const [reloadTrovesInProgress, setReloadTrovesInProgress] = useState(false)
   const [reloadTrovesProgress, setReloadTrovesProgress] = useState({ current: 0, total: 0 })
@@ -1468,6 +1469,7 @@ aria-label="Clear compare troves"
                       sortDir={sortDir}
                       onSortChange={handleGridSortChange}
                       showScoreColumn={query.trim() !== '*'}
+                      viewMode={searchResultsViewMode}
                     />
                   </>
                 )
@@ -1496,6 +1498,25 @@ aria-label="Clear compare troves"
                     {totalPages > 1 && ` Showing ${formatCount(from)}–${formatCount(to)}.`}
                   </p>
                   <div className="search-results-options">
+                    <span className="view-mode-toggle" role="group" aria-label="Results view">
+                      <span className="view-mode-label">View:</span>
+                      <button
+                        type="button"
+                        className={`view-mode-btn ${searchResultsViewMode === 'list' ? 'view-mode-btn--active' : ''}`}
+                        onClick={() => setSearchResultsViewMode('list')}
+                        aria-pressed={searchResultsViewMode === 'list'}
+                      >
+                        List
+                      </button>
+                      <button
+                        type="button"
+                        className={`view-mode-btn ${searchResultsViewMode === 'gallery' ? 'view-mode-btn--active' : ''}`}
+                        onClick={() => setSearchResultsViewMode('gallery')}
+                        aria-pressed={searchResultsViewMode === 'gallery'}
+                      >
+                        Gallery
+                      </button>
+                    </span>
                     <label className="page-size-label">
                       Page size
                       <select
@@ -1596,6 +1617,7 @@ aria-label="Clear compare troves"
                     sortDir={sortDir}
                     onSortChange={handleGridSortChange}
                     showScoreColumn={query.trim() !== '*'}
+                    viewMode={searchResultsViewMode}
                   />
                 </>
               )
