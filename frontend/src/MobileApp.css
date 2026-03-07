@@ -858,6 +858,21 @@
   -webkit-overflow-scrolling: touch;
 }
 
+/* Toolbar: filter box then file type picker to its right, single row */
+.mobile-search-results-grid .grid-toolbar {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.mobile-search-results-grid .grid-filter-input {
+  flex: 1;
+  min-width: 0;
+  max-width: none;
+}
+
 /* When file type dropdown is open, allow it to extend below the result set without being clipped */
 .mobile-search-results-grid.mobile-filetype-dropdown-open {
   overflow-x: auto;
