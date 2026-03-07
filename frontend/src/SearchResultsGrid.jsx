@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useCallback } from 'react'
+import { useState, useMemo, useEffect, useCallback, useRef } from 'react'
 import {
   useReactTable,
   getCoreRowModel,
@@ -179,9 +179,35 @@ export function SearchResultsGrid({ data, sortBy = null, sortDir = 'asc', onSort
   }, [data, globalFilter])
 
   const showGallery = viewMode === 'gallery'
+  const [showBackToTop, setShowBackToTop] = useState(false)
+  const gridRef = useRef(null)
+  const [backToTopCenterX, setBackToTopCenterX] = useState(null)
+  useEffect(() => {
+    const threshold = 200
+    const onScroll = () => setShowBackToTop(window.scrollY > threshold)
+    onScroll()
+    window.addEventListener('scroll', onScroll, { passive: true })
+    return () => window.removeEventListener('scroll', onScroll)
+  }, [])
+  useEffect(() => {
+    const el = gridRef.current
+    if (!el) return
+    const updateCenter = () => {
+      const rect = el.getBoundingClientRect()
+      setBackToTopCenterX(rect.left + rect.width / 2)
+    }
+    updateCenter()
+    const ro = new ResizeObserver(updateCenter)
+    ro.observe(el)
+    window.addEventListener('resize', updateCenter)
+    return () => {
+      ro.disconnect()
+      window.removeEventListener('resize', updateCenter)
+    }
+  }, [showGallery])
 
   return (
-    <div className="search-results-grid">
+    <div className="search-results-grid" ref={gridRef}>
       {lightbox && (
         <div
           className="search-thumb-lightbox"
@@ -343,6 +369,18 @@ export function SearchResultsGrid({ data, sortBy = null, sortDir = 'asc', onSort
           </tbody>
         </table>
       </div>
+      )}
+      {showBackToTop && (
+        <button
+          type="button"
+          className="back-to-top-btn"
+          style={backToTopCenterX != null ? { left: backToTopCenterX } : undefined}
+          onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+          aria-label="Back to top"
+          title="Back to top"
+        >
+          <span aria-hidden="true">▲</span>
+        </button>
       )}
     </div>
   )
