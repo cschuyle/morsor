@@ -334,7 +334,7 @@ public class SearchDataService {
     }
 
     /** Boost factor for the preferred (booster) trove so its hits outrank others. */
-    private static final float TROVE_BOOST_FACTOR = 5.0f;
+    private static final float TROVE_BOOST_FACTOR = 1.2f;
 
     public List<ScoredSearchResult> search(List<String> troveIds, String query) {
         return search(troveIds, query, null);
