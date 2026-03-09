@@ -597,10 +597,17 @@ function App() {
     }
     const idsForSplit =
       searchMode === 'search' && hasResults
-        ? new Set(withCounts.filter((t) => t.resultCount > 0).map((t) => t.id))
+        ? new Set(withCounts.filter((t) => t.resultCount > 0 || selectedTroveIds.has(t.id)).map((t) => t.id))
         : selectedTroveIds
     const doSplit = searchMode !== 'search' || !freezeTroveListOrder || (searchMode === 'search' && hasResults)
-    const selectedSort = doSplit && hasResults ? sortByHitsDesc : sortByName
+    const selectedSortWhenResults =
+      (a, b) => {
+        if ((a.resultCount ?? 0) > 0 && (b.resultCount ?? 0) === 0) return -1
+        if ((a.resultCount ?? 0) === 0 && (b.resultCount ?? 0) > 0) return 1
+        if ((a.resultCount ?? 0) > 0 && (b.resultCount ?? 0) > 0) return sortByHitsDesc(a, b)
+        return sortByName(a, b)
+      }
+    const selectedSort = doSplit && hasResults ? selectedSortWhenResults : sortByName
     const selected = doSplit ? filtered.filter((t) => idsForSplit.has(t.id)).sort(selectedSort) : []
     const notSelected = doSplit ? filtered.filter((t) => !idsForSplit.has(t.id)).sort(sortByName) : [...filtered].sort(sortByName)
     return { selected, notSelected, displaySelectedTroveIds: idsForSplit }
