@@ -77,7 +77,14 @@ function MobileApp() {
     setFileTypePanelRect({ top: rect.bottom + 4, left: rect.left, width: rect.width })
   }, [fileTypeDropdownOpen])
 
+  function urlTroveId(value, troveList) {
+    if (!value || !troveList?.length) return value || null
+    const t = troveList.find((x) => x.id === value || (x.name && x.name === value))
+    return t ? t.id : value
+  }
+
   // Restore query and trove selection from URL (bookmark / desktop↔mobile toggle).
+  // Resolve trove names to ids when troves are loaded so state and URL use ids.
   useEffect(() => {
     const q = searchParams.get('q')
     setQuery(q != null ? q : '')
@@ -86,20 +93,24 @@ function MobileApp() {
     const mode = searchParams.get('mode')
     if (mode !== 'duplicates' && mode !== 'uniques') {
       setSearchMode('search')
-      setSelectedTroveIds(new Set(searchParams.getAll('trove')))
+      const troveIds = searchParams.getAll('trove').map((v) => urlTroveId(v, troves) ?? v).filter(Boolean)
+      setSelectedTroveIds(new Set(troveIds))
+      const boost = searchParams.get('boost')
+      setBoostTroveId(boost != null && boost !== '' ? (urlTroveId(boost, troves) ?? boost) : null)
     } else {
       setSearchMode(mode)
       const primary = searchParams.get('primary') ?? ''
-      const compare = new Set(searchParams.getAll('compare'))
+      const compareIds = searchParams.getAll('compare').map((v) => urlTroveId(v, troves) ?? v).filter(Boolean)
+      const compare = new Set(compareIds)
       if (mode === 'duplicates') {
-        setDupPrimaryTroveId(primary)
+        setDupPrimaryTroveId(primary ? (urlTroveId(primary, troves) ?? primary) : '')
         setDupCompareTroveIds(compare)
       } else {
-        setUniqPrimaryTroveId(primary)
+        setUniqPrimaryTroveId(primary ? (urlTroveId(primary, troves) ?? primary) : '')
         setUniqCompareTroveIds(compare)
       }
     }
-  }, [searchParams])
+  }, [searchParams, troves])
 
   function buildSearchParams(fileTypesSet = null) {
     const next = new URLSearchParams()
@@ -107,15 +118,19 @@ function MobileApp() {
     const qTrim = (query ?? '').trim()
     if (qTrim) next.set('q', qTrim)
     if (searchMode === 'search') {
-      selectedTroveIds.forEach((id) => next.append('trove', id))
+      [...selectedTroveIds].map((id) => urlTroveId(id, troves) ?? id).filter(Boolean).forEach((id) => next.append('trove', id))
+      const boostId = boostTroveId ? (urlTroveId(boostTroveId, troves) ?? boostTroveId) : null
+      if (boostId) next.set('boost', boostId)
       const ft = fileTypesSet ?? fileTypeFilters
       ft.forEach((f) => next.append('fileTypes', f))
     } else if (searchMode === 'duplicates') {
-      if (dupPrimaryTroveId) next.set('primary', dupPrimaryTroveId)
-      dupCompareTroveIds.forEach((id) => next.append('compare', id))
+      const primaryId = dupPrimaryTroveId ? (urlTroveId(dupPrimaryTroveId, troves) ?? dupPrimaryTroveId) : null
+      if (primaryId) next.set('primary', primaryId)
+      [...dupCompareTroveIds].map((id) => urlTroveId(id, troves) ?? id).filter(Boolean).forEach((id) => next.append('compare', id))
     } else {
-      if (uniqPrimaryTroveId) next.set('primary', uniqPrimaryTroveId)
-      uniqCompareTroveIds.forEach((id) => next.append('compare', id))
+      const primaryId = uniqPrimaryTroveId ? (urlTroveId(uniqPrimaryTroveId, troves) ?? uniqPrimaryTroveId) : null
+      if (primaryId) next.set('primary', primaryId)
+      [...uniqCompareTroveIds].map((id) => urlTroveId(id, troves) ?? id).filter(Boolean).forEach((id) => next.append('compare', id))
     }
     return next
   }
@@ -126,10 +141,13 @@ function MobileApp() {
     const qTrim = (query ?? '').trim()
     if (qTrim) next.set('q', qTrim)
     if (mode === 'search') {
-      selectedTroveIds.forEach((id) => next.append('trove', id))
+      [...selectedTroveIds].map((id) => urlTroveId(id, troves) ?? id).filter(Boolean).forEach((id) => next.append('trove', id))
+      const boostId = boostTroveId ? (urlTroveId(boostTroveId, troves) ?? boostTroveId) : null
+      if (boostId) next.set('boost', boostId)
     } else {
-      if (primary) next.set('primary', primary)
-      compare.forEach((id) => next.append('compare', id))
+      const primaryId = primary ? (urlTroveId(primary, troves) ?? primary) : null
+      if (primaryId) next.set('primary', primaryId)
+      [...compare].map((id) => urlTroveId(id, troves) ?? id).filter(Boolean).forEach((id) => next.append('compare', id))
     }
     return next
   }
@@ -153,7 +171,7 @@ function MobileApp() {
     if (next.toString() !== searchParams.toString()) {
       setSearchParams(next, { replace: true })
     }
-  }, [query, searchMode, selectedTroveIds, dupPrimaryTroveId, dupCompareTroveIds, uniqPrimaryTroveId, uniqCompareTroveIds, fileTypeFilters, searchParams])
+  }, [query, searchMode, selectedTroveIds, dupPrimaryTroveId, dupCompareTroveIds, uniqPrimaryTroveId, uniqCompareTroveIds, fileTypeFilters, boostTroveId, searchParams])
 
   useEffect(() => {
     if (!fileTypeDropdownOpen) return
