@@ -58,7 +58,6 @@ function getLightboxPayload(row) {
 
 function getFileTypeTooltip(pdfs, imageUrls, ebooks, videos, audios, otherFiles, itemUrl) {
   const labels = new Set()
-  if (itemUrl) labels.add('URL')
   if (pdfs.length > 0) labels.add('PDF')
   imageUrls.forEach((u) => {
     const m = u.match(/\.(jpe?g|png|gif|webp|tiff?|bmp|svg)(\?|$)/i)
@@ -81,6 +80,10 @@ function getFileTypeTooltip(pdfs, imageUrls, ebooks, videos, audios, otherFiles,
     labels.add(m ? m[1].toUpperCase() : 'Other')
   })
   const list = [...labels].sort()
+  if (itemUrl) {
+    const mediaPart = list.length > 0 ? ` · Media: ${list.join(', ')}` : ''
+    return `Link: ${itemUrl}${mediaPart}`
+  }
   return list.length > 0 ? `Media: ${list.join(', ')}` : null
 }
 
