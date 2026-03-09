@@ -573,6 +573,8 @@ function App() {
     }
     const sortByName = (a, b) => (a.name || '').localeCompare(b.name || '', undefined, { sensitivity: 'base' })
     const sortByHitsDesc = (a, b) => {
+      if (searchMode === 'search' && boostTroveId && a.id === boostTroveId && b.id !== boostTroveId) return -1
+      if (searchMode === 'search' && boostTroveId && b.id === boostTroveId && a.id !== boostTroveId) return 1
       const c = (b.resultCount ?? 0) - (a.resultCount ?? 0)
       return c !== 0 ? c : sortByName(a, b)
     }
@@ -585,7 +587,7 @@ function App() {
     const selected = doSplit ? filtered.filter((t) => idsForSplit.has(t.id)).sort(selectedSort) : []
     const notSelected = doSplit ? filtered.filter((t) => !idsForSplit.has(t.id)).sort(sortByName) : [...filtered].sort(sortByName)
     return { selected, notSelected, displaySelectedTroveIds: idsForSplit }
-  }, [troves, searchResult, troveFilter, showFilter, selectedTroveIds, searchMode, freezeTroveListOrder])
+  }, [troves, searchResult, troveFilter, showFilter, selectedTroveIds, searchMode, freezeTroveListOrder, boostTroveId])
 
   const sortedDuplicateRows = useMemo(() => {
     const raw = Array.isArray(duplicatesResult?.rows) ? duplicatesResult.rows : []

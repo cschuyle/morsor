@@ -581,6 +581,8 @@ function MobileApp() {
     const sortByHitsDesc =
       troveCounts != null
         ? (a, b) => {
+            if (searchMode === 'search' && boostTroveId && a.id === boostTroveId && b.id !== boostTroveId) return -1
+            if (searchMode === 'search' && boostTroveId && b.id === boostTroveId && a.id !== boostTroveId) return 1
             const c = (troveCounts[b.id] ?? 0) - (troveCounts[a.id] ?? 0)
             return c !== 0 ? c : sortByName(a, b)
           }
@@ -588,7 +590,7 @@ function MobileApp() {
     const selected = [...filteredTroves.filter((t) => displaySelectedTroveIds.has(t.id))].sort(sortByHitsDesc)
     const notSelected = [...filteredTroves.filter((t) => !displaySelectedTroveIds.has(t.id))].sort(sortByName)
     return { selected, notSelected }
-  }, [searchMode, filteredTroves, displaySelectedTroveIds, freezeTroveListOrder, searchResult?.troveCounts])
+  }, [searchMode, filteredTroves, displaySelectedTroveIds, freezeTroveListOrder, boostTroveId, searchResult?.troveCounts])
 
   return (
     <div className="mobile-app">
