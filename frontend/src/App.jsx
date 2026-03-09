@@ -686,6 +686,7 @@ function App() {
                             type="text"
                             value={primaryTroveFilter}
                             onChange={(e) => setPrimaryTroveFilter(e.target.value)}
+                            onKeyDown={(e) => { if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); setPrimaryTroveFilter('') } }}
                             placeholder="Filter by name…"
                             className="sidebar-trove-filter-input primary-trove-filter-input"
                             aria-label="Filter primary troves by name"
@@ -795,6 +796,7 @@ aria-label="Clear compare troves"
                           type="text"
                           value={troveFilter}
                           onChange={(e) => setTroveFilter(e.target.value)}
+                          onKeyDown={(e) => { if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); setTroveFilter('') } }}
                           placeholder="Filter compare troves…"
                           className="sidebar-trove-filter-input"
                           aria-label="Filter compare troves by name"
@@ -893,6 +895,7 @@ aria-label="Clear compare troves"
               type="text"
               value={troveFilter}
               onChange={(e) => setTroveFilter(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); setTroveFilter('') } }}
               placeholder={searchMode === 'duplicates' ? 'Filter compare troves…' : 'Filter troves…'}
               className="sidebar-trove-filter-input"
               aria-label={searchMode === 'duplicates' ? 'Filter compare troves by name' : 'Filter troves by name'}
@@ -1058,6 +1061,7 @@ aria-label="Clear compare troves"
                     type="text"
                     value={query}
                     onChange={(e) => { setQuery(e.target.value); setFreezeTroveListOrder(false) }}
+                    onKeyDown={(e) => { if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); setQuery(''); queryRef.current = '' } }}
                     placeholder="e.g. Greek, Prince, Albanian — or * for all"
                     className="search-query-input"
                     aria-label="Query"

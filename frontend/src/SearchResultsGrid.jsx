@@ -335,6 +335,7 @@ export function SearchResultsGrid({ data, sortBy = null, sortDir = 'asc', onSort
           placeholder="Filter this page"
           value={globalFilter}
           onChange={(e) => setGlobalFilter(e.target.value)}
+          onKeyDown={(e) => { if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); setGlobalFilter('') } }}
           className="grid-filter-input"
         />
         {afterFilterSlot}

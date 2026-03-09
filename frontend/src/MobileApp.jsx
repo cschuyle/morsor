@@ -666,6 +666,7 @@ onClick={() => {
               type="search"
               value={query}
               onChange={(e) => { setQuery(e.target.value); setFreezeTroveListOrder(false) }}
+              onKeyDown={(e) => { if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); setQuery(''); queryRef.current = '' } }}
               placeholder="e.g. Greek, Prince, Albanian — or * for all"
               className="mobile-search-input"
               autoCapitalize="off"
@@ -872,6 +873,7 @@ onClick={() => {
                   type="text"
                   value={trovePickerFilter}
                   onChange={(e) => setTrovePickerFilter(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); setTrovePickerFilter('') } }}
                   placeholder="Filter by trove name"
                   className="mobile-trove-picker-filter"
                   aria-label="Filter troves by name"
