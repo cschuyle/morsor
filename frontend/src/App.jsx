@@ -596,10 +596,10 @@ function App() {
       return c !== 0 ? c : sortByName(a, b)
     }
     const idsForSplit =
-      searchMode === 'search' && selectedTroveIds.size === 0 && hasResults
+      searchMode === 'search' && hasResults
         ? new Set(withCounts.filter((t) => t.resultCount > 0).map((t) => t.id))
         : selectedTroveIds
-    const doSplit = searchMode !== 'search' || !freezeTroveListOrder
+    const doSplit = searchMode !== 'search' || !freezeTroveListOrder || (searchMode === 'search' && hasResults)
     const selectedSort = doSplit && hasResults ? sortByHitsDesc : sortByName
     const selected = doSplit ? filtered.filter((t) => idsForSplit.has(t.id)).sort(selectedSort) : []
     const notSelected = doSplit ? filtered.filter((t) => !idsForSplit.has(t.id)).sort(sortByName) : [...filtered].sort(sortByName)

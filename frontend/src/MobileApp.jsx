@@ -580,8 +580,8 @@ function MobileApp() {
   const sortByName = (a, b) => (a.name || '').localeCompare(b.name || '', undefined, { sensitivity: 'base' })
   const mobileSearchTrovesWithResults = useMemo(() => {
     if (searchMode !== 'search') return { selected: [], notSelected: [...filteredTroves].sort(sortByName) }
-    if (freezeTroveListOrder) return { selected: [], notSelected: [...filteredTroves].sort(sortByName) }
     const troveCounts = searchResult?.troveCounts != null && typeof searchResult.troveCounts === 'object' ? searchResult.troveCounts : null
+    const hasResults = searchResult?.results != null && Array.isArray(searchResult.results) && searchResult.results.length > 0
     const sortByHitsDesc =
       troveCounts != null
         ? (a, b) => {
@@ -591,10 +591,17 @@ function MobileApp() {
             return c !== 0 ? c : sortByName(a, b)
           }
         : sortByName
-    const selected = [...filteredTroves.filter((t) => displaySelectedTroveIds.has(t.id))].sort(sortByHitsDesc)
-    const notSelected = [...filteredTroves.filter((t) => !displaySelectedTroveIds.has(t.id))].sort(sortByName)
+    if (!hasResults || freezeTroveListOrder) {
+      const selected = [...filteredTroves.filter((t) => displaySelectedTroveIds.has(t.id))].sort(sortByName)
+      const notSelected = [...filteredTroves.filter((t) => !displaySelectedTroveIds.has(t.id))].sort(sortByName)
+      return { selected, notSelected }
+    }
+    const withHits = filteredTroves.filter((t) => (troveCounts?.[t.id] ?? 0) > 0)
+    const noHits = filteredTroves.filter((t) => (troveCounts?.[t.id] ?? 0) === 0)
+    const selected = [...withHits].sort(sortByHitsDesc)
+    const notSelected = [...noHits].sort(sortByName)
     return { selected, notSelected }
-  }, [searchMode, filteredTroves, displaySelectedTroveIds, freezeTroveListOrder, boostTroveId, searchResult?.troveCounts])
+  }, [searchMode, filteredTroves, displaySelectedTroveIds, freezeTroveListOrder, boostTroveId, searchResult?.troveCounts, searchResult?.results])
 
   return (
     <div className="mobile-app">
