@@ -215,7 +215,7 @@ function App() {
     const qTrim = (q ?? '').trim()
     if (qTrim) next.set('q', qTrim)
     if (mode === 'search') {
-      [...searchTroves].map((id) => urlTroveId(id, troves) ?? id).filter(Boolean).forEach((id) => next.append('trove', id))
+      Array.from(searchTroves).map((id) => urlTroveId(id, troves) ?? id).filter(Boolean).forEach((id) => next.append('trove', id))
       const boostId = boostTrove ? (urlTroveId(boostTrove, troves) ?? boostTrove) : null
       if (boostId) next.set('boost', boostId)
       const ft = fileTypesSet ?? fileTypeFilters
@@ -223,11 +223,11 @@ function App() {
     } else if (mode === 'duplicates') {
       const primaryId = dupPrimary ? (urlTroveId(dupPrimary, troves) ?? dupPrimary) : null
       if (primaryId) next.set('primary', primaryId)
-      [...dupCompare].map((id) => urlTroveId(id, troves) ?? id).filter(Boolean).forEach((id) => next.append('compare', id))
+      Array.from(dupCompare).map((id) => urlTroveId(id, troves) ?? id).filter(Boolean).forEach((id) => next.append('compare', id))
     } else {
       const primaryId = uniqPrimary ? (urlTroveId(uniqPrimary, troves) ?? uniqPrimary) : null
       if (primaryId) next.set('primary', primaryId)
-      [...uniqCompare].map((id) => urlTroveId(id, troves) ?? id).filter(Boolean).forEach((id) => next.append('compare', id))
+      Array.from(uniqCompare).map((id) => urlTroveId(id, troves) ?? id).filter(Boolean).forEach((id) => next.append('compare', id))
     }
     return next
   }

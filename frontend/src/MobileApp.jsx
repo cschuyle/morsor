@@ -118,7 +118,7 @@ function MobileApp() {
     const qTrim = (query ?? '').trim()
     if (qTrim) next.set('q', qTrim)
     if (searchMode === 'search') {
-      [...selectedTroveIds].map((id) => urlTroveId(id, troves) ?? id).filter(Boolean).forEach((id) => next.append('trove', id))
+      Array.from(selectedTroveIds).map((id) => urlTroveId(id, troves) ?? id).filter(Boolean).forEach((id) => next.append('trove', id))
       const boostId = boostTroveId ? (urlTroveId(boostTroveId, troves) ?? boostTroveId) : null
       if (boostId) next.set('boost', boostId)
       const ft = fileTypesSet ?? fileTypeFilters
@@ -126,11 +126,11 @@ function MobileApp() {
     } else if (searchMode === 'duplicates') {
       const primaryId = dupPrimaryTroveId ? (urlTroveId(dupPrimaryTroveId, troves) ?? dupPrimaryTroveId) : null
       if (primaryId) next.set('primary', primaryId)
-      [...dupCompareTroveIds].map((id) => urlTroveId(id, troves) ?? id).filter(Boolean).forEach((id) => next.append('compare', id))
+      Array.from(dupCompareTroveIds).map((id) => urlTroveId(id, troves) ?? id).filter(Boolean).forEach((id) => next.append('compare', id))
     } else {
       const primaryId = uniqPrimaryTroveId ? (urlTroveId(uniqPrimaryTroveId, troves) ?? uniqPrimaryTroveId) : null
       if (primaryId) next.set('primary', primaryId)
-      [...uniqCompareTroveIds].map((id) => urlTroveId(id, troves) ?? id).filter(Boolean).forEach((id) => next.append('compare', id))
+      Array.from(uniqCompareTroveIds).map((id) => urlTroveId(id, troves) ?? id).filter(Boolean).forEach((id) => next.append('compare', id))
     }
     return next
   }
@@ -141,13 +141,13 @@ function MobileApp() {
     const qTrim = (query ?? '').trim()
     if (qTrim) next.set('q', qTrim)
     if (mode === 'search') {
-      [...selectedTroveIds].map((id) => urlTroveId(id, troves) ?? id).filter(Boolean).forEach((id) => next.append('trove', id))
+      Array.from(selectedTroveIds).map((id) => urlTroveId(id, troves) ?? id).filter(Boolean).forEach((id) => next.append('trove', id))
       const boostId = boostTroveId ? (urlTroveId(boostTroveId, troves) ?? boostTroveId) : null
       if (boostId) next.set('boost', boostId)
     } else {
       const primaryId = primary ? (urlTroveId(primary, troves) ?? primary) : null
       if (primaryId) next.set('primary', primaryId)
-      [...compare].map((id) => urlTroveId(id, troves) ?? id).filter(Boolean).forEach((id) => next.append('compare', id))
+      Array.from(compare).map((id) => urlTroveId(id, troves) ?? id).filter(Boolean).forEach((id) => next.append('compare', id))
     }
     return next
   }
