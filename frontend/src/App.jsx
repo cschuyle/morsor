@@ -317,7 +317,7 @@ function App() {
   function handleOnlyClick(troveId) {
     if (searchMode === 'search') {
       setFreezeTroveListOrder(true)
-      setBoostTroveId(troveId)
+      setBoostTroveId((prev) => (prev === troveId ? null : troveId))
       if (!query.trim()) {
         queryRef.current = '*'
         setQuery('*')
