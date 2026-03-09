@@ -402,6 +402,18 @@ function MobileApp() {
     setFreezeTroveListOrder(false)
   }, [searchMode])
 
+  const prevBoostTroveIdRef = useRef(undefined)
+  useEffect(() => {
+    if (searchMode !== 'search') return
+    if (prevBoostTroveIdRef.current === undefined) {
+      prevBoostTroveIdRef.current = boostTroveId
+      return
+    }
+    if (prevBoostTroveIdRef.current === boostTroveId) return
+    prevBoostTroveIdRef.current = boostTroveId
+    if (queryRef.current.trim()) fetchSearch(0)
+  }, [boostTroveId, searchMode])
+
   function toggleTrove(id) {
     if (searchMode === 'search') setFreezeTroveListOrder(true)
     setSelectedTroveIds((prev) => {
@@ -458,7 +470,6 @@ function MobileApp() {
       }
       setPage(0)
       setShowTrovePicker(false)
-      fetchSearch(0)
     }
   }
 
