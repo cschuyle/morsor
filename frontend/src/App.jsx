@@ -198,6 +198,8 @@ function App() {
       setSearchSelectedTroveIds(new Set(troveIds))
       const boost = searchParams.get('boost')
       setBoostTroveId(boost != null && boost !== '' ? (urlTroveId(boost, troves) ?? boost) : null)
+      const view = searchParams.get('view')
+      setSearchResultsViewMode(view === 'gallery' ? 'gallery' : 'list')
     } else if (mode === 'duplicates') {
       const primary = searchParams.get('primary')
       setDupPrimaryTroveId(primary != null ? (urlTroveId(primary, troves) ?? primary) : '')
@@ -209,7 +211,7 @@ function App() {
     }
   }, [searchParams, troves])
 
-  function buildSearchParams(mode, q, searchTroves, dupPrimary, dupCompare, uniqPrimary, uniqCompare, fileTypesSet = null, boostTrove = null) {
+  function buildSearchParams(mode, q, searchTroves, dupPrimary, dupCompare, uniqPrimary, uniqCompare, fileTypesSet = null, boostTrove = null, view = null) {
     const next = new URLSearchParams()
     if (mode !== 'search') next.set('mode', mode)
     const qTrim = (q ?? '').trim()
@@ -220,6 +222,7 @@ function App() {
       if (boostId) next.set('boost', boostId)
       const ft = fileTypesSet ?? fileTypeFilters
       if (ft && ft.size > 0) ft.forEach((f) => next.append('fileTypes', f))
+      next.set('view', view === 'gallery' ? 'gallery' : 'list')
     } else if (mode === 'duplicates') {
       const primaryId = dupPrimary ? (urlTroveId(dupPrimary, troves) ?? dupPrimary) : null
       if (primaryId) next.set('primary', primaryId)
@@ -251,12 +254,13 @@ function App() {
       uniqPrimaryTroveId,
       uniqCompareTroveIds,
       fileTypeFilters,
-      boostTroveId
+      boostTroveId,
+      searchResultsViewMode
     )
     if (next.toString() !== searchParams.toString()) {
       setSearchParams(next, { replace: true })
     }
-  }, [query, searchMode, searchSelectedTroveIds, primaryTroveId, dupCompareTroveIds, uniqCompareTroveIds, fileTypeFilters, boostTroveId])
+  }, [query, searchMode, searchSelectedTroveIds, primaryTroveId, dupCompareTroveIds, uniqCompareTroveIds, fileTypeFilters, boostTroveId, searchResultsViewMode])
 
   useEffect(() => {
     if (searchMode !== 'search') return
@@ -318,6 +322,7 @@ function App() {
       uniqPrimaryTroveId,
       searchMode === 'uniques' ? new Set() : uniqCompareTroveIds,
       fileTypeFilters,
+      null,
       null
     ), { replace: true })
   }
@@ -1021,7 +1026,7 @@ aria-label="Clear compare troves"
                 aria-selected={searchMode === 'search'}
                 className={searchMode === 'search' ? 'active' : ''}
                 onClick={() => {
-                  setSearchParams(buildSearchParams('search', query, searchSelectedTroveIds, dupPrimaryTroveId, dupCompareTroveIds, uniqPrimaryTroveId, uniqCompareTroveIds, fileTypeFilters, boostTroveId), { replace: true })
+                  setSearchParams(buildSearchParams('search', query, searchSelectedTroveIds, dupPrimaryTroveId, dupCompareTroveIds, uniqPrimaryTroveId, uniqCompareTroveIds, fileTypeFilters, boostTroveId, searchResultsViewMode), { replace: true })
                   setDuplicatesResult(null)
                   setUniquesResult(null)
                 }}
@@ -1163,7 +1168,7 @@ aria-label="Clear compare troves"
                           onClick={(e) => {
                             e.stopPropagation()
                             setFileTypeFilters(new Set())
-                            setSearchParams(buildSearchParams('search', query, searchSelectedTroveIds, dupPrimaryTroveId, dupCompareTroveIds, uniqPrimaryTroveId, uniqCompareTroveIds, new Set(), boostTroveId), { replace: true })
+                            setSearchParams(buildSearchParams('search', query, searchSelectedTroveIds, dupPrimaryTroveId, dupCompareTroveIds, uniqPrimaryTroveId, uniqCompareTroveIds, new Set(), boostTroveId, searchResultsViewMode), { replace: true })
                             fetchSearch(0, null, null, null, null, new Set())
                           }}
                           aria-label="Clear file type filter"
@@ -1195,7 +1200,7 @@ aria-label="Clear compare troves"
                                     if (allSelected) types.forEach((t) => next.delete(t))
                                     else types.forEach((t) => next.add(t))
                                     setFileTypeFilters(next)
-                                    setSearchParams(buildSearchParams('search', query, searchSelectedTroveIds, dupPrimaryTroveId, dupCompareTroveIds, uniqPrimaryTroveId, uniqCompareTroveIds, next, boostTroveId), { replace: true })
+                                    setSearchParams(buildSearchParams('search', query, searchSelectedTroveIds, dupPrimaryTroveId, dupCompareTroveIds, uniqPrimaryTroveId, uniqCompareTroveIds, next, boostTroveId, searchResultsViewMode), { replace: true })
                                     fetchSearch(0, null, null, null, null, next)
                                   }}
                                 />
@@ -1212,7 +1217,7 @@ aria-label="Clear compare troves"
                                     if (next.has(ft)) next.delete(ft)
                                     else next.add(ft)
                                     setFileTypeFilters(next)
-                                    setSearchParams(buildSearchParams('search', query, searchSelectedTroveIds, dupPrimaryTroveId, dupCompareTroveIds, uniqPrimaryTroveId, uniqCompareTroveIds, next, boostTroveId), { replace: true })
+                                    setSearchParams(buildSearchParams('search', query, searchSelectedTroveIds, dupPrimaryTroveId, dupCompareTroveIds, uniqPrimaryTroveId, uniqCompareTroveIds, next, boostTroveId, searchResultsViewMode), { replace: true })
                                     fetchSearch(0, null, null, null, null, next)
                                   }}
                                 />
