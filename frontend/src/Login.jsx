@@ -17,37 +17,45 @@ export default function Login() {
     e.preventDefault()
     const form = formRef.current
     if (!form) return
-    const fd = new FormData(form)
-    const user = (fd.get('username') ?? '').toString().trim()
-    const pass = (fd.get('password') ?? '').toString()
-    if (!user || !pass) return
-    setError('')
     setSubmitting(true)
-    const csrf = getCsrfToken()
-    const body = new URLSearchParams({ username: user, password: pass })
-    const headers = { 'Content-Type': 'application/x-www-form-urlencoded' }
-    if (csrf) headers['X-XSRF-TOKEN'] = csrf
-    fetch('/login', {
-      method: 'POST',
-      credentials: 'include',
-      redirect: 'manual',
-      headers,
-      body,
-    })
-      .then((res) => {
-        if (res.type === 'opaqueredirect' || res.status === 302) {
-          // Stay on current origin (e.g. Vite dev server) instead of following backend redirect to :8080
-          window.location.href = `${window.location.origin}/`
-          return
-        }
-        if (res.status === 200) {
-          window.location.href = `${window.location.origin}/`
-          return
-        }
-        setError('Invalid username or password.')
+    setError('')
+    // Defer reading form so password manager / Safari autofill have written to inputs (first submit often fires before values are in the DOM).
+    const runLogin = () => {
+      const fd = new FormData(form)
+      const user = (fd.get('username') ?? '').toString().trim()
+      const pass = (fd.get('password') ?? '').toString()
+      if (!user || !pass) {
+        setSubmitting(false)
+        return
+      }
+      const csrf = getCsrfToken()
+      const body = new URLSearchParams({ username: user, password: pass })
+      const headers = { 'Content-Type': 'application/x-www-form-urlencoded' }
+      if (csrf) headers['X-XSRF-TOKEN'] = csrf
+      fetch('/login', {
+        method: 'POST',
+        credentials: 'include',
+        redirect: 'manual',
+        headers,
+        body,
       })
-      .catch(() => setError('Login failed.'))
-      .finally(() => setSubmitting(false))
+        .then((res) => {
+          if (res.type === 'opaqueredirect' || res.status === 302) {
+            window.location.href = `${window.location.origin}/`
+            return
+          }
+          if (res.status === 200) {
+            window.location.href = `${window.location.origin}/`
+            return
+          }
+          setError('Invalid username or password.')
+        })
+        .catch(() => setError('Login failed.'))
+        .finally(() => setSubmitting(false))
+    }
+    requestAnimationFrame(() => {
+      requestAnimationFrame(runLogin)
+    })
   }
 
   return (
