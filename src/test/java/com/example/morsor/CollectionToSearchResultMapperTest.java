@@ -74,4 +74,47 @@ class CollectionToSearchResultMapperTest {
             assertThat(results.get(1).snippet()).isEqualTo("Robert Altman · 1992");
         }
     }
+
+    @Test
+    void mapsLittlePrinceItemUrlToSearchResult() throws Exception {
+        String json = """
+            {
+              "id": "test-trove",
+              "name": "Test Trove",
+              "shortName": "Test",
+              "items": [
+                {
+                  "littlePrinceItem": {
+                    "title": "Item with URL",
+                    "smallImageUrl": "https://example.com/small.jpg",
+                    "largeImageUrl": "https://example.com/large.jpg",
+                    "itemUrl": "https://example.com/item-page"
+                  }
+                },
+                {
+                  "littlePrinceItem": {
+                    "title": "Item without itemUrl",
+                    "smallImageUrl": "https://example.com/s2.jpg"
+                  }
+                },
+                {
+                  "movie": {
+                    "title": "A Movie",
+                    "year": "2020",
+                    "itemUrl": "https://example.com/movie"
+                  }
+                }
+              ]
+            }
+            """;
+        JsonNode root = objectMapper.readTree(json);
+        List<SearchResult> results = CollectionToSearchResultMapper.mapRootToSearchResults(root);
+        assertThat(results).hasSize(3);
+        assertThat(results.get(0).itemType()).isEqualTo("littlePrinceItem");
+        assertThat(results.get(0).itemUrl()).isEqualTo("https://example.com/item-page");
+        assertThat(results.get(1).itemType()).isEqualTo("littlePrinceItem");
+        assertThat(results.get(1).itemUrl()).isNull();
+        assertThat(results.get(2).itemType()).isEqualTo("movie");
+        assertThat(results.get(2).itemUrl()).isNull();
+    }
 }

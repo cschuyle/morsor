@@ -76,7 +76,7 @@ public final class CollectionToSearchResultMapper {
             JsonNode titleNode = titlesArray.get(i);
             String title = titleNode != null && titleNode.isTextual() ? titleNode.asText() : (titleNode != null ? titleNode.toString() : "");
             String id = troveId != null && !troveId.isEmpty() ? troveId + "-" + i : "trove-" + i;
-            out.add(new SearchResult(id, title, title, troveName, troveId, null, null, List.of(), null));
+            out.add(new SearchResult(id, title, title, troveName, troveId, null, null, List.of(), null, null));
         }
     }
 
@@ -114,8 +114,9 @@ public final class CollectionToSearchResultMapper {
         String largeImageUrl = text(item, "largeImageUrl");
         List<String> files = textArray(item, "files");
         String itemType = text(item, "_itemType");
+        String itemUrl = "littlePrinceItem".equals(itemType) ? text(item, "itemUrl") : null;
 
-        return new SearchResult(id, title, snippet, troveName, troveId, thumbnailUrl, largeImageUrl, files, itemType);
+        return new SearchResult(id, title, snippet, troveName, troveId, thumbnailUrl, largeImageUrl, files, itemType, itemUrl);
     }
 
     private static String buildSnippet(JsonNode item) {
