@@ -8,7 +8,11 @@ export default function Login() {
   const formRef = useRef(null)
 
   useEffect(() => {
-    if (new URLSearchParams(window.location.search).has('error')) {
+    const params = new URLSearchParams(window.location.search)
+    const errorParam = params.get('error')
+    if (errorParam === 'service_unavailable') {
+      setError('Service unavailable. The database may be down. Please try again later.')
+    } else if (params.has('error')) {
       setError('Invalid username or password.')
     }
   }, [])

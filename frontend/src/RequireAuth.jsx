@@ -20,11 +20,11 @@ export function RequireAuth({ children }) {
           return
         }
         setStatus('redirecting')
-        window.location.href = '/login'
+        window.location.href = '/login?error=service_unavailable'
       })
       .catch(() => {
         setStatus('redirecting')
-        window.location.href = '/login'
+        window.location.href = '/login?error=service_unavailable'
       })
   }, [])
   if (status !== 'ok') return null
