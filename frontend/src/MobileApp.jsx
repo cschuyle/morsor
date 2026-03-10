@@ -61,6 +61,7 @@ function MobileApp() {
   const [searchResultsViewMode, setSearchResultsViewMode] = useState('list') // 'list' | 'gallery'
   const queryRef = useRef(query)
   const skipSearchRef = useRef(true)
+  const skipFileTypeSearchRef = useRef(false)
   const abortRef = useRef(null)
   const reloadAbortControllerRef = useRef(null)
   const fileTypeDropdownRef = useRef(null)
@@ -439,6 +440,10 @@ function MobileApp() {
     if (searchMode !== 'search') return
     if (skipSearchRef.current) {
       skipSearchRef.current = false
+      return
+    }
+    if (skipFileTypeSearchRef.current) {
+      skipFileTypeSearchRef.current = false
       return
     }
     const t = setTimeout(() => {
@@ -1168,6 +1173,7 @@ onClick={() => {
                                 e.stopPropagation()
                                 setFileTypeFilters(new Set())
                                 setSearchParams(buildSearchParams(new Set()), { replace: true })
+                                skipFileTypeSearchRef.current = true
                                 fetchSearch(0, null, null, new Set())
                               }}
                               aria-label="Clear file type filter"
@@ -1201,6 +1207,7 @@ onClick={() => {
                                       else types.forEach((t) => next.add(t))
                                       setFileTypeFilters(next)
                                       setSearchParams(buildSearchParams(next), { replace: true })
+                                      skipFileTypeSearchRef.current = true
                                       fetchSearch(0, null, null, next)
                                     }}
                                   />
@@ -1218,6 +1225,7 @@ onClick={() => {
                                       else next.add(ft)
                                       setFileTypeFilters(next)
                                       setSearchParams(buildSearchParams(next), { replace: true })
+                                      skipFileTypeSearchRef.current = true
                                       fetchSearch(0, null, null, next)
                                     }}
                                   />
