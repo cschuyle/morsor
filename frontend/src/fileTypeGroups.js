@@ -11,6 +11,9 @@ const GROUPS = [
   { group: 'Audio', types: AUDIO_TYPES }
 ]
 
+/** All known file types from groups; used so dropdown can show full list (e.g. on mobile) even before API returns. */
+export const ALL_KNOWN_FILE_TYPES = [...IMAGE_TYPES, ...TEXT_TYPES, ...VIDEO_TYPES, ...AUDIO_TYPES]
+
 /**
  * @param {string[]} availableFileTypes - Types returned by the API (any case)
  * @returns {{ group: string | null, types: string[] }[]} Groups with group label (or null) and types in display order (original case from available)

@@ -4,7 +4,7 @@ import { getApiAuthHeaders } from './apiAuth'
 import { getCsrfToken } from './getCsrfToken'
 import { queryCache } from './queryCache'
 import { formatCount } from './formatCount'
-import { groupFileTypes, getGroupNameIfFullySelected } from './fileTypeGroups'
+import { groupFileTypes, getGroupNameIfFullySelected, ALL_KNOWN_FILE_TYPES } from './fileTypeGroups'
 import { SearchResultsGrid } from './SearchResultsGrid'
 import { DuplicateResultsView } from './DuplicateResultsView'
 import { UniquesResultsView } from './UniquesResultsView'
@@ -661,6 +661,18 @@ function MobileApp() {
   const count = searchResult?.count ?? 0
   const searchSize = typeof searchResult?.size === 'number' ? searchResult.size : pageSize
   const totalPages = Math.ceil(count / searchSize) || 0
+  const displayFileTypes = useMemo(() => {
+    const upper = (s) => (s || '').toUpperCase()
+    const seen = new Set(ALL_KNOWN_FILE_TYPES.map(upper))
+    const out = [...ALL_KNOWN_FILE_TYPES]
+    ;(allAvailableFileTypes || []).forEach((t) => {
+      if (!seen.has(upper(t))) {
+        seen.add(upper(t))
+        out.push(t)
+      }
+    })
+    return out.sort((a, b) => String(a).localeCompare(String(b), undefined, { sensitivity: 'base' }))
+  }, [allAvailableFileTypes])
   const displaySelectedTroveIds = useMemo(() => {
     if (searchMode !== 'search' || selectedTroveIds.size > 0) return selectedTroveIds
     if (!Array.isArray(results) || results.length === 0) return selectedTroveIds
@@ -1188,11 +1200,11 @@ onClick={() => {
                   viewMode={searchResultsViewMode}
                   hideTroveInGallery={selectedTroveIds.size === 1}
                   showPdfSashInGallery
-                  afterFilterSlot={allAvailableFileTypes.length >= 1 ? (() => {
+                  afterFilterSlot={displayFileTypes.length >= 1 ? (() => {
                     const urlFileTypes = new Set(searchParams.getAll('fileTypes').filter((f) => f != null && f.trim()).map((f) => f.trim()))
                     const fileTypesForLabel = fileTypeFilters.size > 0 ? fileTypeFilters : urlFileTypes
                     const upper = (s) => (s || '').toUpperCase()
-                    const availableUpper = new Set((allAvailableFileTypes || []).map(upper))
+                    const availableUpper = new Set(displayFileTypes.map(upper))
                     const selectedUpper = new Set([...fileTypesForLabel].map(upper))
                     const allSelected = availableUpper.size > 0 && availableUpper.size === selectedUpper.size && [...availableUpper].every((t) => selectedUpper.has(t))
                     const hasFileTypeFilter = fileTypesForLabel.size > 0 && !allSelected
@@ -1213,7 +1225,7 @@ onClick={() => {
                               ? 'Media: All'
                               : (() => {
                                   if (fileTypesForLabel.size === 1) return `Only ${[...fileTypesForLabel][0]}`
-                                  const groupName = getGroupNameIfFullySelected(fileTypesForLabel, allAvailableFileTypes)
+                                  const groupName = getGroupNameIfFullySelected(fileTypesForLabel, displayFileTypes)
                                   return groupName ? `Only ${groupName}` : `${fileTypesForLabel.size} filetypes`
                                 })()}
                         </button>
@@ -1253,7 +1265,7 @@ onClick={() => {
                               onClick={(e) => {
                                 e.preventDefault()
                                 skipFileTypeSearchRef.current = true
-                                const next = new Set(allAvailableFileTypes)
+                                const next = new Set(displayFileTypes)
                                 setFileTypeFilters(next)
                                 setSearchParams(buildSearchParams(next), { replace: true })
                                 fetchSearch(0, null, null, next)
@@ -1277,7 +1289,7 @@ onClick={() => {
                               None
                             </button>
                           </div>
-                          {groupFileTypes(allAvailableFileTypes).map(({ group, types }) => {
+                          {groupFileTypes(displayFileTypes).map(({ group, types }) => {
                             const allSelectedGroup = types.every((ft) => fileTypeFilters.has(ft))
                             const someSelected = types.some((ft) => fileTypeFilters.has(ft))
                             return (
