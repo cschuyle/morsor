@@ -5,6 +5,8 @@ import './Login.css'
 export default function Login() {
   const [error, setError] = useState('')
   const [submitting, setSubmitting] = useState(false)
+  const [username, setUsername] = useState('')
+  const [password, setPassword] = useState('')
   const formRef = useRef(null)
 
   useEffect(() => {
@@ -19,47 +21,60 @@ export default function Login() {
 
   function handleSubmit(e) {
     e.preventDefault()
-    const form = formRef.current
-    if (!form) return
     setSubmitting(true)
     setError('')
-    // Defer reading form so password manager / Safari autofill have written to inputs (first submit often fires before values are in the DOM).
-    const runLogin = () => {
-      const fd = new FormData(form)
-      const user = (fd.get('username') ?? '').toString().trim()
-      const pass = (fd.get('password') ?? '').toString()
-      if (!user || !pass) {
-        setSubmitting(false)
-        return
+    let user = (username ?? '').trim()
+    let pass = password ?? ''
+    // Safari/Firefox often don't fire onChange for password-manager autofill; read from DOM as fallback
+    if ((!user || !pass) && formRef.current) {
+      const unInput = formRef.current.querySelector('[name=username]')
+      const pwInput = formRef.current.querySelector('[name=password]')
+      if (unInput && pwInput) {
+        if (!user) user = (unInput.value ?? '').trim()
+        if (!pass) pass = pwInput.value ?? ''
       }
+    }
+    if (!user || !pass) {
+      setSubmitting(false)
+      return
+    }
+    const attemptLogin = () => {
       const csrf = getCsrfToken()
       const body = new URLSearchParams({ username: user, password: pass })
       const headers = { 'Content-Type': 'application/x-www-form-urlencoded' }
       if (csrf) headers['X-XSRF-TOKEN'] = csrf
-      fetch('/login', {
+      return fetch('/login', {
         method: 'POST',
         credentials: 'include',
         redirect: 'manual',
         headers,
         body,
       })
-        .then((res) => {
-          if (res.type === 'opaqueredirect' || res.status === 302) {
-            window.location.href = `${window.location.origin}/`
-            return
-          }
-          if (res.status === 200) {
-            window.location.href = `${window.location.origin}/`
-            return
-          }
-          setError('Invalid username or password.')
-        })
-        .catch(() => setError('Login failed.'))
-        .finally(() => setSubmitting(false))
     }
-    requestAnimationFrame(() => {
-      requestAnimationFrame(runLogin)
-    })
+
+    attemptLogin()
+      .then(async (res) => {
+        if (res.type === 'opaqueredirect' || res.status === 302 || res.status === 200) {
+          window.location.href = `${window.location.origin}/`
+          return
+        }
+        // If unauthorized/forbidden, refresh CSRF/session once and retry
+        if (res.status === 401 || res.status === 403) {
+          try {
+            await fetch('/api/status', { credentials: 'include' })
+          } catch {
+            // ignore, we'll still retry once
+          }
+          const retry = await attemptLogin()
+          if (retry.type === 'opaqueredirect' || retry.status === 302 || retry.status === 200) {
+            window.location.href = `${window.location.origin}/`
+            return
+          }
+        }
+        setError('Invalid username or password.')
+      })
+      .catch(() => setError('Login failed.'))
+      .finally(() => setSubmitting(false))
   }
 
   return (
@@ -74,7 +89,8 @@ export default function Login() {
               type="text"
               name="username"
               autoComplete="username"
-              defaultValue=""
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
               className="login-input"
               required
             />
@@ -85,7 +101,8 @@ export default function Login() {
               type="password"
               name="password"
               autoComplete="current-password"
-              defaultValue=""
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
               className="login-input"
               required
             />
