@@ -53,6 +53,7 @@ function App() {
   const [uniqPageSize, setUniqPageSize] = useState(50)
   const [uniquesSortBy, setUniquesSortBy] = useState(null)
   const [uniquesSortDir, setUniquesSortDir] = useState('asc')
+  const [searchPageInput, setSearchPageInput] = useState('')
   const [fileTypeFilters, setFileTypeFilters] = useState(() => new Set())
   const [allAvailableFileTypes, setAllAvailableFileTypes] = useState([])
   const [fileTypeDropdownOpen, setFileTypeDropdownOpen] = useState(false)
@@ -269,6 +270,13 @@ function App() {
       setSearchParams(next, { replace: true })
     }
   }, [query, searchMode, searchSelectedTroveIds, primaryTroveId, dupCompareTroveIds, uniqCompareTroveIds, fileTypeFilters, boostTroveId, searchResultsViewMode, searchResult?.page, searchResult?.size, pageSize])
+
+  // Keep the search page input in sync with the current page (1-based)
+  useEffect(() => {
+    if (searchMode !== 'search') return
+    const pageNum = typeof searchResult?.page === 'number' ? searchResult.page : 0
+    setSearchPageInput(String(pageNum + 1))
+  }, [searchMode, searchResult?.page])
 
   useEffect(() => {
     if (searchMode !== 'search') return
@@ -568,6 +576,21 @@ function App() {
     const nextParams = new URLSearchParams(searchParams)
     nextParams.set('page', String(nextPage + 1))
     setSearchParams(nextParams, { replace: true })
+  }
+
+  function handleSearchPageInputKeyDown(e, totalPages, currentPage) {
+    if (e.key !== 'Enter') return
+    const raw = e.currentTarget.value.trim()
+    const num = Number(raw)
+    if (!Number.isFinite(num)) {
+      setSearchPageInput(String(currentPage + 1))
+      return
+    }
+    const clamped = Math.min(Math.max(1, num), totalPages || 1)
+    setSearchPageInput(String(clamped))
+    if (clamped - 1 !== currentPage) {
+      goToPage(clamped - 1)
+    }
   }
 
   function handleGridSortChange(newSortBy, newSortDir) {
@@ -1672,7 +1695,16 @@ aria-label="Clear compare troves"
                       return (
                         <nav className="pagination" aria-label="Search results pages">
                           <span className="pagination-info">
-                            Page {formatCount(pageNum + 1)} of {formatCount(totalPages)}
+                            Page{' '}
+                            <input
+                              type="text"
+                              className="pagination-page-input"
+                              value={searchPageInput}
+                              onChange={(e) => setSearchPageInput(e.target.value)}
+                              onKeyDown={(e) => handleSearchPageInputKeyDown(e, totalPages, pageNum)}
+                              aria-label="Current page"
+                            />{' '}
+                            of {formatCount(totalPages)}
                           </span>
                           <button
                             type="button"

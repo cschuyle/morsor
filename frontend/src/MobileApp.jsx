@@ -42,6 +42,7 @@ function MobileApp() {
   const [uniquesPage, setUniquesPage] = useState(0)
   const [uniquesSortBy, setUniquesSortBy] = useState(null)
   const [uniquesSortDir, setUniquesSortDir] = useState('asc')
+  const [mobileSearchPageInput, setMobileSearchPageInput] = useState('')
   const [showTrovePicker, setShowTrovePicker] = useState(false)
   const [trovePickerFilter, setTrovePickerFilter] = useState('')
   const [searchError, setSearchError] = useState(null)
@@ -183,6 +184,12 @@ function MobileApp() {
       setSearchParams(next, { replace: true })
     }
   }, [query, searchMode, selectedTroveIds, dupPrimaryTroveId, dupCompareTroveIds, uniqPrimaryTroveId, uniqCompareTroveIds, fileTypeFilters, boostTroveId, searchResultsViewMode, searchResult?.page, searchResult?.size, page, searchParams])
+
+  // Keep mobile search page input in sync with the current page (1-based)
+  useEffect(() => {
+    if (searchMode !== 'search') return
+    setMobileSearchPageInput(String(page + 1))
+  }, [searchMode, page])
 
   useEffect(() => {
     if (!fileTypeDropdownOpen) return
@@ -573,6 +580,21 @@ function MobileApp() {
     setSearchParams(nextParams, { replace: true })
   }
 
+  function handleMobileSearchPageInputKeyDown(e, totalPages, currentPage) {
+    if (e.key !== 'Enter') return
+    const raw = e.currentTarget.value.trim()
+    const num = Number(raw)
+    if (!Number.isFinite(num)) {
+      setMobileSearchPageInput(String(currentPage + 1))
+      return
+    }
+    const clamped = Math.min(Math.max(1, num), totalPages || 1)
+    setMobileSearchPageInput(String(clamped))
+    if (clamped - 1 !== currentPage) {
+      goToPage(clamped - 1)
+    }
+  }
+
   const sortedDuplicateRows = useMemo(() => {
     const raw = Array.isArray(duplicatesResult?.rows) ? duplicatesResult.rows : []
     if (!duplicatesSortBy) return raw
@@ -864,7 +886,15 @@ onClick={() => {
                 ‹
               </button>
               <span className="mobile-page-info">
-                {formatCount(page + 1)} / {formatCount(totalPages)}
+                <input
+                  type="text"
+                  className="mobile-page-input"
+                  value={mobileSearchPageInput}
+                  onChange={(e) => setMobileSearchPageInput(e.target.value)}
+                  onKeyDown={(e) => handleMobileSearchPageInputKeyDown(e, totalPages, page)}
+                  aria-label="Current page"
+                />{' '}
+                / {formatCount(totalPages)}
               </span>
               <button
                 type="button"

@@ -669,6 +669,23 @@
   color: #555;
 }
 
+.mobile-page-input {
+  width: 2.5ch; /* enough for 2 digits */
+  padding: 0.1rem 0.25rem;
+  margin: 0 0.15rem;
+  border: 1px solid #e0e0e0;
+  border-radius: 4px;
+  background: #ffaa44;
+  color: #213547;
+  text-align: center;
+  font: inherit;
+}
+
+.mobile-page-input:focus {
+  outline: 2px solid #6633cc;
+  outline-offset: 1px;
+}
+
 .mobile-footer {
   flex-shrink: 0;
   padding: 1rem;
