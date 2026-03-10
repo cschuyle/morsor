@@ -30,11 +30,11 @@ export MOOCHO_BUCKET_NAME=blah
 
 # Docker image settings
 
-# Docker build platform (e.g. linux/amd64, linux/arm64). If unset or empty, docker build is run without --platform (host default).
+# Docker build platform. If unset or empty, the build is done on the local architecture. You can override it here.
 #export MOOCHO_ARCHITECTURE=linux/amd64
 
-# Docker image repository and name (e.g. namespace/morsor). If unset or empty, docker image is not tagged and pushed.
+# Docker image repository and name. If unset or empty, the deploy script provides this. You can override it here.
 #export MOOCHO_REGISTRY=namespace/morsor
 
-# Docker image version (e.g. 1.0.0, latest). If unset or empty, docker image is not tagged and pushed.
+# Docker image version. If unset or empty, the deploy script provides this. You can override it here.
 #export MOOCHO_VERSION=latest
