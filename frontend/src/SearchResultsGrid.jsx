@@ -370,6 +370,7 @@ export function SearchResultsGrid({ data, sortBy = null, sortDir = 'asc', onSort
               const trove = row?.trove ?? ''
               const files = Array.isArray(row?.files) ? row.files : []
               const hasPdf = files.some((u) => typeof u === 'string' && /\.pdf(\?|$)/i.test(u))
+              const hasTextNotPdf = files.some((u) => typeof u === 'string' && /\.(mobi|epub|txt|doc|docx|rtf|odt)(\?|$)/i.test(u))
               const hasAudio = files.some((u) => typeof u === 'string' && /\.(mp3|m4a|wav|ogg|flac|aac|wma)(\?|$)/i.test(u))
               const hasVideo = files.some((u) => typeof u === 'string' && /\.(mp4|webm|mov|avi|mkv|m4v|ogv|wmv)(\?|$)/i.test(u))
               const isPdf = (u) => typeof u === 'string' && /\.pdf(\?|$)/i.test(u)
@@ -417,6 +418,11 @@ export function SearchResultsGrid({ data, sortBy = null, sortDir = 'asc', onSort
                     {showPdfSashInGallery && hasPdf && (
                       <span className="search-results-gallery-card-pdf-sash" aria-hidden="true">
                         <img src="/pdf.svg" alt="" />
+                      </span>
+                    )}
+                    {showPdfSashInGallery && hasTextNotPdf && !hasPdf && (
+                      <span className="search-results-gallery-card-pdf-sash" aria-hidden="true">
+                        <img src="/book.svg" alt="" />
                       </span>
                     )}
                     {showPdfSashInGallery && hasAudio && (
