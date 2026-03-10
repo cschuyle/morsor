@@ -10,7 +10,7 @@ export function RequireAuth({ children }) {
   useEffect(() => {
     fetch('/api/troves', { credentials: 'include', headers: { ...getApiAuthHeaders() } })
       .then((res) => {
-        if (res.status === 401) {
+        if (res.status === 401 || res.status === 403) {
           setStatus('redirecting')
           window.location.href = '/login'
           return
@@ -24,7 +24,7 @@ export function RequireAuth({ children }) {
       })
       .catch(() => {
         setStatus('redirecting')
-        window.location.href = '/login?error=service_unavailable'
+        window.location.href = '/login'
       })
   }, [])
   if (status !== 'ok') return null
