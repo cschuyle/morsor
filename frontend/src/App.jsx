@@ -650,7 +650,6 @@ function App() {
 
   return (
     <div className="desktop-app">
-      <div className="desktop-app-body">
       <h1 className="app-title">
         <span className="search-title-brand">Morsor</span> <span className="sidebar-title-note">More lists than you needed</span>
       </h1>
@@ -1834,7 +1833,6 @@ aria-label="Clear compare troves"
           </button>
         </div>
       </footer>
-      </div>
       {reloadTrovesInProgress && (
         <div className="reload-troves-overlay" role="dialog" aria-modal="true" aria-label="Reloading troves">
           <div className="reload-troves-popup">

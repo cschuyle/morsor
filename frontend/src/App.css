@@ -11,27 +11,10 @@
 .desktop-app {
   display: flex;
   flex-direction: column;
-  width: 100%;
-  max-width: 100%;
   min-height: calc(100vh - 4rem);
   max-height: calc(100vh - 4rem);
   overflow: hidden;
   box-sizing: border-box;
-  background: #282c34;
-  border-radius: 8px;
-  padding: 0 1rem;
-}
-
-/* Wrapper so header and main share the same width (reserves scrollbar gutter on the right) */
-.desktop-app-body {
-  display: flex;
-  flex-direction: column;
-  flex: 1 1 0;
-  min-height: 0;
-  width: 100%;
-  max-width: 100%;
-  box-sizing: border-box;
-  padding-right: 17px;
 }
 
 @media (max-width: 1920px) {
@@ -66,7 +49,7 @@
     padding: 1rem;
   }
   .app-layout {
-    gap: 1.5rem;
+    gap: 0.1rem;
   }
 }
 
@@ -102,23 +85,15 @@
 
 .app-title {
   margin: 0 0 1rem;
-  padding: 0;
-  width: 100%;
-  max-width: 100%;
-  min-width: 0;
   text-align: center;
   font-size: inherit;
   font-weight: inherit;
   flex-shrink: 0;
   color: #6633cc;
-  box-sizing: border-box;
-  overflow-x: hidden;
-  background: #ffaa44;
-  border-radius: 8px 8px 0 0;
 }
 
 .desktop-app .app-title .search-title-brand {
-  font-size: 4.5rem;
+  font-size: 3.15rem;
 }
 
 .app-title .sidebar-title-note {
@@ -128,17 +103,12 @@
 
 .app-layout {
   display: flex;
-  gap: 2rem;
+  gap: 0.125rem;
   align-items: stretch;
   margin-top: 1.5rem;
   text-align: left;
   flex: 1 1 0;
   min-height: 0;
-  width: 100%;
-  max-width: 100%;
-  min-width: 0;
-  box-sizing: border-box;
-  background: #ffaa44;
 }
 
 .backend-status-divider {
@@ -153,16 +123,11 @@
   margin-top: 0.5rem;
   margin-bottom: 0;
   padding-top: 0.5rem;
-  width: 100%;
-  max-width: 100%;
-  box-sizing: border-box;
   display: flex;
   flex-direction: column;
   align-items: stretch;
   gap: 0.25rem;
   flex-shrink: 0;
-  background: #ffaa44;
-  border-radius: 0 0 8px 8px;
 }
 
 .app-footer-row {
