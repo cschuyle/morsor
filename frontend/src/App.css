@@ -115,6 +115,7 @@
 .app-title .sidebar-title-note {
   font-size: 1.3rem;
   color: #6633cc;
+  font-weight: 700;
 }
 
 .app-layout {
@@ -343,7 +344,7 @@
 .sidebar-wrapper--open .sidebar-toggle {
   top: -1rem;
   right: 0.75rem;
-  color: #333;
+  color: #6633cc;
 }
 
 .sidebar-wrapper:not(.sidebar-wrapper--open) .sidebar-toggle {
