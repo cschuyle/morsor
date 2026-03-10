@@ -102,14 +102,17 @@
   margin-top: 0;
   line-height: 1.15;
   background: linear-gradient(to bottom, #000 0%, #000 58%, #2d3139 85%, #4b5260 100%);
+  color: #7c4ed6;
 }
 
 .desktop-app .app-title .search-title-brand {
   font-size: 2.6rem;
+  color: #7c4ed6;
 }
 
 .desktop-app .app-title .sidebar-title-note {
   font-size: 1.1rem;
+  color: #7c4ed6;
 }
 
 .app-title .sidebar-title-note {
@@ -151,6 +154,12 @@
   padding: 0.4rem 0 0.15rem;
   margin-top: 0;
   background: linear-gradient(to top, #000 0%, #000 58%, #2d3139 85%, #4b5260 100%);
+}
+
+.desktop-app .app-footer a,
+.desktop-app .app-footer .app-footer-logout-btn,
+.desktop-app .app-footer .app-footer-clear-cache {
+  color: #7c4ed6;
 }
 
 .app-footer-row {
@@ -344,12 +353,13 @@
 .sidebar-wrapper--open .sidebar-toggle {
   top: -1rem;
   right: 0.75rem;
-  color: #6633cc;
+  color: #7c4ed6;
 }
 
 .sidebar-wrapper:not(.sidebar-wrapper--open) .sidebar-toggle {
   width: 50px;
   min-width: 50px;
+  color: #a67ee6;
 }
 
 .sidebar-toggle {
