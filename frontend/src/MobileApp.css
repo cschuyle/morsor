@@ -710,6 +710,11 @@
   color: #666;
 }
 
+.mobile-footer-version {
+  font-size: 0.8rem;
+  color: #252525;
+}
+
 .mobile-footer-row {
   display: flex;
   justify-content: space-between;

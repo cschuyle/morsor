@@ -137,13 +137,13 @@
   gap: 1rem;
 }
 
-.app-footer-link {
+.app-footer a {
   font-size: 0.9rem;
   color: #6633cc;
   text-decoration: none;
 }
 
-.app-footer-link:hover {
+.app-footer a:hover {
   text-decoration: underline;
 }
 
@@ -208,12 +208,15 @@
 
 .about-page {
   margin-top: 2rem;
-  padding: 2rem 0 3rem 2rem;
+  padding: 2rem 2rem 3rem;
   text-align: left;
+  display: flex;
+  justify-content: center;
 }
 
 .about-content {
   max-width: 65ch;
+  width: 100%;
 }
 
 .about-content h1 {

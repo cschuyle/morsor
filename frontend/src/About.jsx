@@ -25,7 +25,11 @@ function About() {
       </div>
       <hr className="backend-status-divider" />
       <footer className="app-footer">
-        <span className="app-footer-text">Version {APP_VERSION}</span>
+        <span className="app-footer-text">
+          GitHub: <a target="_blank" rel="noopener noreferrer" href="https://github.com/cschuyle/morsor">https://github.com/cschuyle/morsor</a>
+          {' · '}
+          Version {APP_VERSION}
+        </span>
         <Link to="/" className="app-footer-link">Go back</Link>
       </footer>
     </>

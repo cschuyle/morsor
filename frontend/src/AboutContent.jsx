@@ -1,5 +1,3 @@
-import { APP_VERSION } from './version'
-
 /**
  * Shared About page content. Used by both desktop (About.jsx) and mobile (MobileAbout.jsx).
  * Layout and styling are handled by the parent; this component is content-only.
@@ -9,8 +7,6 @@ function AboutContent() {
     <>
       <h1>Morsor</h1>
       <p>A list of lists navigator</p>
-      <b>GitHub: <a target="_blank" rel="noopener noreferrer" href="https://github.com/cschuyle/morsor">https://github.com/cschuyle/morsor</a></b>
-      <p>Version {APP_VERSION}</p>
       <h2>Why?</h2>
       <p>
         The REAL goal: Vibe-code the whole thing. This is an experiment: 99.999% vibe-coding a nontrivial app from scratch.

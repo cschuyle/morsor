@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom'
 import { getCsrfToken } from './getCsrfToken'
 import AboutContent from './AboutContent'
+import { APP_VERSION } from './version'
 import './App.css'
 import './MobileApp.css'
 
@@ -27,9 +28,12 @@ function MobileAbout() {
         </div>
       </main>
       <footer className="mobile-footer">
-        <Link to="/mobile" className="mobile-footer-link">Back to search</Link>
         <div className="mobile-footer-row">
-          <Link to="/" className="mobile-footer-link" onClick={() => sessionStorage.setItem('morsorPreferDesktop', 'true')}>Desktop site</Link>
+          <Link to="/mobile" className="mobile-footer-link">← Back</Link>
+          <span className="mobile-footer-version">v{APP_VERSION}</span>
+        </div>
+        <div className="mobile-footer-row">
+          <Link to="/" className="mobile-footer-link" onClick={() => sessionStorage.setItem('morsorPreferDesktop', 'true')}>Desktop</Link>
           <button
             type="button"
             className="mobile-footer-link mobile-footer-logout-btn"
@@ -42,7 +46,7 @@ function MobileAbout() {
                 .catch(() => { window.location.href = '/login' })
             }}
           >
-            Log Out
+            Logout
           </button>
         </div>
       </footer>
