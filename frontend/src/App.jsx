@@ -67,6 +67,7 @@ function App() {
   const queryRef = useRef(query)
   const skipCheckboxSearchRef = useRef(true)
   const skipFileTypeSearchRef = useRef(false)
+  const skipViewModeSearchRef = useRef(false)
   const abortControllerRef = useRef(null)
   const reloadAbortControllerRef = useRef(null)
   const fileTypeDropdownRef = useRef(null)
@@ -294,6 +295,10 @@ function App() {
     }
     if (skipFileTypeSearchRef.current) {
       skipFileTypeSearchRef.current = false
+      return
+    }
+    if (skipViewModeSearchRef.current) {
+      skipViewModeSearchRef.current = false
       return
     }
     const t = setTimeout(() => {
@@ -1675,7 +1680,10 @@ aria-label="Clear compare troves"
                       <button
                         type="button"
                         className={`view-mode-btn ${searchResultsViewMode === 'list' ? 'view-mode-btn--active' : ''}`}
-                        onClick={() => setSearchResultsViewMode('list')}
+                        onClick={() => {
+                          skipViewModeSearchRef.current = true
+                          setSearchResultsViewMode('list')
+                        }}
                         aria-pressed={searchResultsViewMode === 'list'}
                       >
                         List
@@ -1683,7 +1691,10 @@ aria-label="Clear compare troves"
                       <button
                         type="button"
                         className={`view-mode-btn ${searchResultsViewMode === 'gallery' ? 'view-mode-btn--active' : ''}`}
-                        onClick={() => setSearchResultsViewMode('gallery')}
+                        onClick={() => {
+                          skipViewModeSearchRef.current = true
+                          setSearchResultsViewMode('gallery')
+                        }}
                         aria-pressed={searchResultsViewMode === 'gallery'}
                       >
                         Gallery

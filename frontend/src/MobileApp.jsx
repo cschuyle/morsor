@@ -68,6 +68,7 @@ function MobileApp() {
   const queryRef = useRef(query)
   const skipSearchRef = useRef(true)
   const skipFileTypeSearchRef = useRef(false)
+  const skipViewModeSearchRef = useRef(false)
   const abortRef = useRef(null)
   const reloadAbortControllerRef = useRef(null)
   const fileTypeDropdownRef = useRef(null)
@@ -453,6 +454,10 @@ function MobileApp() {
     }
     if (skipFileTypeSearchRef.current) {
       skipFileTypeSearchRef.current = false
+      return
+    }
+    if (skipViewModeSearchRef.current) {
+      skipViewModeSearchRef.current = false
       return
     }
     const t = setTimeout(() => {
@@ -913,7 +918,10 @@ onClick={() => {
                 <button
                   type="button"
                   className={`mobile-view-mode-btn ${searchResultsViewMode === 'list' ? 'mobile-view-mode-btn--active' : ''}`}
-                  onClick={() => setSearchResultsViewMode('list')}
+                  onClick={() => {
+                    skipViewModeSearchRef.current = true
+                    setSearchResultsViewMode('list')
+                  }}
                   aria-pressed={searchResultsViewMode === 'list'}
                 >
                   List
@@ -921,7 +929,10 @@ onClick={() => {
                 <button
                   type="button"
                   className={`mobile-view-mode-btn ${searchResultsViewMode === 'gallery' ? 'mobile-view-mode-btn--active' : ''}`}
-                  onClick={() => setSearchResultsViewMode('gallery')}
+                  onClick={() => {
+                    skipViewModeSearchRef.current = true
+                    setSearchResultsViewMode('gallery')
+                  }}
                   aria-pressed={searchResultsViewMode === 'gallery'}
                 >
                   Gallery
