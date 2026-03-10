@@ -712,6 +712,7 @@
 .trove-name {
   font-size: 0.9rem;
   line-height: 1.35;
+  color: #555;
 }
 
 .trove-item--has-results .trove-name {
