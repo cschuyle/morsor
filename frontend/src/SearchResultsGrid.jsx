@@ -405,7 +405,9 @@ export function SearchResultsGrid({ data, sortBy = null, sortDir = 'asc', onSort
                       </span>
                     )}
                     {showPdfSashInGallery && hasPdf && (
-                      <span className="search-results-gallery-card-pdf-sash" aria-hidden="true">PDF</span>
+                      <span className="search-results-gallery-card-pdf-sash" aria-hidden="true">
+                        <img src="/pdf.svg" alt="" />
+                      </span>
                     )}
                     {showPdfSashInGallery && hasAudio && (
                       <span className="search-results-gallery-card-audio-sash" aria-hidden="true">

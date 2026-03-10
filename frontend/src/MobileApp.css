@@ -1096,20 +1096,15 @@
 }
 
 .mobile-search-results-grid .search-results-gallery-card-pdf-sash {
-  position: absolute;
-  top: 1.6rem;
-  left: -0.7rem;
-  padding: 0.12rem 1.2rem;
-  font-size: 0.5rem;
-  font-weight: 800;
-  letter-spacing: 0.02em;
-  background: rgba(0, 0, 0, 0.55);
-  color: #fff;
-  transform: rotate(-45deg);
-  transform-origin: top left;
-  line-height: 1.2;
-  white-space: nowrap;
-  pointer-events: none;
+  width: 52px;
+  top: 1.75rem;
+  left: -1rem;
+  padding: 0.2rem 0.4rem;
+}
+
+.mobile-search-results-grid .search-results-gallery-card-pdf-sash img {
+  width: 12px;
+  height: 12px;
 }
 
 .mobile-search-results-grid .search-results-gallery-card-audio-sash {
