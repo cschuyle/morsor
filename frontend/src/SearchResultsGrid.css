@@ -340,6 +340,15 @@
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
+.search-results-gallery-card--title-wraps .search-results-gallery-card-title {
+  white-space: normal;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+  overflow: hidden;
+}
+
 .search-results-gallery-card:hover:not(:disabled) {
   border-color: #6633cc;
   box-shadow: 0 2px 8px rgba(102, 51, 204, 0.2);
