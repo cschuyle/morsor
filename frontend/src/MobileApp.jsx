@@ -1226,9 +1226,9 @@ onClick={() => {
                               title="Clear file type filter"
                               onClick={(e) => {
                                 e.stopPropagation()
+                                skipFileTypeSearchRef.current = true
                                 setFileTypeFilters(new Set())
                                 setSearchParams(buildSearchParams(new Set()), { replace: true })
-                                skipFileTypeSearchRef.current = true
                                 fetchSearch(0, null, null, new Set())
                               }}
                               aria-label="Clear file type filter"
@@ -1252,10 +1252,10 @@ onClick={() => {
                               disabled={allSelected}
                               onClick={(e) => {
                                 e.preventDefault()
+                                skipFileTypeSearchRef.current = true
                                 const next = new Set(allAvailableFileTypes)
                                 setFileTypeFilters(next)
                                 setSearchParams(buildSearchParams(next), { replace: true })
-                                skipFileTypeSearchRef.current = true
                                 fetchSearch(0, null, null, next)
                               }}
                             >
@@ -1267,10 +1267,10 @@ onClick={() => {
                               disabled={fileTypeFilters.size === 0}
                               onClick={(e) => {
                                 e.preventDefault()
+                                skipFileTypeSearchRef.current = true
                                 const next = new Set()
                                 setFileTypeFilters(next)
                                 setSearchParams(buildSearchParams(next), { replace: true })
-                                skipFileTypeSearchRef.current = true
                                 fetchSearch(0, null, null, next)
                               }}
                             >
@@ -1289,12 +1289,12 @@ onClick={() => {
                                     ref={(el) => { if (el) el.indeterminate = someSelected && !allSelectedGroup }}
                                     checked={allSelectedGroup}
                                     onChange={() => {
+                                      skipFileTypeSearchRef.current = true
                                       const next = new Set(fileTypeFilters)
                                       if (allSelectedGroup) types.forEach((t) => next.delete(t))
                                       else types.forEach((t) => next.add(t))
                                       setFileTypeFilters(next)
                                       setSearchParams(buildSearchParams(next), { replace: true })
-                                      skipFileTypeSearchRef.current = true
                                       fetchSearch(0, null, null, next)
                                     }}
                                   />
@@ -1307,12 +1307,12 @@ onClick={() => {
                                     type="checkbox"
                                     checked={fileTypeFilters.has(ft)}
                                     onChange={() => {
+                                      skipFileTypeSearchRef.current = true
                                       const next = new Set(fileTypeFilters)
                                       if (next.has(ft)) next.delete(ft)
                                       else next.add(ft)
                                       setFileTypeFilters(next)
                                       setSearchParams(buildSearchParams(next), { replace: true })
-                                      skipFileTypeSearchRef.current = true
                                       fetchSearch(0, null, null, next)
                                     }}
                                   />

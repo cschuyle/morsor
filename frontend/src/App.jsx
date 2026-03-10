@@ -1270,9 +1270,9 @@ aria-label="Clear compare troves"
                           title="Clear file type filter"
                           onClick={(e) => {
                             e.stopPropagation()
+                            skipFileTypeSearchRef.current = true
                             setFileTypeFilters(new Set())
                             setSearchParams(buildSearchParams('search', query, searchSelectedTroveIds, dupPrimaryTroveId, dupCompareTroveIds, uniqPrimaryTroveId, uniqCompareTroveIds, new Set(), boostTroveId, searchResultsViewMode), { replace: true })
-                            skipFileTypeSearchRef.current = true
                             fetchSearch(0, null, null, null, null, new Set())
                           }}
                           aria-label="Clear file type filter"
@@ -1295,10 +1295,10 @@ aria-label="Clear compare troves"
                             disabled={allSelected}
                             onClick={(e) => {
                               e.preventDefault()
+                              skipFileTypeSearchRef.current = true
                               const next = new Set(allAvailableFileTypes)
                               setFileTypeFilters(next)
                               setSearchParams(buildSearchParams('search', query, searchSelectedTroveIds, dupPrimaryTroveId, dupCompareTroveIds, uniqPrimaryTroveId, uniqCompareTroveIds, next, boostTroveId, searchResultsViewMode), { replace: true })
-                              skipFileTypeSearchRef.current = true
                               fetchSearch(0, null, null, null, null, next)
                             }}
                           >
@@ -1310,10 +1310,10 @@ aria-label="Clear compare troves"
                             disabled={fileTypeFilters.size === 0}
                             onClick={(e) => {
                               e.preventDefault()
+                              skipFileTypeSearchRef.current = true
                               const next = new Set()
                               setFileTypeFilters(next)
                               setSearchParams(buildSearchParams('search', query, searchSelectedTroveIds, dupPrimaryTroveId, dupCompareTroveIds, uniqPrimaryTroveId, uniqCompareTroveIds, next, boostTroveId, searchResultsViewMode), { replace: true })
-                              skipFileTypeSearchRef.current = true
                               fetchSearch(0, null, null, null, null, next)
                             }}
                           >
@@ -1332,12 +1332,12 @@ aria-label="Clear compare troves"
                                   ref={(el) => { if (el) el.indeterminate = someSelected && !allSelected }}
                                   checked={allSelected}
                                   onChange={() => {
+                                    skipFileTypeSearchRef.current = true
                                     const next = new Set(fileTypeFilters)
                                     if (allSelected) types.forEach((t) => next.delete(t))
                                     else types.forEach((t) => next.add(t))
                                     setFileTypeFilters(next)
                                     setSearchParams(buildSearchParams('search', query, searchSelectedTroveIds, dupPrimaryTroveId, dupCompareTroveIds, uniqPrimaryTroveId, uniqCompareTroveIds, next, boostTroveId, searchResultsViewMode), { replace: true })
-                                    skipFileTypeSearchRef.current = true
                                     fetchSearch(0, null, null, null, null, next)
                                   }}
                                 />
@@ -1350,12 +1350,12 @@ aria-label="Clear compare troves"
                                   type="checkbox"
                                   checked={fileTypeFilters.has(ft)}
                                   onChange={() => {
+                                    skipFileTypeSearchRef.current = true
                                     const next = new Set(fileTypeFilters)
                                     if (next.has(ft)) next.delete(ft)
                                     else next.add(ft)
                                     setFileTypeFilters(next)
                                     setSearchParams(buildSearchParams('search', query, searchSelectedTroveIds, dupPrimaryTroveId, dupCompareTroveIds, uniqPrimaryTroveId, uniqCompareTroveIds, next, boostTroveId, searchResultsViewMode), { replace: true })
-                                    skipFileTypeSearchRef.current = true
                                     fetchSearch(0, null, null, null, null, next)
                                   }}
                                 />
