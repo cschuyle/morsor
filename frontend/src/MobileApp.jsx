@@ -1208,12 +1208,14 @@ onClick={() => {
                           aria-label="Filter by file type"
                         >
                           {fileTypesForLabel.size === 0
-                            ? 'Media: All'
-                            : (() => {
-                                if (fileTypesForLabel.size === 1) return `Only ${[...fileTypesForLabel][0]}`
-                                const groupName = getGroupNameIfFullySelected(fileTypesForLabel, allAvailableFileTypes)
-                                return groupName ? `Only ${groupName}` : `${fileTypesForLabel.size} filetypes`
-                              })()}
+                            ? 'Media: Any'
+                            : allSelected
+                              ? 'Media: All'
+                              : (() => {
+                                  if (fileTypesForLabel.size === 1) return `Only ${[...fileTypesForLabel][0]}`
+                                  const groupName = getGroupNameIfFullySelected(fileTypesForLabel, allAvailableFileTypes)
+                                  return groupName ? `Only ${groupName}` : `${fileTypesForLabel.size} filetypes`
+                                })()}
                         </button>
                         {fileTypesForLabel.size > 0 && (
                           <>
@@ -1243,8 +1245,40 @@ onClick={() => {
                           aria-label="File type filter"
                           style={{ position: 'fixed', top: fileTypePanelRect.top, left: fileTypePanelRect.left, width: fileTypePanelRect.width, zIndex: 1100 }}
                         >
+                          <div className="mobile-filetype-quick-actions">
+                            <button
+                              type="button"
+                              className="mobile-filetype-quick-btn"
+                              disabled={allSelected}
+                              onClick={(e) => {
+                                e.preventDefault()
+                                const next = new Set(allAvailableFileTypes)
+                                setFileTypeFilters(next)
+                                setSearchParams(buildSearchParams(next), { replace: true })
+                                skipFileTypeSearchRef.current = true
+                                fetchSearch(0, null, null, next)
+                              }}
+                            >
+                              All
+                            </button>
+                            <button
+                              type="button"
+                              className="mobile-filetype-quick-btn"
+                              disabled={fileTypeFilters.size === 0}
+                              onClick={(e) => {
+                                e.preventDefault()
+                                const next = new Set()
+                                setFileTypeFilters(next)
+                                setSearchParams(buildSearchParams(next), { replace: true })
+                                skipFileTypeSearchRef.current = true
+                                fetchSearch(0, null, null, next)
+                              }}
+                            >
+                              None
+                            </button>
+                          </div>
                           {groupFileTypes(allAvailableFileTypes).map(({ group, types }) => {
-                            const allSelected = types.every((ft) => fileTypeFilters.has(ft))
+                            const allSelectedGroup = types.every((ft) => fileTypeFilters.has(ft))
                             const someSelected = types.some((ft) => fileTypeFilters.has(ft))
                             return (
                             <div key={group ?? 'other'} className="mobile-filetype-group">
@@ -1252,11 +1286,11 @@ onClick={() => {
                                 <label className="mobile-filetype-group-header">
                                   <input
                                     type="checkbox"
-                                    ref={(el) => { if (el) el.indeterminate = someSelected && !allSelected }}
-                                    checked={allSelected}
+                                    ref={(el) => { if (el) el.indeterminate = someSelected && !allSelectedGroup }}
+                                    checked={allSelectedGroup}
                                     onChange={() => {
                                       const next = new Set(fileTypeFilters)
-                                      if (allSelected) types.forEach((t) => next.delete(t))
+                                      if (allSelectedGroup) types.forEach((t) => next.delete(t))
                                       else types.forEach((t) => next.add(t))
                                       setFileTypeFilters(next)
                                       setSearchParams(buildSearchParams(next), { replace: true })

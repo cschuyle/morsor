@@ -985,6 +985,41 @@
   z-index: 100;
 }
 
+.search-filetype-quick-actions {
+  display: flex;
+  gap: 0.35rem;
+  padding: 0 0.5rem 0.4rem;
+  border-bottom: 1px solid #eee;
+  margin-bottom: 0.25rem;
+}
+
+.search-filetype-quick-btn {
+  flex: 1;
+  padding: 0.3rem 0.5rem;
+  font-size: 0.85rem;
+  font-family: inherit;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  background: #f8f8f8;
+  color: #333;
+  cursor: pointer;
+}
+
+.search-filetype-quick-btn:hover {
+  background: #eee;
+  border-color: #bbb;
+}
+
+.search-filetype-quick-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.search-filetype-quick-btn:disabled:hover {
+  background: #f8f8f8;
+  border-color: #ccc;
+}
+
 .search-filetype-group {
   padding: 0 0 0.25rem;
 }

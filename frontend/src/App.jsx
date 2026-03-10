@@ -1252,12 +1252,14 @@ aria-label="Clear compare troves"
                         aria-label="Filter by file type"
                       >
                         {fileTypesForLabel.size === 0
-                          ? 'Media: All'
-                          : (() => {
-                              const groupNames = getFullySelectedGroupNames(fileTypesForLabel, allAvailableFileTypes)
-                              const label = groupNames?.length > 0 ? groupNames.join(', ') : (getGroupNameIfFullySelected(fileTypesForLabel, allAvailableFileTypes) ?? [...fileTypesForLabel].sort().join(', '))
-                              return `Only ${label}`
-                            })()}
+                          ? 'Media: Any'
+                          : allSelected
+                            ? 'Media: All'
+                            : (() => {
+                                const groupNames = getFullySelectedGroupNames(fileTypesForLabel, allAvailableFileTypes)
+                                const label = groupNames?.length > 0 ? groupNames.join(', ') : (getGroupNameIfFullySelected(fileTypesForLabel, allAvailableFileTypes) ?? [...fileTypesForLabel].sort().join(', '))
+                                return `Only ${label}`
+                              })()}
                       </button>
                       {fileTypesForLabel.size > 0 && (
                         <>
@@ -1286,6 +1288,38 @@ aria-label="Clear compare troves"
                         role="listbox"
                         aria-label="File type filter"
                       >
+                        <div className="search-filetype-quick-actions">
+                          <button
+                            type="button"
+                            className="search-filetype-quick-btn"
+                            disabled={allSelected}
+                            onClick={(e) => {
+                              e.preventDefault()
+                              const next = new Set(allAvailableFileTypes)
+                              setFileTypeFilters(next)
+                              setSearchParams(buildSearchParams('search', query, searchSelectedTroveIds, dupPrimaryTroveId, dupCompareTroveIds, uniqPrimaryTroveId, uniqCompareTroveIds, next, boostTroveId, searchResultsViewMode), { replace: true })
+                              skipFileTypeSearchRef.current = true
+                              fetchSearch(0, null, null, null, null, next)
+                            }}
+                          >
+                            All
+                          </button>
+                          <button
+                            type="button"
+                            className="search-filetype-quick-btn"
+                            disabled={fileTypeFilters.size === 0}
+                            onClick={(e) => {
+                              e.preventDefault()
+                              const next = new Set()
+                              setFileTypeFilters(next)
+                              setSearchParams(buildSearchParams('search', query, searchSelectedTroveIds, dupPrimaryTroveId, dupCompareTroveIds, uniqPrimaryTroveId, uniqCompareTroveIds, next, boostTroveId, searchResultsViewMode), { replace: true })
+                              skipFileTypeSearchRef.current = true
+                              fetchSearch(0, null, null, null, null, next)
+                            }}
+                          >
+                            None
+                          </button>
+                        </div>
                         {groupFileTypes(allAvailableFileTypes).map(({ group, types }) => {
                           const allSelected = types.every((ft) => fileTypeFilters.has(ft))
                           const someSelected = types.some((ft) => fileTypeFilters.has(ft))
