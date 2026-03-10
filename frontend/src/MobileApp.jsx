@@ -1220,9 +1220,9 @@ onClick={() => {
                           aria-label="Filter by file type"
                         >
                           {fileTypesForLabel.size === 0
-                            ? 'Media: Any'
+                            ? 'Select media'
                             : allSelected
-                              ? 'Media: All'
+                              ? 'Any media'
                               : (() => {
                                   if (fileTypesForLabel.size === 1) return `Only ${[...fileTypesForLabel][0]}`
                                   const groupName = getGroupNameIfFullySelected(fileTypesForLabel, displayFileTypes)
@@ -1271,7 +1271,7 @@ onClick={() => {
                                 fetchSearch(0, null, null, next)
                               }}
                             >
-                              All
+                              Any
                             </button>
                             <button
                               type="button"

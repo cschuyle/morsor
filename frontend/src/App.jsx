@@ -1252,9 +1252,9 @@ aria-label="Clear compare troves"
                         aria-label="Filter by file type"
                       >
                         {fileTypesForLabel.size === 0
-                          ? 'Media: Any'
+                          ? 'Select media'
                           : allSelected
-                            ? 'Media: All'
+                            ? 'Any media'
                             : (() => {
                                 const groupNames = getFullySelectedGroupNames(fileTypesForLabel, allAvailableFileTypes)
                                 const label = groupNames?.length > 0 ? groupNames.join(', ') : (getGroupNameIfFullySelected(fileTypesForLabel, allAvailableFileTypes) ?? [...fileTypesForLabel].sort().join(', '))
@@ -1302,7 +1302,7 @@ aria-label="Clear compare troves"
                               fetchSearch(0, null, null, null, null, next)
                             }}
                           >
-                            All
+                            Any
                           </button>
                           <button
                             type="button"
