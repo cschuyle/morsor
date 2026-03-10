@@ -403,18 +403,20 @@
   pointer-events: none;
 }
 
-.search-results-gallery-card-audio-sash svg {
-  display: block;
-  width: 16.8px;
-  height: 16.8px;
-  transform: rotate(-45deg);
-}
-
 .search-results-gallery-card-image img {
   display: block;
   width: 100%;
   height: auto;
   vertical-align: middle;
+}
+
+.search-results-gallery-card-audio-sash img {
+  display: block;
+  width: 16.8px;
+  height: 16.8px;
+  transform: rotate(-45deg) translate(4px, 4px);
+  vertical-align: middle;
+  filter: brightness(0) invert(1) sepia(1) saturate(5) hue-rotate(15deg);
 }
 
 .search-results-gallery-card-placeholder {
