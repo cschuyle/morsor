@@ -1,6 +1,11 @@
 # Stage 1: build frontend
 FROM node:20-alpine AS frontend
 WORKDIR /app
+
+# Version string passed from deploy script
+ARG MOOCHO_VERSION=dev
+ENV VITE_APP_VERSION=${MOOCHO_VERSION}
+
 COPY frontend/package.json frontend/package-lock.json frontend/
 RUN cd frontend && npm ci
 COPY frontend/ frontend/
