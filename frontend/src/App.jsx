@@ -606,9 +606,8 @@ function App() {
     const doSplit = searchMode !== 'search' || !freezeTroveListOrder || (searchMode === 'search' && (hasResults || selectedTroveIds.size > 0 || boostTroveId != null))
     const selectedSortWhenResults =
       (a, b) => {
-        if ((a.resultCount ?? 0) > 0 && (b.resultCount ?? 0) === 0) return -1
-        if ((a.resultCount ?? 0) === 0 && (b.resultCount ?? 0) > 0) return 1
-        if ((a.resultCount ?? 0) > 0 && (b.resultCount ?? 0) > 0) return sortByHitsDesc(a, b)
+        const diff = (b.resultCount ?? 0) - (a.resultCount ?? 0)
+        if (diff !== 0) return diff
         if (boostTroveId != null && a.id === boostTroveId && b.id !== boostTroveId) return -1
         if (boostTroveId != null && b.id === boostTroveId && a.id !== boostTroveId) return 1
         return sortByName(a, b)
