@@ -3,7 +3,7 @@ import { Link, useSearchParams, useLocation } from 'react-router-dom'
 import { getApiAuthHeaders } from './apiAuth'
 import { getCsrfToken } from './getCsrfToken'
 import { queryCache } from './queryCache'
-import { formatCount, formatCacheBytes } from './formatCount'
+import { formatCount } from './formatCount'
 import { groupFileTypes, getGroupNameIfFullySelected } from './fileTypeGroups'
 import { SearchResultsGrid } from './SearchResultsGrid'
 import { DuplicateResultsView } from './DuplicateResultsView'
@@ -194,15 +194,21 @@ function MobileApp() {
       .then((res) => { if (res.status === 401) { window.location.href = '/login'; return }; return res.json() })
       .then((data) => {
         if (!data) return
-        const base = data.status === 'UP' ? 'Status: Backend is up' : `Status: Backend: ${data.status}`
+        const base = data.status === 'UP' ? 'Server is live' : `Server: ${data.status}`
         const cache = data.cache
-        const cacheMsg = cache != null && typeof cache.entries === 'number' && typeof cache.estimatedBytes === 'number'
-          ? (cache.entries === 0 ? ' · Cache: empty' : ` · Cache: ${formatCount(cache.entries)} entries, ~${formatCacheBytes(cache.estimatedBytes)}`)
-          : ''
+        const cacheMsg = (() => {
+          if (cache == null || typeof cache.estimatedBytes !== 'number' || !Number.isFinite(cache.estimatedBytes)) return ''
+          const b = cache.estimatedBytes
+          if (b === 0) return ' · Cache: empty'
+          const mb = 1024 * 1024
+          const gb = 1024 * mb
+          const rounded = b >= gb ? `${Math.round(b / gb)} GB` : b >= mb ? `~${Math.round(b / mb)} MB` : `~${Math.round(b / 1024)} KB`
+          return ` · Cache: ${rounded}`
+        })()
         setStatusMessage(base + cacheMsg)
         setCacheEntries(cache != null && typeof cache.entries === 'number' ? cache.entries : 0)
       })
-      .catch(() => setStatusMessage('Status: Backend unreachable'))
+      .catch(() => setStatusMessage('Server unreachable'))
   }
 
   function fetchSearch(pageNum, sortByOverride = null, sortDirOverride = null, fileTypesOverride = undefined) {
@@ -1218,7 +1224,7 @@ onClick={() => {
                       .catch(() => {})
                   }}
                 >
-                  Clear Cache
+                  Clear
                 </button>
               </>
             )}

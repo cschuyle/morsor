@@ -63,7 +63,7 @@ describe('Desktop and mobile share state via URL', () => {
       </MemoryRouter>
     )
     await waitFor(() => {
-      expect(screen.getByText(/Status: Backend is up/)).toBeInTheDocument()
+      expect(screen.getByText(/Server is live/)).toBeInTheDocument()
     })
 
     const desktopLink = screen.getByRole('link', { name: 'Desktop site' })
@@ -101,7 +101,7 @@ describe('Desktop and mobile share state via URL', () => {
       </MemoryRouter>
     )
     await waitFor(() => {
-      expect(screen.getByText(/Status: Backend is up/)).toBeInTheDocument()
+      expect(screen.getByText(/Server is live/)).toBeInTheDocument()
     })
 
     const desktopLink = screen.getByRole('link', { name: 'Desktop site' })
