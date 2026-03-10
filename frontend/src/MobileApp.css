@@ -1070,6 +1070,11 @@
   height: 1.33rem;
 }
 
+.mobile-search-results-grid .search-results-gallery-card-other-filetypes {
+  padding: 0.18rem 0.3rem;
+  font-size: 0.6rem;
+}
+
 .mobile-search-results-grid .search-results-gallery-card-title,
 .mobile-search-results-grid .search-results-gallery-card-trove {
   padding: 0.2rem 0.3rem;

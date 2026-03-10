@@ -372,6 +372,16 @@ export function SearchResultsGrid({ data, sortBy = null, sortDir = 'asc', onSort
               const hasPdf = files.some((u) => typeof u === 'string' && /\.pdf(\?|$)/i.test(u))
               const hasAudio = files.some((u) => typeof u === 'string' && /\.(mp3|m4a|wav|ogg|flac|aac|wma)(\?|$)/i.test(u))
               const hasVideo = files.some((u) => typeof u === 'string' && /\.(mp4|webm|mov|avi|mkv|m4v|ogv|wmv)(\?|$)/i.test(u))
+              const isPdf = (u) => typeof u === 'string' && /\.pdf(\?|$)/i.test(u)
+              const isAudio = (u) => typeof u === 'string' && /\.(mp3|m4a|wav|ogg|flac|aac|wma)(\?|$)/i.test(u)
+              const isVideo = (u) => typeof u === 'string' && /\.(mp4|webm|mov|avi|mkv|m4v|ogv|wmv)(\?|$)/i.test(u)
+              const otherFileExts = new Set()
+              files.forEach((u) => {
+                if (typeof u !== 'string' || isPdf(u) || isAudio(u) || isVideo(u)) return
+                const m = u.match(/\.([a-z0-9]+)(\?|$)/i)
+                if (m) otherFileExts.add(m[1].toUpperCase())
+              })
+              const otherFileTypesList = [...otherFileExts].sort()
               const galleryLinkIcon = (
                 <span className="search-results-gallery-card-link-icon" aria-hidden="true">
                   <PopOutIcon className="search-results-gallery-card-link-icon-img" />
@@ -420,6 +430,11 @@ export function SearchResultsGrid({ data, sortBy = null, sortDir = 'asc', onSort
                       </span>
                     )}
                   </span>
+                  {otherFileTypesList.length > 0 && (
+                    <span className="search-results-gallery-card-other-filetypes" aria-hidden="true">
+                      {otherFileTypesList.join(', ')}
+                    </span>
+                  )}
                   <span className="search-results-gallery-card-title">{title || '\u00A0'}</span>
                   {!hideTroveInGallery && <span className="search-results-gallery-card-trove">{trove || '\u00A0'}</span>}
                 </button>

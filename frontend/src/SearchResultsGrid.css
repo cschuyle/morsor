@@ -482,6 +482,18 @@
   flex-shrink: 0;
 }
 
+.search-results-gallery-card-other-filetypes {
+  display: block;
+  padding: 0.25rem 0.6rem;
+  font-size: 0.7rem;
+  line-height: 1.3;
+  color: #555;
+  background: #e8e8e8;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .search-results-gallery-card-title,
 .search-results-gallery-card-trove {
   display: block;
