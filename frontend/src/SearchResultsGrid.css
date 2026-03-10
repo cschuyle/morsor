@@ -35,7 +35,7 @@
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
 }
 .search-results-grid .back-to-top-btn:focus-visible {
-  outline: 2px solid #646cff;
+  outline: 2px solid #6633cc;
   outline-offset: 2px;
 }
 
@@ -65,8 +65,8 @@
 
 .grid-filter-input:focus {
   outline: none;
-  border-color: #646cff;
-  box-shadow: 0 0 0 2px rgba(100, 108, 255, 0.2);
+  border-color: #6633cc;
+  box-shadow: 0 0 0 2px rgba(102, 51, 204, 0.2);
 }
 
 .grid-wrapper {
@@ -111,7 +111,7 @@
 
 .sort-indicator {
   margin-left: 0.25rem;
-  color: #646cff;
+  color: #6633cc;
 }
 
 .grid-table tbody tr:hover td {
@@ -194,8 +194,8 @@
   width: 3.2rem;
   height: 3.2rem;
   border-radius: 4px;
-  background: rgba(100, 108, 255, 0.08);
-  color: #646cff;
+  background: rgba(102, 51, 204, 0.08);
+  color: #6633cc;
 }
 
 .search-thumb-link-icon-img {
@@ -330,8 +330,8 @@
 }
 
 .search-results-gallery-card:hover:not(:disabled) {
-  border-color: #646cff;
-  box-shadow: 0 2px 8px rgba(100, 108, 255, 0.2);
+  border-color: #6633cc;
+  box-shadow: 0 2px 8px rgba(102, 51, 204, 0.2);
 }
 
 .search-results-gallery-card:disabled {
@@ -373,8 +373,8 @@
   justify-content: center;
   width: 100%;
   min-height: 106.67px;
-  background: rgba(100, 108, 255, 0.08);
-  color: #646cff;
+  background: rgba(102, 51, 204, 0.08);
+  color: #6633cc;
 }
 
 .search-results-gallery-card-link-icon-img {

@@ -39,13 +39,13 @@
   font-weight: 800;
   font-size: 1.25rem;
   font-family: "Nunito", "Plus Jakarta Sans", system-ui, -apple-system, sans-serif;
-  color: #6b8cff;
+  color: #6633cc;
   text-decoration: none;
 }
 
 .mobile-nav-link {
   font-size: 0.95rem;
-  color: #646cff;
+  color: #6633cc;
   text-decoration: none;
 }
 
@@ -153,9 +153,9 @@
 
 .mobile-search-btn {
   padding: 0.75rem 1rem;
-  border: 1px solid #646cff;
+  border: 1px solid #6633cc;
   border-radius: 8px;
-  background: #646cff;
+  background: #6633cc;
   color: #fff;
   font-size: 1rem;
   font-weight: 500;
@@ -440,7 +440,7 @@
 }
 
 .mobile-trove-filter-wrap:focus-within {
-  border-color: #646cff;
+  border-color: #6633cc;
 }
 
 .mobile-trove-picker-filter:focus {
@@ -450,7 +450,7 @@
 .mobile-trove-picker-done {
   padding: 0.5rem 1rem;
   border: none;
-  background: #646cff;
+  background: #6633cc;
   color: #fff;
   font-size: 1rem;
   border-radius: 6px;
@@ -472,7 +472,7 @@
   border: none;
   background: none;
   font-size: 0.9rem;
-  color: #646cff;
+  color: #6633cc;
   cursor: pointer;
 }
 .mobile-trove-clear:disabled {
@@ -532,7 +532,7 @@
 .mobile-trove-label input {
   width: 1.1rem;
   height: 1.1rem;
-  accent-color: #646cff;
+  accent-color: #6633cc;
 }
 
 .mobile-trove-only-actions {
@@ -559,7 +559,7 @@
   padding: 0.25rem 0.4rem;
   font-family: inherit;
   font-size: 0.8rem;
-  color: #646cff;
+  color: #6633cc;
   cursor: pointer;
   text-decoration: none;
   border-radius: 4px;
@@ -696,7 +696,7 @@
 
 .mobile-footer-link {
   font-size: 0.9rem;
-  color: #646cff;
+  color: #6633cc;
   text-decoration: none;
 }
 
@@ -711,7 +711,7 @@
   cursor: pointer;
   font-family: inherit;
   font-size: inherit;
-  color: #646cff;
+  color: #6633cc;
   text-decoration: none;
 }
 
@@ -726,7 +726,7 @@
   font: inherit;
   cursor: pointer;
   font-size: 0.9rem;
-  color: #646cff;
+  color: #6633cc;
   text-decoration: none;
 }
 
@@ -859,7 +859,7 @@
   width: 1.25rem;
   height: 1.25rem;
   border: 2px solid #e5e5e5;
-  border-top-color: #646cff;
+  border-top-color: #6633cc;
   border-radius: 50%;
   animation: mobile-search-spinner 0.7s linear infinite;
 }
@@ -891,7 +891,7 @@
 
 .search-compare-progress-bar {
   height: 100%;
-  background: #646cff;
+  background: #6633cc;
   border-radius: 4px;
   transition: width 0.15s ease-out;
 }
@@ -1243,7 +1243,7 @@
 
 .reload-troves-progress-fill {
   height: 100%;
-  background: #646cff;
+  background: #6633cc;
   border-radius: 4px;
   transition: width 0.15s ease-out;
 }
@@ -1268,7 +1268,7 @@
 .reload-troves-progress-bar.reload-troves-progress-indeterminate {
   height: 100%;
   width: 40%;
-  background: #646cff;
+  background: #6633cc;
   border-radius: 4px;
   animation: search-compare-progress-indeterminate 1.2s ease-in-out infinite;
 }

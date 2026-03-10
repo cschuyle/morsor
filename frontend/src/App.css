@@ -110,7 +110,7 @@
   font-size: inherit;
   font-weight: inherit;
   flex-shrink: 0;
-  color: #6b8cff;
+  color: #6633cc;
   box-sizing: border-box;
   overflow-x: hidden;
   background: #ffaa44;
@@ -123,7 +123,7 @@
 
 .app-title .sidebar-title-note {
   font-size: 1.3rem;
-  color: #8fa3e0;
+  color: #6633cc;
 }
 
 .app-layout {
@@ -175,7 +175,7 @@
 
 .app-footer-link {
   font-size: 0.9rem;
-  color: #646cff;
+  color: #6633cc;
   text-decoration: none;
 }
 
@@ -195,7 +195,7 @@
   cursor: pointer;
   font-family: inherit;
   font-size: 0.9rem;
-  color: #646cff;
+  color: #6633cc;
   text-decoration: none;
 }
 .app-footer-logout-btn:hover {
@@ -209,7 +209,7 @@
   cursor: pointer;
   font-family: inherit;
   font-size: inherit;
-  color: #646cff;
+  color: #6633cc;
   text-decoration: none;
 }
 
@@ -256,21 +256,21 @@
   font-size: 2.5rem;
   font-weight: 800;
   font-family: "Nunito", "Plus Jakarta Sans", system-ui, -apple-system, sans-serif;
-  color: #646cff;
+  color: #6633cc;
 }
 
 .about-content h2 {
   margin: 1.5rem 0 0.5rem;
   font-size: 1.25rem;
   font-weight: 600;
-  color: #646cff;
+  color: #6633cc;
 }
 
 .about-content h3 {
   margin: 1.25rem 0 0.5rem;
   font-size: 1.1rem;
   font-weight: 600;
-  color: #646cff;
+  color: #6633cc;
 }
 
 .about-content p {
@@ -310,7 +310,7 @@
 }
 
 .about-content a {
-  color: #646cff;
+  color: #6633cc;
   text-decoration: none;
 }
 
@@ -366,7 +366,7 @@
   padding: 0;
   border: none;
   background: transparent;
-  color: #6b8cff;
+  color: #6633cc;
   font-size: 3.125rem;
   cursor: pointer;
   position: absolute;
@@ -384,7 +384,7 @@
 }
 
 .sidebar-toggle:focus-visible {
-  outline: 2px solid #646cff;
+  outline: 2px solid #6633cc;
   outline-offset: 2px;
   border-radius: 6px;
 }
@@ -424,7 +424,7 @@
   border: none;
   padding: 0;
   font: inherit;
-  color: #646cff;
+  color: #6633cc;
   cursor: pointer;
   text-decoration: none;
 }
@@ -456,7 +456,7 @@
 
 .sidebar-show-select:focus {
   outline: none;
-  border-color: #646cff;
+  border-color: #6633cc;
 }
 
 .sidebar-trove-filter-wrap {
@@ -490,7 +490,7 @@
 }
 
 .sidebar-trove-filter-wrap:focus-within {
-  border-color: #646cff;
+  border-color: #6633cc;
 }
 
 .sidebar-selection-message {
@@ -647,7 +647,7 @@
   border: none;
   background: none;
   font-family: inherit;
-  color: #646cff;
+  color: #6633cc;
   cursor: pointer;
   border-radius: 4px;
 }
@@ -679,14 +679,14 @@
 }
 
 .trove-item--selected .trove-checkbox:hover {
-  background: rgba(100, 108, 255, 0.08);
+  background: rgba(102, 51, 204, 0.08);
 }
 
 .trove-checkbox input {
   flex-shrink: 0;
   width: 1.1rem;
   height: 1.1rem;
-  accent-color: #646cff;
+  accent-color: #6633cc;
   cursor: pointer;
 }
 
@@ -989,7 +989,7 @@
   width: 1.25rem;
   height: 1.25rem;
   border: 2px solid #e5e5e5;
-  border-top-color: #646cff;
+  border-top-color: #6633cc;
   border-radius: 50%;
   animation: search-spinner 0.7s linear infinite;
 }
@@ -1069,8 +1069,8 @@
 }
 
 .view-mode-btn--active {
-  background: #646cff;
-  border-color: #646cff;
+  background: #6633cc;
+  border-color: #6633cc;
   color: #fff;
 }
 
@@ -1130,7 +1130,7 @@
   min-width: 2.25rem;
   border: none;
   background: none;
-  color: #646cff;
+  color: #6633cc;
   cursor: pointer;
   padding: 0 0.25rem;
 }
@@ -1407,7 +1407,7 @@
 
 .search-compare-progress-bar {
   height: 100%;
-  background: #646cff;
+  background: #6633cc;
   border-radius: 4px;
   transition: width 0.15s ease-out;
 }
@@ -1680,7 +1680,7 @@
 
 .reload-troves-progress-fill {
   height: 100%;
-  background: #646cff;
+  background: #6633cc;
   border-radius: 4px;
   transition: width 0.15s ease-out;
 }
@@ -1705,7 +1705,7 @@
 .reload-troves-progress-bar.reload-troves-progress-indeterminate {
   height: 100%;
   width: 40%;
-  background: #646cff;
+  background: #6633cc;
   border-radius: 4px;
   animation: search-compare-progress-indeterminate 1.2s ease-in-out infinite;
 }

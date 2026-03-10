@@ -46,7 +46,7 @@
 
 .login-input:focus {
   outline: none;
-  border-color: #646cff;
+  border-color: #6633cc;
 }
 
 .login-error {
@@ -57,7 +57,7 @@
 
 .login-submit {
   padding: 0.65rem 1rem;
-  background: #646cff;
+  background: #6633cc;
   color: #fff;
   border: none;
   border-radius: 6px;
