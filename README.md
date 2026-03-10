@@ -8,7 +8,7 @@ The REAL goal: Vibe-code the whole thing. This is an experiment doing 99.999% vi
 
 But, as for what the app DOES:
 
-I'm a list-maker. I have a few dozen lists which I want to be able to easily browse, search and do some analysis on. That's what the app does.
+I'm a list-maker. I have a few dozen lists which I want to be able to easily browse, search and do some analysis on. That's what Morsor's for.
 
 ## What's the name?
 

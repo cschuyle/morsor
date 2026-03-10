@@ -4,6 +4,18 @@ import './App.css'
 function About() {
   return (
     <>
+      <svg className="about-viewport-border-svg" aria-hidden="true">
+        <defs>
+          <filter id="about-frame-fade" x="-0.05" y="-0.05" width="1.1" height="1.1">
+            <feGaussianBlur in="SourceGraphic" stdDeviation="0.003" />
+          </filter>
+          <mask id="about-frame-mask" maskUnits="objectBoundingBox" maskContentUnits="objectBoundingBox">
+            <rect width="1" height="1" fill="white" />
+            <rect x="0.015" y="0.015" width="0.97" height="0.97" rx="0.01" ry="0.01" fill="black" filter="url(#about-frame-fade)" />
+          </mask>
+        </defs>
+      </svg>
+      <div className="about-viewport-border" aria-hidden="true" />
       <div className="about-page">
         <article className="about-content">
           <h1>Morsor</h1>
@@ -16,7 +28,7 @@ function About() {
           <p>But, as for what the app DOES:</p>
           <p>
             I&apos;m a list-maker. I have a few dozen lists which I want to be able to easily browse, search
-            and do some analysis on. That&apos;s what the app does.
+            and do some analysis on. That&apos;s what Morsor's for.
           </p>
           <h2>Features</h2>
           <ul>
