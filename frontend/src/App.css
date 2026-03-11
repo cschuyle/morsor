@@ -1170,6 +1170,14 @@
   color: #666;
   font-size: 0.95rem;
 }
+.card .search-count,
+.card .search-results-options .view-mode-toggle,
+.card .search-results-options .gallery-decorate-wrap,
+.card .search-results-options .page-size-label,
+.card .search-results-options .pagination-info,
+.card .search-results-options .pagination-ellipsis {
+  color: #b8b8b8;
+}
 .search-results-options {
   margin-top: 0.5rem;
   margin-bottom: 0.5rem;
@@ -1280,9 +1288,9 @@
 }
 
 .view-mode-btn--active:hover {
-  background: #e0d8f0;
-  border-color: #c9b8e8;
-  color: #333;
+  background: #6633cc;
+  border-color: #6633cc;
+  color: #fff;
 }
 
 .page-size-label {
@@ -1356,9 +1364,10 @@
   min-width: 2.25rem;
   border: none;
   background: none;
-  color: #6633cc;
+  color: #8844ff;
   cursor: pointer;
   padding: 0 0.25rem;
+  font-weight: 700;
 }
 
 .pagination-num:hover:not(:disabled) {
@@ -1366,13 +1375,17 @@
 }
 
 .pagination-num--current {
-  font-weight: 600;
+  font-weight: 700;
   color: #213547;
   cursor: default;
 }
 
 .pagination-num--current:hover {
   text-decoration: none;
+}
+
+.desktop-app .pagination-num--current {
+  color: #fff;
 }
 
 .pagination-ellipsis {
