@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom'
-import { getCsrfToken } from './getCsrfToken'
 import AboutContent from './AboutContent'
+import { performLogout } from './performLogout'
 import { APP_VERSION } from './version'
 import './App.css'
 import './MobileApp.css'
@@ -38,12 +38,9 @@ function MobileAbout() {
             type="button"
             className="mobile-footer-link mobile-footer-logout-btn"
             onClick={() => {
-              const token = getCsrfToken()
-              const headers = { 'Content-Type': 'application/x-www-form-urlencoded' }
-              if (token) headers['X-XSRF-TOKEN'] = token
-              fetch('/logout', { method: 'POST', credentials: 'include', headers })
+              performLogout()
                 .then(() => { window.location.href = '/login' })
-                .catch(() => { window.location.href = '/login' })
+                .catch(() => { window.alert('Logout failed. Please try again.') })
             }}
           >
             Logout

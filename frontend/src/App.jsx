@@ -5,6 +5,7 @@ import { DuplicateResultsView } from './DuplicateResultsView'
 import { UniquesResultsView } from './UniquesResultsView'
 import { getApiAuthHeaders } from './apiAuth'
 import { getCsrfToken } from './getCsrfToken'
+import { performLogout } from './performLogout'
 import { queryCache } from './queryCache'
 import { formatCount, formatCacheBytes } from './formatCount'
 import { groupFileTypes, getGroupNameIfFullySelected, getFullySelectedGroupNames } from './fileTypeGroups'
@@ -1968,12 +1969,9 @@ aria-label="Clear compare troves"
             type="button"
             className="app-footer-link app-footer-logout-btn"
             onClick={() => {
-              const token = getCsrfToken()
-              const headers = { 'Content-Type': 'application/x-www-form-urlencoded' }
-              if (token) headers['X-XSRF-TOKEN'] = token
-              fetch('/logout', { method: 'POST', credentials: 'include', headers })
+              performLogout()
                 .then(() => { window.location.href = '/login' })
-                .catch(() => { window.location.href = '/login' })
+                .catch(() => { window.alert('Logout failed. Please try again.') })
             }}
           >
             Log Out

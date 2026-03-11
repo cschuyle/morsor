@@ -2,6 +2,7 @@ import { useState, useEffect, useLayoutEffect, useRef, useMemo } from 'react'
 import { Link, useSearchParams, useLocation } from 'react-router-dom'
 import { getApiAuthHeaders } from './apiAuth'
 import { getCsrfToken } from './getCsrfToken'
+import { performLogout } from './performLogout'
 import { queryCache } from './queryCache'
 import { formatCount } from './formatCount'
 import { groupFileTypes, getGroupNameIfFullySelected, ALL_KNOWN_FILE_TYPES } from './fileTypeGroups'
@@ -1569,12 +1570,9 @@ onClick={() => {
             type="button"
             className="mobile-footer-link mobile-footer-logout-btn"
             onClick={() => {
-              const token = getCsrfToken()
-              const headers = { 'Content-Type': 'application/x-www-form-urlencoded' }
-              if (token) headers['X-XSRF-TOKEN'] = token
-              fetch('/logout', { method: 'POST', credentials: 'include', headers })
+              performLogout()
                 .then(() => { window.location.href = '/login' })
-                .catch(() => { window.location.href = '/login' })
+                .catch(() => { window.alert('Logout failed. Please try again.') })
             }}
           >
             Logout
