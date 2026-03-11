@@ -81,7 +81,10 @@ public class SecurityConfig {
             .logout(logout -> logout
                 .logoutUrl("/logout")
                 .logoutSuccessUrl("/login")
-                .permitAll())
+                .invalidateHttpSession(true)
+                .deleteCookies("JSESSIONID", "XSRF-TOKEN")
+                .permitAll()
+            )
             .userDetailsService(userDetailsService)
             .addFilterBefore(new ResponseCapturingFilter(), AuthorizationFilter.class)
             .addFilterBefore(apiTokenAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
