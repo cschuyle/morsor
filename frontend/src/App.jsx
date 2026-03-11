@@ -1306,7 +1306,7 @@ aria-label="Clear compare troves"
                               fetchSearch(0, null, null, null, null, next)
                             }}
                           >
-                            Any
+                            <span className="search-filetype-quick-prefix search-filetype-quick-prefix--asterisk" aria-hidden="true">*</span> Any
                           </button>
                           <button
                             type="button"
@@ -1322,7 +1322,7 @@ aria-label="Clear compare troves"
                               fetchSearch(0, null, null, null, null, next)
                             }}
                           >
-                            Meh
+                            <span className="search-filetype-quick-prefix" aria-hidden="true">×</span> Meh
                           </button>
                         </div>
                         {groupFileTypes(allAvailableFileTypes).map(({ group, types }) => {

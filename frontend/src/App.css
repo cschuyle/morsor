@@ -995,7 +995,11 @@
 
 .search-filetype-quick-btn {
   flex: 1;
-  padding: 0.3rem 0.5rem;
+  display: inline-flex;
+  align-items: center;
+  flex-direction: row;
+  white-space: nowrap;
+  padding: 0 0.5rem 0.12rem 0.2rem;
   font-size: 0.85rem;
   font-family: inherit;
   border: 1px solid #ccc;
@@ -1018,6 +1022,20 @@
 .search-filetype-quick-btn:disabled:hover {
   background: #f8f8f8;
   border-color: #ccc;
+}
+
+.search-filetype-quick-prefix {
+  vertical-align: super;
+  font-size: 1.125em;
+  color: #888;
+  margin-right: 0.15em;
+  margin-top: -0.28em;
+}
+
+.search-filetype-quick-prefix--asterisk {
+  vertical-align: baseline;
+  font-size: 1.5em;
+  margin-top: 0.06em;
 }
 
 .search-filetype-group {

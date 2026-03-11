@@ -1277,7 +1277,7 @@ onClick={() => {
                                 fetchSearch(0, null, null, next)
                               }}
                             >
-                              Any
+                              <span className="mobile-filetype-quick-prefix mobile-filetype-quick-prefix--asterisk" aria-hidden="true">*</span> Any
                             </button>
                             <button
                               type="button"
@@ -1293,7 +1293,7 @@ onClick={() => {
                                 fetchSearch(0, null, null, next)
                               }}
                             >
-                              Meh
+                              <span className="mobile-filetype-quick-prefix" aria-hidden="true">×</span> Meh
                             </button>
                           </div>
                           {groupFileTypes(displayFileTypes).map(({ group, types }) => {
