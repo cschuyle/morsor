@@ -306,6 +306,10 @@
 
 .mobile-filetype-quick-btn {
   flex: 1;
+  display: inline-flex;
+  align-items: center;
+  flex-direction: row;
+  white-space: nowrap;
   padding: 0 0.5rem 0.25rem 0.2rem;
   font-size: 0.85rem;
   font-family: inherit;
@@ -337,14 +341,15 @@
   font-weight: bold;
   color: #888;
   margin-right: 0.15em;
+  margin-top: -0.28em;
 }
 
 .mobile-filetype-quick-prefix--asterisk {
   vertical-align: baseline;
-  font-size: 1.85em;
+  font-size: 1.5em;
   font-weight: normal;
   color: #888;
-  margin-top: 0.34em;
+  margin-top: 0.18em;
 }
 
 .mobile-filetype-group {
