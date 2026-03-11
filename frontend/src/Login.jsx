@@ -7,6 +7,7 @@ export default function Login() {
   const [submitting, setSubmitting] = useState(false)
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
+  const [redirectTo, setRedirectTo] = useState(() => `${window.location.origin}/`)
   const formRef = useRef(null)
 
   useEffect(() => {
@@ -16,6 +17,15 @@ export default function Login() {
       setError('Service unavailable. The database may be down. Please try again later.')
     } else if (params.has('error')) {
       setError('Invalid username or password.')
+    }
+    const nextParam = params.get('next')
+    if (nextParam) {
+      try {
+        const url = new URL(nextParam, window.location.origin)
+        setRedirectTo(url.toString())
+      } catch {
+        // ignore malformed next; keep default
+      }
     }
   }, [])
 
@@ -55,7 +65,7 @@ export default function Login() {
     attemptLogin()
       .then(async (res) => {
         if (res.type === 'opaqueredirect' || res.status === 302 || res.status === 200) {
-          window.location.href = `${window.location.origin}/`
+          window.location.href = redirectTo
           return
         }
         // If unauthorized/forbidden, refresh CSRF/session once and retry
@@ -67,7 +77,7 @@ export default function Login() {
           }
           const retry = await attemptLogin()
           if (retry.type === 'opaqueredirect' || retry.status === 302 || retry.status === 200) {
-            window.location.href = `${window.location.origin}/`
+            window.location.href = redirectTo
             return
           }
         }
