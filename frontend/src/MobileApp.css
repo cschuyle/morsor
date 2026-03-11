@@ -43,10 +43,60 @@
   text-decoration: none;
 }
 
+.mobile-header-nav {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
 .mobile-nav-link {
   font-size: 0.95rem;
   color: #6633cc;
   text-decoration: none;
+}
+.mobile-share-btn {
+  padding: 0.35rem;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: #6633cc;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  -webkit-tap-highlight-color: transparent;
+}
+.mobile-share-btn:hover {
+  background: rgba(102, 51, 204, 0.12);
+}
+.mobile-share-icon {
+  display: block;
+  width: 1.25rem;
+  height: 1.25rem;
+  object-fit: contain;
+}
+.mobile-copied-flare {
+  position: fixed;
+  bottom: 5rem;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 0.5rem 1rem;
+  background: #252525;
+  color: #fff;
+  font-size: 0.9rem;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+  z-index: 100;
+  animation: mobile-copied-flare-in 0.2s ease-out;
+}
+@keyframes mobile-copied-flare-in {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(0.5rem);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
 }
 
 /* Scroll area is transparent so top/bottom padding shows dark background; gap only visible at scroll extremes.

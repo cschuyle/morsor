@@ -61,6 +61,7 @@ function MobileApp() {
   const [fileTypePanelRect, setFileTypePanelRect] = useState(null)
   const [searchResultsViewMode, setSearchResultsViewMode] = useState('list') // 'list' | 'gallery'
   const [galleryDecorate, setGalleryDecorate] = useState(true)
+  const [copiedUrlFlare, setCopiedUrlFlare] = useState(false)
   const [pageSize, setPageSize] = useState(() => {
     const p = new URLSearchParams(window.location.search)
     const s = Number(p.get('size'))
@@ -74,6 +75,7 @@ function MobileApp() {
   const abortRef = useRef(null)
   const reloadAbortControllerRef = useRef(null)
   const fileTypeDropdownRef = useRef(null)
+  const copyFlareTimeoutRef = useRef(null)
   const [searchParams, setSearchParams] = useSearchParams()
   const location = useLocation()
   queryRef.current = query
@@ -429,6 +431,11 @@ function MobileApp() {
   }, [])
 
   useEffect(() => {
+    return () => {
+      if (copyFlareTimeoutRef.current) clearTimeout(copyFlareTimeoutRef.current)
+    }
+  }, [])
+  useEffect(() => {
     if (!showTrovePicker) return
     const onKeyDown = (e) => {
       if (e.key === 'Escape') setShowTrovePicker(false)
@@ -762,8 +769,33 @@ function MobileApp() {
     <div className="mobile-app">
       <header className="mobile-header">
         <Link to="/mobile" className="mobile-brand">Morsor</Link>
-        <Link to="/mobile/about" className="mobile-nav-link">About</Link>
+        <nav className="mobile-header-nav" aria-label="Header links">
+          {searchMode === 'search' && searchResult != null && results.length > 0 && (
+            <button
+              type="button"
+              className="mobile-share-btn"
+              onClick={async () => {
+                try {
+                  await navigator.clipboard.writeText(window.location.href)
+                  if (copyFlareTimeoutRef.current) clearTimeout(copyFlareTimeoutRef.current)
+                  setCopiedUrlFlare(true)
+                  copyFlareTimeoutRef.current = setTimeout(() => setCopiedUrlFlare(false), 2000)
+                } catch (_) {}
+              }}
+              aria-label="Copy URL to clipboard"
+              title="Copy URL"
+            >
+              <img src="/share-ios.svg" alt="" aria-hidden="true" className="mobile-share-icon" />
+            </button>
+          )}
+          <Link to="/mobile/about" className="mobile-nav-link">About</Link>
+        </nav>
       </header>
+      {copiedUrlFlare && (
+        <div className="mobile-copied-flare" role="status" aria-live="polite">
+          Copied URL
+        </div>
+      )}
 
       <main className={`mobile-main${fileTypeDropdownOpen ? ' mobile-filetype-dropdown-open' : ''}`}>
         <div className="mobile-main-inner">
