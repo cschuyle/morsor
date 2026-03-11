@@ -911,7 +911,13 @@ onClick={() => {
                   aria-label="Filter by file type"
                 >
                   {fileTypesForLabel.size === 0
-                    ? 'Media?'
+                    ? (
+                        <span className="mobile-filetype-trigger-icons" aria-hidden="true">
+                          <img src="/pdf.svg" alt="" />
+                          <img src="/video.svg" alt="" />
+                          <img src="/audio.png" alt="" />
+                        </span>
+                      )
                     : allSelected
                       ? 'Any media'
                       : (() => {
@@ -1093,17 +1099,21 @@ onClick={() => {
               </span>
               {searchResultsViewMode === 'gallery' && (
                 <span className="mobile-gallery-decorate-wrap">
-                  <span className="mobile-gallery-decorate-label">Decorate</span>
                   <button
                     type="button"
                     role="switch"
                     aria-checked={galleryDecorate}
-                    aria-label="Show file type decorations on gallery items"
+                    aria-label={galleryDecorate ? 'Hide decorations' : 'Show decorations'}
                     title={galleryDecorate ? 'Hide decorations' : 'Show decorations'}
-                    className={`mobile-gallery-decorate-toggle ${galleryDecorate ? 'mobile-gallery-decorate-toggle--on' : ''}`}
+                    className="mobile-gallery-decorate-toggle"
                     onClick={() => setGalleryDecorate((v) => !v)}
                   >
-                    <span className="mobile-gallery-decorate-toggle-thumb" aria-hidden="true" />
+                    <img
+                      src={galleryDecorate ? '/decorated-picture.png' : '/undecorated-picture.png'}
+                      alt=""
+                      aria-hidden="true"
+                      className="mobile-gallery-decorate-toggle-icon"
+                    />
                   </button>
                 </span>
               )}
