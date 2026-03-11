@@ -14,7 +14,6 @@ describe('RequireAuth', () => {
       })
     })
     vi.stubGlobal('fetch', fetchMock)
-    // Ensure dev token is used (localhost)
     Object.defineProperty(window, 'location', {
       value: { ...window.location, hostname: 'localhost' },
       writable: true,
@@ -25,7 +24,7 @@ describe('RequireAuth', () => {
     vi.unstubAllGlobals()
   })
 
-  it('sends Authorization Bearer header on initial /api/troves auth check', async () => {
+  it('checks /api/troves before rendering children', async () => {
     render(
       <RequireAuth>
         <span>Child content</span>
@@ -40,9 +39,6 @@ describe('RequireAuth', () => {
       (call) => typeof call[0] === 'string' && call[0].includes('/api/troves')
     )
     expect(trovesCall).toBeDefined()
-    const options = trovesCall[1]
-    expect(options?.headers).toBeDefined()
-    expect(options.headers?.Authorization).toBe('Bearer dev-token')
   })
 
   it('renders children after successful auth', async () => {

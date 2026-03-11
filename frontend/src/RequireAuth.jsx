@@ -3,7 +3,7 @@ import { getApiAuthHeaders } from './apiAuth'
 
 /**
  * Prevents flash of logged-in UI: verify auth before rendering children; redirect to /login if 401.
- * Must include getApiAuthHeaders() so dev token is sent on the initial auth check (e.g. bootRun on localhost).
+ * Must include getApiAuthHeaders() so the initial auth check also works under the Vite dev server.
  */
 export function RequireAuth({ children }) {
   const [status, setStatus] = useState('pending')
