@@ -67,9 +67,25 @@ public class SecurityConfig {
             .csrf(csrf -> csrf
                 .csrfTokenRepository(csrfRepo)
                 .csrfTokenRequestHandler(requestHandler))
+
+            // Cursor let me get away with this wihtout noticing a thing. Baaaad Cursor! Also, Bad Me for trusting it
+            // .authorizeHttpRequests(auth -> auth
+            //     .requestMatchers("/api/**").access(new StreamAwareAuthorizationManager())
+            //     .anyRequest().permitAll())
+
+            // This is the correct way to do it, usually. Except I'm using Vite.
+            // .authorizeHttpRequests(auth -> auth
+            //     .requestMatchers("/login", "/css/**", "/js/**", "/images/**").permitAll()
+            //     .requestMatchers("/api/**").access(new StreamAwareAuthorizationManager())
+            //     .anyRequest().authenticated()
+            // )
             .authorizeHttpRequests(auth -> auth
+                .requestMatchers("/login", "/favicon.ico").permitAll()
+                .requestMatchers("/assets/**").permitAll() // Because, Vite.
+                .requestMatchers("/@vite/**").permitAll() // Because, Vite.
                 .requestMatchers("/api/**").access(new StreamAwareAuthorizationManager())
-                .anyRequest().permitAll())
+                .anyRequest().authenticated()
+            )
             .exceptionHandling(ex -> ex
                 .defaultAuthenticationEntryPointFor(
                     new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED),
