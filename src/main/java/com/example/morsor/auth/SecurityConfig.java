@@ -20,11 +20,23 @@ import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
+import jakarta.servlet.FilterChain;
+import jakarta.servlet.ServletException;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import org.springframework.web.filter.OncePerRequestFilter;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
+
+import java.io.IOException;
 import java.util.List;
 
 @Configuration
 @EnableWebSecurity
 public class SecurityConfig {
+
+    @Value("${app.cors.allowed-origins:}")
+    private String allowedOriginsConfig;
 
     private final CustomUserDetailsService userDetailsService;
     private final ApiTokenAuthenticationFilter apiTokenAuthenticationFilter;
@@ -34,9 +46,6 @@ public class SecurityConfig {
         this.userDetailsService = userDetailsService;
         this.apiTokenAuthenticationFilter = apiTokenAuthenticationFilter;
     }
-
-    @Value("${app.cors.allowed-origins:}")
-    private String allowedOriginsConfig;
 
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
@@ -108,42 +117,9 @@ public class SecurityConfig {
         return http.build();
     }
 
-    /*
-    Explanation of the code below:
-	1.	Early return for /logout
-	•	Prevents the filter from automatically authenticating the user before Spring Security clears the session.
-	2.	SecurityContext cleared properly
-	•	Logout still invalidates session and deletes cookies.
-	•	The filter won’t re-set Authentication for the same request.
-	3.	Other requests work as before
-	•	/api/** requests still get token-based authentication.
-	•	Session-based authentication still works normally.
-    */
-    // Added this to fix the logout issue.
-    @Override
-    protected void doFilterInternal(HttpServletRequest request,
-                                    HttpServletResponse response,
-                                    FilterChain filterChain)
-            throws ServletException, IOException {
-
-        // Skip token authentication on logout
-        if (request.getRequestURI().equals("/logout")) {
-            filterChain.doFilter(request, response);
-            return;
-        }
-
-        // Your normal token authentication logic
-        String token = resolveToken(request); // however you get it
-        if (token != null && validateToken(token)) {
-            Authentication auth = getAuthentication(token);
-            SecurityContextHolder.getContext().setAuthentication(auth);
-        }
-
-        filterChain.doFilter(request, response);
-    }
-
     @Bean
     public PasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder();
     }
 }
+

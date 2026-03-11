@@ -29,7 +29,7 @@ public class ApiTokenAuthenticationFilter extends OncePerRequestFilter {
     private final TokenHashService tokenHashService;
 
     public ApiTokenAuthenticationFilter(ApiTokenRepository apiTokenRepository,
-                                         TokenHashService tokenHashService) {
+                                        TokenHashService tokenHashService) {
         this.apiTokenRepository = apiTokenRepository;
         this.tokenHashService = tokenHashService;
     }
@@ -37,6 +37,14 @@ public class ApiTokenAuthenticationFilter extends OncePerRequestFilter {
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response,
                                     FilterChain filterChain) throws ServletException, IOException {
+
+        // ---- SKIP TOKEN AUTH ON LOGOUT ----
+        if (request.getRequestURI().equals("/logout")) {
+            filterChain.doFilter(request, response);
+            return;
+        }
+
+        // ---- EXISTING TOKEN AUTH LOGIC ----
         String authHeader = request.getHeader(AUTHORIZATION);
         if (authHeader != null && authHeader.startsWith(BEARER)) {
             String token = authHeader.substring(BEARER.length()).trim();
