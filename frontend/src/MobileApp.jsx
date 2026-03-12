@@ -49,6 +49,7 @@ function MobileApp() {
   const [trovePickerFilter, setTrovePickerFilter] = useState('')
   const [searchError, setSearchError] = useState(null)
   const [statusMessage, setStatusMessage] = useState('')
+  const [statusTooltip, setStatusTooltip] = useState('')
   const [cacheEntries, setCacheEntries] = useState(0)
   const [cacheLabel, setCacheLabel] = useState('')
   const [compareProgress, setCompareProgress] = useState({ current: 0, total: 0 })
@@ -244,11 +245,13 @@ function MobileApp() {
           return ` · Cache: ${rounded}`
         })()
         setStatusMessage(base)
+        setStatusTooltip(data.status ?? '')
         setCacheLabel(cacheMsg ? cacheMsg.replace(/^ · /, '') : '')
         setCacheEntries(cache != null && typeof cache.entries === 'number' ? cache.entries : 0)
       })
       .catch(() => {
         setStatusMessage('Server AWOL')
+        setStatusTooltip('AWOL')
         setCacheLabel('')
       })
   }
@@ -1490,7 +1493,17 @@ onClick={() => {
       <footer className="mobile-footer">
         {statusMessage && (
           <p className="mobile-status-message" role="status">
-            {statusMessage}
+            <span
+              className="mobile-status-icon-wrap"
+              title={`Status: ${statusTooltip || statusMessage}`}
+              aria-label={`Status: ${statusTooltip || statusMessage}`}
+            >
+              <img
+                src={statusMessage === 'Server OK' ? '/data_ok.png' : '/data_error.png'}
+                alt={statusMessage === 'Server OK' ? 'Server OK' : 'Server not OK'}
+                className="mobile-status-icon"
+              />
+            </span>
             {cacheEntries > 0 && (
               <>
                 {' · '}

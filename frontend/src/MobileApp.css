@@ -963,6 +963,20 @@
   color: #666;
 }
 
+.mobile-status-icon-wrap {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  vertical-align: middle;
+}
+
+.mobile-status-icon {
+  width: 1.35rem;
+  height: 1.35rem;
+  object-fit: contain;
+  display: block;
+}
+
 .mobile-footer-version {
   font-size: 0.8rem;
   color: #252525;
