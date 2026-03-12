@@ -765,12 +765,14 @@ function MobileApp() {
   )
   const showMobileFileTypePicker = useMemo(
     () => (
-      Array.isArray(results) && (
+      galleryDecorate || (
+        Array.isArray(results) && (
         results.length === 0 ||
         results.some((row) => Array.isArray(row?.files) && row.files.some((f) => typeof f === 'string' && f.trim() !== ''))
+        )
       )
     ),
-    [results]
+    [results, galleryDecorate]
   )
   const effectiveSearchResultsViewMode = showMobileViewModeToggle ? searchResultsViewMode : 'list'
   const showSearchPaginationControls = totalPages > 1
