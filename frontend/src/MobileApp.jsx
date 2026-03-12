@@ -238,11 +238,11 @@ function MobileApp() {
         const cacheMsg = (() => {
           if (cache == null || typeof cache.estimatedBytes !== 'number' || !Number.isFinite(cache.estimatedBytes)) return ''
           const b = cache.estimatedBytes
-          if (b === 0) return ' · Cache: empty'
+          if (b === 0) return ' · cache empty'
           const mb = 1024 * 1024
           const gb = 1024 * mb
-          const rounded = b >= gb ? `${Math.round(b / gb)} GB` : b >= mb ? `~${Math.round(b / mb)} MB` : `~${Math.round(b / 1024)} KB`
-          return ` · Cache: ${rounded}`
+          const rounded = b >= gb ? `${Math.round(b / gb)}gb` : b >= mb ? `${Math.round(b / mb)}mb` : `${Math.round(b / 1024)}kb`
+          return ` · cache ${rounded}`
         })()
         setStatusMessage(base)
         setStatusTooltip(data.status ?? '')
