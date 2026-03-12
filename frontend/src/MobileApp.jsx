@@ -1504,22 +1504,29 @@ onClick={() => {
       </main>
 
       <footer className="mobile-footer">
-        {statusMessage && (
-          <p className="mobile-status-message" role="status">
-            <span
-              className="mobile-status-icon-wrap"
-              title={`Status: ${statusTooltip || statusMessage}`}
-              aria-label={`Status: ${statusTooltip || statusMessage}`}
-            >
-              <img
-                src={statusMessage === 'Server OK' ? '/data_ok.png' : '/data_error.png'}
-                alt={statusMessage === 'Server OK' ? 'Server OK' : 'Server not OK'}
-                className="mobile-status-icon"
-              />
-            </span>
+        <div className="mobile-footer-row mobile-footer-row--singleline">
+          <Link to={location.search ? `/?${location.search.slice(1)}` : '/'} className="mobile-footer-link" onClick={() => sessionStorage.setItem('morsorPreferDesktop', 'true')}>Desktop</Link>
+          <span className="mobile-footer-middle">
+            {statusMessage && (
+              <>
+                <span className="mobile-status-message" role="status">
+                  <span
+                    className="mobile-status-icon-wrap"
+                    title={`Status: ${statusTooltip || statusMessage}`}
+                    aria-label={`Status: ${statusTooltip || statusMessage}`}
+                  >
+                    <img
+                      src={statusMessage === 'Server OK' ? '/data_ok.png' : '/data_error.png'}
+                      alt={statusMessage === 'Server OK' ? 'Server OK' : 'Server not OK'}
+                      className="mobile-status-icon"
+                    />
+                  </span>
+                </span>
+                <span className="mobile-footer-sep" aria-hidden="true">·</span>
+              </>
+            )}
             {cacheEntries > 0 && (
               <>
-                {' · '}
                 <button
                   type="button"
                   className="mobile-footer-link mobile-clear-cache-btn"
@@ -1541,9 +1548,9 @@ onClick={() => {
                   </svg>
                   <span>{renderCacheLabel()}</span>
                 </button>
+                <span className="mobile-footer-sep" aria-hidden="true">·</span>
               </>
             )}
-            {' · '}
             <button
               type="button"
               className="mobile-footer-link mobile-clear-cache-btn"
@@ -1595,8 +1602,19 @@ onClick={() => {
               </svg>
               <span> troves</span>
             </button>
-          </p>
-        )}
+          </span>
+          <button
+            type="button"
+            className="mobile-footer-link mobile-footer-logout-btn"
+            onClick={() => {
+              performLogout()
+                .then(() => { window.location.href = '/login' })
+                .catch(() => { window.alert('Logout failed. Please try again.') })
+            }}
+          >
+            Logout
+          </button>
+        </div>
       {reloadTrovesInProgress && (
         <div className="reload-troves-overlay" role="dialog" aria-modal="true" aria-label="Reloading troves">
           <div className="reload-troves-popup">
@@ -1634,20 +1652,6 @@ onClick={() => {
           </div>
         </div>
       )}
-        <div className="mobile-footer-row">
-          <Link to={location.search ? `/?${location.search.slice(1)}` : '/'} className="mobile-footer-link" onClick={() => sessionStorage.setItem('morsorPreferDesktop', 'true')}>Desktop</Link>
-          <button
-            type="button"
-            className="mobile-footer-link mobile-footer-logout-btn"
-            onClick={() => {
-              performLogout()
-                .then(() => { window.location.href = '/login' })
-                .catch(() => { window.alert('Logout failed. Please try again.') })
-            }}
-          >
-            Logout
-          </button>
-        </div>
       </footer>
     </div>
   )

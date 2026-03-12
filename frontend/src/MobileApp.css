@@ -22,10 +22,11 @@
 .mobile-header {
   flex-shrink: 0;
   display: flex;
+  flex-wrap: nowrap;
   align-items: center;
   justify-content: space-between;
   margin: 0 0.35rem;
-  padding: 0.75rem 1rem;
+  padding: 0.5rem 1rem;
   background: #ffaa44;
   border-bottom: 1px solid rgba(0, 0, 0, 0.08);
   border-radius: 0 0 8px 8px;
@@ -50,17 +51,26 @@
   font-family: "Nunito", "Plus Jakarta Sans", system-ui, -apple-system, sans-serif;
   color: #6633cc;
   text-decoration: none;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .mobile-header-nav {
   display: flex;
+  flex-wrap: nowrap;
   align-items: center;
+  justify-content: flex-end;
+  flex: 1 1 auto;
+  min-width: 0;
+  white-space: nowrap;
   gap: 0.75rem;
 }
 .mobile-nav-link {
   font-size: 0.95rem;
   color: #6633cc;
   text-decoration: none;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 .mobile-share-btn {
   padding: 0.35rem;
@@ -958,9 +968,13 @@
 }
 
 .mobile-status-message {
-  margin: 0 0 0.25rem;
+  margin: 0;
   font-size: 0.85rem;
   color: #666;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  white-space: nowrap;
 }
 
 .mobile-status-icon-wrap {
@@ -988,6 +1002,29 @@
   align-items: center;
 }
 
+.mobile-footer-row--singleline {
+  justify-content: space-between;
+  gap: 0;
+  flex-wrap: nowrap;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.mobile-footer-middle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  white-space: nowrap;
+}
+
+.mobile-footer-sep {
+  color: #6633cc;
+  opacity: 0.9;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+}
+
 .mobile-footer-link {
   font-size: 0.9rem;
   color: #6633cc;
@@ -1004,13 +1041,13 @@
   padding: 0;
   cursor: pointer;
   font-family: inherit;
-  font-size: inherit;
+  font-size: 0.9rem;
   color: #6633cc;
   text-decoration: none;
   display: inline-flex;
   align-items: center;
   vertical-align: middle;
-  margin-top: -2px;
+  margin-top: 0;
 }
 
 .mobile-clear-cache-btn:hover {
