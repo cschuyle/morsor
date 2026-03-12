@@ -687,6 +687,16 @@ function MobileApp() {
     setPage(0)
   }
 
+  function handleGalleryDecorateToggle() {
+    setGalleryDecorate((v) => !v)
+    // Preserve current pagination while toggling gallery decorations.
+    const nextParams = buildSearchParams()
+    nextParams.set('page', String(page + 1))
+    nextParams.set('size', String(pageSize))
+    setSearchParams(nextParams, { replace: true })
+    setMobileSearchPageInput(String(page + 1))
+  }
+
   function handleMobileSearchPageInputKeyDown(e, totalPages, currentPage) {
     if (e.key !== 'Enter') return
     const raw = e.currentTarget.value.trim()
@@ -1231,7 +1241,7 @@ onClick={() => {
                     aria-label={galleryDecorate ? 'Hide decorations' : 'Show decorations'}
                     title={galleryDecorate ? 'Hide decorations' : 'Show decorations'}
                     className="mobile-gallery-decorate-toggle"
-                    onClick={() => setGalleryDecorate((v) => !v)}
+                    onClick={handleGalleryDecorateToggle}
                   >
                     <img
                       src={galleryDecorate ? '/decorated-picture.png' : '/undecorated-picture.png'}
