@@ -50,6 +50,7 @@ function MobileApp() {
   const [searchError, setSearchError] = useState(null)
   const [statusMessage, setStatusMessage] = useState('')
   const [cacheEntries, setCacheEntries] = useState(0)
+  const [cacheLabel, setCacheLabel] = useState('')
   const [compareProgress, setCompareProgress] = useState({ current: 0, total: 0 })
   const [reloadTrovesInProgress, setReloadTrovesInProgress] = useState(false)
   const [reloadTrovesProgress, setReloadTrovesProgress] = useState({ current: 0, total: 0 })
@@ -242,10 +243,14 @@ function MobileApp() {
           const rounded = b >= gb ? `${Math.round(b / gb)} GB` : b >= mb ? `~${Math.round(b / mb)} MB` : `~${Math.round(b / 1024)} KB`
           return ` · Cache: ${rounded}`
         })()
-        setStatusMessage(base + cacheMsg)
+        setStatusMessage(base)
+        setCacheLabel(cacheMsg ? cacheMsg.replace(/^ · /, '') : '')
         setCacheEntries(cache != null && typeof cache.entries === 'number' ? cache.entries : 0)
       })
-      .catch(() => setStatusMessage('Server AWOL'))
+      .catch(() => {
+        setStatusMessage('Server AWOL')
+        setCacheLabel('')
+      })
   }
 
   function fetchSearch(pageNum, sortByOverride = null, sortDirOverride = null, fileTypesOverride = undefined, sizeOverride = undefined) {
@@ -1508,7 +1513,7 @@ onClick={() => {
                     <line x1="10" y1="11" x2="10" y2="17" />
                     <line x1="14" y1="11" x2="14" y2="17" />
                   </svg>
-                  <span> cache</span>
+                  <span>{` ${cacheLabel || 'cache'}`}</span>
                 </button>
               </>
             )}
