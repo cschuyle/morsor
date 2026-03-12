@@ -1098,6 +1098,7 @@
   font-size: inherit;
   font-weight: inherit;
   line-height: inherit;
+  font-variant-caps: small-caps;
 }
 
 .mobile-footer-logout-btn {
