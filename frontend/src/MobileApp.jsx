@@ -245,6 +245,15 @@ function MobileApp() {
     return () => document.removeEventListener('click', handleClickOutside)
   }, [fileTypeDropdownOpen])
 
+  useEffect(() => {
+    if (!fileTypeDropdownOpen) return
+    function handleEscape(e) {
+      if (e.key === 'Escape') setFileTypeDropdownOpen(false)
+    }
+    window.addEventListener('keydown', handleEscape)
+    return () => window.removeEventListener('keydown', handleEscape)
+  }, [fileTypeDropdownOpen])
+
   function refreshStatusMessage() {
     fetch('/api/status', { credentials: 'include', headers: { ...getApiAuthHeaders() } })
       .then((res) => { if (res.status === 401) { window.location.href = '/login'; return }; return res.json() })
