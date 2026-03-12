@@ -14,6 +14,14 @@ import './MobileApp.css'
 const MOBILE_PAGE_SIZE = 100
 const MOBILE_PAGE_SIZE_OPTIONS = [10, 25, 50, 100, 250, 500]
 const DUP_UNIQUES_PAGE_SIZE = 50
+const AMAZON_PLACEHOLDER_THUMB = 'https://m.media-amazon.com/images/I/01RmK+J4pJL._SS135_.gif'
+
+function hasUsableThumbnail(row) {
+  const thumbnailUrl = row?.thumbnailUrl
+  if (!thumbnailUrl || !String(thumbnailUrl).trim()) return false
+  const normalized = String(thumbnailUrl).trim()
+  return normalized !== AMAZON_PLACEHOLDER_THUMB && !normalized.includes('/no_image')
+}
 
 function MobileApp() {
   const [troves, setTroves] = useState([])
@@ -551,12 +559,12 @@ function MobileApp() {
 
   function toggleTrove(id) {
     if (searchMode === 'search') setFreezeTroveListOrder(true)
-    setSelectedTroveIds((prev) => {
-      const next = new Set(prev)
-      if (next.has(id)) next.delete(id)
-      else next.add(id)
-      return next
-    })
+    const next = new Set(selectedTroveIds)
+    if (next.has(id)) next.delete(id)
+    else next.add(id)
+    setSelectedTroveIds(next)
+    // Keep URL trove params in lockstep with picker changes.
+    setSearchParams(buildSearchParams(null, next), { replace: true })
   }
 
   function setPrimary(id) {
@@ -652,7 +660,7 @@ function MobileApp() {
     setUniquesResult(null)
     setFreezeTroveListOrder(false)
     setPage(0)
-    const nextParams = new URLSearchParams(searchParams)
+    const nextParams = buildSearchParams()
     nextParams.set('page', '1')
     nextParams.set('size', String(pageSize))
     setSearchParams(nextParams, { replace: true })
@@ -662,7 +670,7 @@ function MobileApp() {
   function goToPage(nextPage) {
     fetchSearch(nextPage)
     setPage(nextPage)
-    const nextParams = new URLSearchParams(searchParams)
+    const nextParams = buildSearchParams()
     nextParams.set('page', String(nextPage + 1))
     nextParams.set('size', String(pageSize))
     setSearchParams(nextParams, { replace: true })
@@ -672,7 +680,7 @@ function MobileApp() {
     const newSize = Number(e.target.value)
     setPageSize(newSize)
     if (searchResult != null && query.trim()) fetchSearch(0, null, null, undefined, newSize)
-    const nextParams = new URLSearchParams(searchParams)
+    const nextParams = buildSearchParams()
     nextParams.set('size', String(newSize))
     nextParams.set('page', '1')
     setSearchParams(nextParams, { replace: true })
@@ -723,6 +731,11 @@ function MobileApp() {
   const count = searchResult?.count ?? 0
   const searchSize = typeof searchResult?.size === 'number' ? searchResult.size : pageSize
   const totalPages = Math.ceil(count / searchSize) || 0
+  const showMobileViewModeToggle = useMemo(
+    () => Array.isArray(results) && results.some((row) => row?.itemType === 'littlePrinceItem' && hasUsableThumbnail(row)),
+    [results]
+  )
+  const effectiveSearchResultsViewMode = showMobileViewModeToggle ? searchResultsViewMode : 'list'
   const showSearchPaginationControls = totalPages > 1
   const displayFileTypes = useMemo(() => {
     const upper = (s) => (s || '').toUpperCase()
@@ -1179,37 +1192,37 @@ onClick={() => {
             <span className="mobile-troves-btn-label">{mobileTroveDropdownLabel}</span>
             <span className="mobile-troves-btn-change" aria-hidden="true">Change</span>
           </button>
-          {searchMode === 'search' && searchResult != null && (
+          {searchMode === 'search' && searchResult != null && showMobileViewModeToggle && (
             <span className="mobile-view-and-size-wrap mobile-troves-row-right">
               <span className="mobile-view-mode-toggle" role="group" aria-label="Results view">
                 <button
                   type="button"
-                  className={`mobile-view-mode-btn ${searchResultsViewMode === 'list' ? 'mobile-view-mode-btn--active' : ''}`}
+                  className={`mobile-view-mode-btn ${effectiveSearchResultsViewMode === 'list' ? 'mobile-view-mode-btn--active' : ''}`}
                   onClick={() => {
                     skipViewModeSearchRef.current = true
                     lastFileTypeOrViewSearchRef.current = Date.now()
                     setSearchResultsViewMode('list')
                   }}
-                  aria-pressed={searchResultsViewMode === 'list'}
+                  aria-pressed={effectiveSearchResultsViewMode === 'list'}
                   aria-label="List view"
                 >
                   <img src="/list.png" alt="" aria-hidden="true" className="mobile-view-mode-btn-icon" />
                 </button>
                 <button
                   type="button"
-                  className={`mobile-view-mode-btn ${searchResultsViewMode === 'gallery' ? 'mobile-view-mode-btn--active' : ''}`}
+                  className={`mobile-view-mode-btn ${effectiveSearchResultsViewMode === 'gallery' ? 'mobile-view-mode-btn--active' : ''}`}
                   onClick={() => {
                     skipViewModeSearchRef.current = true
                     lastFileTypeOrViewSearchRef.current = Date.now()
                     setSearchResultsViewMode('gallery')
                   }}
-                  aria-pressed={searchResultsViewMode === 'gallery'}
+                  aria-pressed={effectiveSearchResultsViewMode === 'gallery'}
                   aria-label="Gallery view"
                 >
                   <img src="/gallery.png" alt="" aria-hidden="true" className="mobile-view-mode-btn-icon" />
                 </button>
               </span>
-              {searchResultsViewMode === 'gallery' && (
+              {effectiveSearchResultsViewMode === 'gallery' && (
                 <span className="mobile-gallery-decorate-wrap">
                   <button
                     type="button"
@@ -1468,7 +1481,7 @@ onClick={() => {
                   sortDir={searchSortDir}
                   onSortChange={(col, dir) => fetchSearch(0, col, dir)}
                   showScoreColumn={query.trim() !== '*'}
-                  viewMode={searchResultsViewMode}
+                  viewMode={effectiveSearchResultsViewMode}
                   hideTroveInGallery={selectedTroveIds.size === 1}
                   showPdfSashInGallery
                   showGalleryDecorations={galleryDecorate}
