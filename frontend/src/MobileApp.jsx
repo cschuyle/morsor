@@ -1598,9 +1598,9 @@ onClick={() => {
               }}
             >
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                <path d="M18.691 17.785A9 9 0 1 1 17.2 7.2" />
+                <path d="M17.661 18.993A9 9 0 1 1 16.361 4.13" />
                 <path
-                  d="M17.652 3.851 L13.783 7.938 L19.465 9.037 Z"
+                  d="M14.108 0.528 L12.709 5.98 L18.21 4.181 Z"
                   fill="currentColor"
                   stroke="currentColor"
                   strokeWidth="1.1"
@@ -1608,7 +1608,7 @@ onClick={() => {
                   strokeLinecap="round"
                 />
               </svg>
-              <span> troves</span>
+              <span className="mobile-reload-label">troves</span>
             </button>
           </span>
           <button
