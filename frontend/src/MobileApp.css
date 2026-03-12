@@ -1500,8 +1500,8 @@
 
 /* Mobile gallery: tiles 1/2 size (height and width) */
 .mobile-search-results-grid .search-results-gallery {
-  /* ~33% larger tiles in each dimension than previous mobile sizing */
-  grid-template-columns: repeat(auto-fill, minmax(123px, 1fr)); /* 92.5px * 1.33 (approx) */
+  /* Reduce gallery image/tile footprint by ~10% on mobile. */
+  grid-template-columns: repeat(auto-fill, minmax(111px, 1fr));
   gap: 0.66rem; /* 0.5rem * 1.33 (approx) */
 }
 
