@@ -433,13 +433,18 @@
 /* Fixed positioning so dropdown is not clipped by scroll containers */
 .mobile-filetype-panel.mobile-filetype-panel--fixed {
   position: fixed;
+  right: auto;
+  left: auto;
   margin-top: 0;
+  max-width: calc(100vw - 1rem);
   max-height: min(12rem, calc(100vh - 2rem));
+  overflow-x: hidden;
 }
 
 .mobile-filetype-quick-actions {
   display: flex;
   gap: 0.35rem;
+  min-width: 0;
   padding: 0 0.5rem 0.4rem;
   border-bottom: 1px solid #eee;
   margin-bottom: 0.25rem;
@@ -447,10 +452,13 @@
 
 .mobile-filetype-quick-btn {
   flex: 1;
+  min-width: 0;
   display: inline-flex;
   align-items: center;
   flex-direction: row;
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
   padding: 0 0.5rem 0.25rem 0.2rem;
   font-size: 0.85rem;
   font-family: inherit;

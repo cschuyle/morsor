@@ -105,7 +105,16 @@ function MobileApp() {
     const el = fileTypeDropdownRef.current
     if (!el) return
     const rect = el.getBoundingClientRect()
-    setFileTypePanelRect({ top: rect.bottom + 4, left: rect.left, width: rect.width })
+    const viewportWidth = window.innerWidth || document.documentElement.clientWidth || rect.width
+    const edgePadding = 8
+    const minPanelWidth = 176
+    const panelWidth = Math.min(
+      Math.max(rect.width, minPanelWidth),
+      Math.max(minPanelWidth, viewportWidth - edgePadding * 2)
+    )
+    const maxLeft = Math.max(edgePadding, viewportWidth - panelWidth - edgePadding)
+    const left = Math.min(Math.max(edgePadding, rect.left), maxLeft)
+    setFileTypePanelRect({ top: rect.bottom + 4, left, width: panelWidth })
   }, [fileTypeDropdownOpen])
 
   function urlTroveId(value, troveList) {
