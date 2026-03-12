@@ -31,12 +31,12 @@
   border-bottom: 1px solid rgba(0, 0, 0, 0.08);
   border-radius: 0 0 8px 8px;
   box-shadow:
-    -6px 0 8px rgba(109, 77, 255, 0.55),
-    6px 0 8px rgba(109, 77, 255, 0.55),
-    0 6px 8px rgba(46, 70, 255, 0.55),
-    -10px 0 14px rgba(16, 32, 184, 0.45),
-    10px 0 14px rgba(16, 32, 184, 0.45),
-    0 10px 14px rgba(16, 32, 184, 0.45);
+    -6px 0 8px rgba(182, 124, 162, 0.55),
+    6px 0 8px rgba(182, 124, 162, 0.55),
+    0 6px 8px rgba(151, 108, 178, 0.55),
+    -10px 0 14px rgba(110, 86, 176, 0.45),
+    10px 0 14px rgba(110, 86, 176, 0.45),
+    0 10px 14px rgba(110, 86, 176, 0.45);
   z-index: 10;
 }
 
@@ -146,9 +146,9 @@
   border-radius: 10px;
   box-shadow: none;
   filter:
-    drop-shadow(0 0 3px #6d4dff)
-    drop-shadow(0 0 8px #2e46ff)
-    drop-shadow(0 0 14px #1020b8);
+    drop-shadow(0 0 3px #b67ca2)
+    drop-shadow(0 0 8px #976cb2)
+    drop-shadow(0 0 14px #6e56b0);
   padding-top: 0;
   padding-bottom: 0;
   margin-left: 0.35rem;
@@ -959,12 +959,12 @@
   border-radius: 8px 8px 0 0;
   margin: 0 0.35rem;
   box-shadow:
-    -6px 0 8px rgba(109, 77, 255, 0.55),
-    6px 0 8px rgba(109, 77, 255, 0.55),
-    0 -6px 8px rgba(46, 70, 255, 0.55),
-    -10px 0 14px rgba(16, 32, 184, 0.45),
-    10px 0 14px rgba(16, 32, 184, 0.45),
-    0 -10px 14px rgba(16, 32, 184, 0.45);
+    -6px 0 8px rgba(182, 124, 162, 0.55),
+    6px 0 8px rgba(182, 124, 162, 0.55),
+    0 -6px 8px rgba(151, 108, 178, 0.55),
+    -10px 0 14px rgba(110, 86, 176, 0.45),
+    10px 0 14px rgba(110, 86, 176, 0.45),
+    0 -10px 14px rgba(110, 86, 176, 0.45);
 }
 
 .mobile-status-message {
