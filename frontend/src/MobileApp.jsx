@@ -763,6 +763,15 @@ function MobileApp() {
     () => Array.isArray(results) && results.some((row) => row?.itemType === 'littlePrinceItem' && hasUsableThumbnail(row)),
     [results]
   )
+  const showMobileFileTypePicker = useMemo(
+    () => (
+      Array.isArray(results) && (
+        results.length === 0 ||
+        results.some((row) => Array.isArray(row?.files) && row.files.some((f) => typeof f === 'string' && f.trim() !== ''))
+      )
+    ),
+    [results]
+  )
   const effectiveSearchResultsViewMode = showMobileViewModeToggle ? searchResultsViewMode : 'list'
   const showSearchPaginationControls = totalPages > 1
   const displayFileTypes = useMemo(() => {
@@ -786,6 +795,11 @@ function MobileApp() {
     }
     return new Set(results.map((r) => r?.troveId).filter(Boolean))
   }, [searchMode, selectedTroveIds, searchResult?.troveCounts, results])
+
+  useEffect(() => {
+    if (!showMobileFileTypePicker && fileTypeDropdownOpen) setFileTypeDropdownOpen(false)
+  }, [showMobileFileTypePicker, fileTypeDropdownOpen])
+
   const troveLabel = isDupOrUniques
     ? (primaryTroveId
         ? <><strong>Primary:</strong> {troves.find((t) => t.id === primaryTroveId)?.name ?? primaryTroveId} · {compareTroveIds.size === 1 && compareTroveIds.has(primaryTroveId) ? <strong>Self-compare</strong> : <><strong>Compare:</strong> {formatCount(compareTroveIds.size)}</>}</>
@@ -1041,7 +1055,7 @@ onClick={() => {
               </svg>
             )}
           </button>
-          {searchMode === 'search' && (displayFileTypes.length >= 1 || fileTypeFilters.size > 0) && (() => {
+          {searchMode === 'search' && showMobileFileTypePicker && (displayFileTypes.length >= 1 || fileTypeFilters.size > 0) && (() => {
             const urlFileTypes = new Set(searchParams.getAll('fileTypes').filter((f) => f != null && f.trim()).map((f) => f.trim()))
             const fileTypesForLabel = fileTypeFilters.size > 0 ? fileTypeFilters : urlFileTypes
             const upper = (s) => (s || '').toUpperCase()
