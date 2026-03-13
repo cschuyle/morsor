@@ -1213,25 +1213,51 @@ onClick={() => {
                     return (
                       <div key={group ?? 'other'} className="mobile-filetype-group">
                         {group != null && (
-                          <label className="mobile-filetype-group-header">
-                            <input
-                              type="checkbox"
-                              ref={(el) => { if (el) el.indeterminate = someSelected && !allSelectedGroup }}
-                              checked={allSelectedGroup}
-                              onChange={() => {
+                          <div className="mobile-filetype-group-header-row">
+                            <label className="mobile-filetype-group-header">
+                              <input
+                                type="checkbox"
+                                ref={(el) => { if (el) el.indeterminate = someSelected && !allSelectedGroup }}
+                                checked={allSelectedGroup}
+                                onChange={() => {
+                                  skipFileTypeSearchRef.current = true
+                                  lastFileTypeOrViewSearchRef.current = Date.now()
+                                  const next = new Set(fileTypeFilters)
+                                  if (allSelectedGroup) types.forEach((t) => next.delete(t))
+                                  else types.forEach((t) => next.add(t))
+                                  setFileTypeQuickMode('custom')
+                                  setFileTypeFilters(next)
+                                  setSearchParams(buildSearchParams(next, null, undefined, undefined, 'custom'), { replace: true })
+                                  fetchSearch(0, null, null, next)
+                                }}
+                              />
+                              {group}
+                            </label>
+                            <button
+                              type="button"
+                              className="mobile-filetype-group-complement"
+                              title={`Complement selection in ${group}`}
+                              aria-label={`Complement selection in ${group}`}
+                              disabled={!someSelected || allSelectedGroup}
+                              onClick={(e) => {
+                                e.preventDefault()
+                                e.stopPropagation()
                                 skipFileTypeSearchRef.current = true
                                 lastFileTypeOrViewSearchRef.current = Date.now()
                                 const next = new Set(fileTypeFilters)
-                                if (allSelectedGroup) types.forEach((t) => next.delete(t))
-                                else types.forEach((t) => next.add(t))
+                                types.forEach((t) => {
+                                  if (next.has(t)) next.delete(t)
+                                  else next.add(t)
+                                })
                                 setFileTypeQuickMode('custom')
                                 setFileTypeFilters(next)
                                 setSearchParams(buildSearchParams(next, null, undefined, undefined, 'custom'), { replace: true })
                                 fetchSearch(0, null, null, next)
                               }}
-                            />
-                            {group}
-                          </label>
+                            >
+                              <img src="/complement.png" alt="" aria-hidden="true" />
+                            </button>
+                          </div>
                         )}
                         {types.map((ft) => (
                           <label key={ft} className="mobile-filetype-option">

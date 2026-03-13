@@ -1416,25 +1416,51 @@ aria-label="Clear compare troves"
                           return (
                           <div key={group ?? 'other'} className="search-filetype-group">
                             {group != null && (
-                              <label className="search-filetype-group-header">
-                                <input
-                                  type="checkbox"
-                                  ref={(el) => { if (el) el.indeterminate = someSelected && !allSelected }}
-                                  checked={allSelected}
-                                  onChange={() => {
+                              <div className="search-filetype-group-header-row">
+                                <label className="search-filetype-group-header">
+                                  <input
+                                    type="checkbox"
+                                    ref={(el) => { if (el) el.indeterminate = someSelected && !allSelected }}
+                                    checked={allSelected}
+                                    onChange={() => {
+                                      skipFileTypeSearchRef.current = true
+                                      lastFileTypeOrViewSearchRef.current = Date.now()
+                                      const next = new Set(fileTypeFilters)
+                                      if (allSelected) types.forEach((t) => next.delete(t))
+                                      else types.forEach((t) => next.add(t))
+                                      setFileTypeQuickMode('custom')
+                                      setFileTypeFilters(next)
+                                      setSearchParams(buildSearchParams('search', query, searchSelectedTroveIds, dupPrimaryTroveId, dupCompareTroveIds, uniqPrimaryTroveId, uniqCompareTroveIds, next, boostTroveId, searchResultsViewMode, undefined, 'custom'), { replace: true })
+                                      fetchSearch(0, null, null, null, null, next)
+                                    }}
+                                  />
+                                  {group}
+                                </label>
+                                <button
+                                  type="button"
+                                  className="search-filetype-group-complement"
+                                  title={`Complement selection in ${group}`}
+                                  aria-label={`Complement selection in ${group}`}
+                                  disabled={!someSelected || allSelected}
+                                  onClick={(e) => {
+                                    e.preventDefault()
+                                    e.stopPropagation()
                                     skipFileTypeSearchRef.current = true
                                     lastFileTypeOrViewSearchRef.current = Date.now()
                                     const next = new Set(fileTypeFilters)
-                                    if (allSelected) types.forEach((t) => next.delete(t))
-                                    else types.forEach((t) => next.add(t))
+                                    types.forEach((t) => {
+                                      if (next.has(t)) next.delete(t)
+                                      else next.add(t)
+                                    })
                                     setFileTypeQuickMode('custom')
                                     setFileTypeFilters(next)
                                     setSearchParams(buildSearchParams('search', query, searchSelectedTroveIds, dupPrimaryTroveId, dupCompareTroveIds, uniqPrimaryTroveId, uniqCompareTroveIds, next, boostTroveId, searchResultsViewMode, undefined, 'custom'), { replace: true })
                                     fetchSearch(0, null, null, null, null, next)
                                   }}
-                                />
-                                {group}
-                              </label>
+                                >
+                                  <img src="/complement.png" alt="" aria-hidden="true" />
+                                </button>
+                              </div>
                             )}
                             {types.map((ft) => (
                               <label key={ft} className="search-filetype-option">
