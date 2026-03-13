@@ -1312,6 +1312,23 @@
   color: #252525;
 }
 
+.gallery-sort-select {
+  height: 2rem;
+  min-width: 5.8rem;
+  padding: 0 0.5rem;
+  font-size: 0.85rem;
+  box-sizing: border-box;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  background: #fff;
+  color: #252525;
+}
+
+.gallery-sort-select:hover {
+  background: #ede5f5;
+  border-color: #ddd0eb;
+}
+
 .pagination {
   display: flex;
   align-items: center;

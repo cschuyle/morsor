@@ -740,6 +740,15 @@ function MobileApp() {
     }
   }
 
+  function handleMobileGallerySortChange(e) {
+    const nextSortBy = e.target.value
+    const nextSortDir = nextSortBy === 'score' ? 'desc' : 'asc'
+    setSearchSortBy(nextSortBy)
+    setSearchSortDir(nextSortDir)
+    const q = queryRef.current.trim()
+    if (q) fetchSearch(page, nextSortBy, nextSortDir)
+  }
+
   const sortedDuplicateRows = useMemo(() => {
     const raw = Array.isArray(duplicatesResult?.rows) ? duplicatesResult.rows : []
     if (!duplicatesSortBy) return raw
@@ -785,6 +794,21 @@ function MobileApp() {
     [results, galleryDecorate]
   )
   const effectiveSearchResultsViewMode = showMobileViewModeToggle ? searchResultsViewMode : 'list'
+  const mobileGallerySortValue = searchSortBy === 'score' || searchSortBy === 'trove' ? searchSortBy : 'title'
+  const mobileGallerySortAfterFilterSlot = effectiveSearchResultsViewMode === 'gallery'
+    ? (
+      <select
+        value={mobileGallerySortValue}
+        onChange={handleMobileGallerySortChange}
+        className="mobile-gallery-sort-select"
+        aria-label="Gallery sort"
+      >
+        <option value="title">Title</option>
+        <option value="score">Score</option>
+        <option value="trove">Trove</option>
+      </select>
+    )
+    : null
   const showSearchPaginationControls = totalPages > 1
   const displayFileTypes = useMemo(() => {
     const upper = (s) => (s || '').toUpperCase()
@@ -1540,6 +1564,7 @@ onClick={() => {
                   onSortChange={(col, dir) => fetchSearch(0, col, dir)}
                   showScoreColumn={query.trim() !== '*'}
                   viewMode={effectiveSearchResultsViewMode}
+                  afterFilterSlot={mobileGallerySortAfterFilterSlot}
                   hideTroveInGallery={selectedTroveIds.size === 1}
                   showPdfSashInGallery
                   showGalleryDecorations={galleryDecorate}

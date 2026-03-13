@@ -640,6 +640,33 @@ function App() {
     fetchSearch(pageNum, null, null, newSortBy, newSortDir)
   }
 
+  function handleGallerySortChange(e) {
+    const nextSortBy = e.target.value
+    const nextSortDir = nextSortBy === 'score' ? 'desc' : 'asc'
+    setSortBy(nextSortBy)
+    setSortDir(nextSortDir)
+    const q = queryRef.current
+    if (!q.trim()) return
+    const pageNum = searchResult != null && typeof searchResult.page === 'number' ? searchResult.page : 0
+    fetchSearch(pageNum, null, null, nextSortBy, nextSortDir)
+  }
+
+  const gallerySortValue = sortBy === 'score' || sortBy === 'trove' ? sortBy : 'title'
+  const gallerySortAfterFilterSlot = searchResultsViewMode === 'gallery'
+    ? (
+      <select
+        value={gallerySortValue}
+        onChange={handleGallerySortChange}
+        className="gallery-sort-select"
+        aria-label="Gallery sort"
+      >
+        <option value="title">Title</option>
+        <option value="score">Score</option>
+        <option value="trove">Trove</option>
+      </select>
+    )
+    : null
+
   const primaryTrovesFiltered = useMemo(() => {
     const q = primaryTroveFilter.trim().toLowerCase()
     if (!q) return troves
@@ -1708,6 +1735,7 @@ aria-label="Clear compare troves"
                       onSortChange={handleGridSortChange}
                       showScoreColumn={query.trim() !== '*'}
                       viewMode={searchResultsViewMode}
+                      afterFilterSlot={gallerySortAfterFilterSlot}
                       showPdfSashInGallery
                       showGalleryDecorations={galleryDecorate}
                     />
@@ -1902,6 +1930,7 @@ aria-label="Clear compare troves"
                     onSortChange={handleGridSortChange}
                     showScoreColumn={query.trim() !== '*'}
                     viewMode={searchResultsViewMode}
+                    afterFilterSlot={gallerySortAfterFilterSlot}
                     hideTroveInGallery={selectedTroveIds.size === 1}
                     showPdfSashInGallery
                     showGalleryDecorations={galleryDecorate}

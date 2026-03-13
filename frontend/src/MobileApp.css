@@ -1474,6 +1474,23 @@
   color: #888;
 }
 
+.mobile-search-results-grid .mobile-gallery-sort-select {
+  height: 2.1rem;
+  min-width: 5.6rem;
+  padding: 0 0.45rem;
+  font-size: 0.85rem;
+  font-family: inherit;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  background: #fff;
+  color: #252525;
+}
+
+.mobile-search-results-grid .mobile-gallery-sort-select:hover {
+  background: #ede5f5;
+  border-color: #ddd0eb;
+}
+
 /* When file type dropdown is open, allow it to extend below the result set without being clipped */
 .mobile-search-results-grid.mobile-filetype-dropdown-open {
   overflow-x: auto;
