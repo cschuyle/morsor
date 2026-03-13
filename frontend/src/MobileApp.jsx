@@ -1536,7 +1536,12 @@ onClick={() => {
                             <label className="mobile-trove-label">
                               <input type="checkbox" checked={selectedTroveIds.has(t.id)} onChange={() => toggleTrove(t.id)} />
                               <span>
-                                {t.name} ({searchResult != null ? `${formatCount(resultCount)}/${formatCount(t.count ?? 0)}` : formatCount(t.count ?? 0)})
+                                {t.name}{' '}
+                                {searchResult != null
+                                  ? (resultCount > 0
+                                    ? <span className="mobile-trove-count-suffix">({formatCount(resultCount)}/{formatCount(t.count ?? 0)})</span>
+                                    : `(${formatCount(resultCount)}/${formatCount(t.count ?? 0)})`)
+                                  : `(${formatCount(t.count ?? 0)})`}
                               </span>
                             </label>
                             {(selectedTroveIds.size !== 1 || !selectedTroveIds.has(t.id)) && (

@@ -883,6 +883,10 @@
   text-align: left;
 }
 
+.mobile-trove-count-suffix {
+  color: #6633cc;
+}
+
 .mobile-trove-only-actions {
   flex-shrink: 0;
   display: inline-flex;
