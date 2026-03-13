@@ -1009,22 +1009,6 @@ export function SearchResultsGrid({ data, sortBy = null, sortDir = 'asc', onSort
               })
             )}
           </tbody>
-          <tfoot>
-            <tr>
-              {table.getFlatHeaders().map((header) => (
-                header.column.id === 'thumb' ? (
-                  <td key={header.id} className="col-thumb grid-thumb-footer" onClick={() => onSortChange && onSortChange('thumb', sortBy === 'thumb' && sortDir === 'asc' ? 'desc' : 'asc')} role="button" tabIndex={0} onKeyDown={(e) => { if ((e.key === 'Enter' || e.key === ' ') && onSortChange) { e.preventDefault(); onSortChange('thumb', sortBy === 'thumb' && sortDir === 'asc' ? 'desc' : 'asc') } }} aria-label={sortBy === 'thumb' && sortDir === 'asc' ? 'Sort by thumbnails last' : 'Sort by thumbnails first'}>
-                    <span className="grid-thumb-footer-icons">
-                      <img src="/thumb-thumbnail.png" alt="" aria-hidden="true" className="grid-thumb-footer-thumbs" />
-                      <img src={sortBy === 'thumb' && sortDir === 'asc' ? '/to-top.png' : '/to-bottom.png'} alt="" aria-hidden="true" className="grid-thumb-footer-direction" />
-                    </span>
-                  </td>
-                ) : (
-                  <td key={header.id} className={`col-${header.column.id}`} />
-                )
-              ))}
-            </tr>
-          </tfoot>
         </table>
       </div>
       )}
