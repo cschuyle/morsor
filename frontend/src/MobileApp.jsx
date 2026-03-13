@@ -78,6 +78,7 @@ function MobileApp() {
   const [fileTypeDropdownOpen, setFileTypeDropdownOpen] = useState(false)
   const [fileTypePanelRect, setFileTypePanelRect] = useState(null)
   const [pageSizeDropdownOpen, setPageSizeDropdownOpen] = useState(false)
+  const [gallerySortDropdownOpen, setGallerySortDropdownOpen] = useState(false)
   const [searchResultsViewMode, setSearchResultsViewMode] = useState('list') // 'list' | 'gallery'
   const [galleryDecorate, setGalleryDecorate] = useState(true)
   const [copiedUrlFlare, setCopiedUrlFlare] = useState(false)
@@ -97,6 +98,7 @@ function MobileApp() {
   const reloadAbortControllerRef = useRef(null)
   const fileTypeDropdownRef = useRef(null)
   const pageSizeDropdownRef = useRef(null)
+  const gallerySortDropdownRef = useRef(null)
   const copyFlareTimeoutRef = useRef(null)
   const mobileMainRef = useRef(null)
   const [mobileMainGapTopOpen, setMobileMainGapTopOpen] = useState(true)
@@ -299,6 +301,26 @@ function MobileApp() {
     window.addEventListener('keydown', handleEscape)
     return () => window.removeEventListener('keydown', handleEscape)
   }, [pageSizeDropdownOpen])
+
+  useEffect(() => {
+    if (!gallerySortDropdownOpen) return
+    function handleClickOutside(e) {
+      if (gallerySortDropdownRef.current && !gallerySortDropdownRef.current.contains(e.target)) {
+        setGallerySortDropdownOpen(false)
+      }
+    }
+    document.addEventListener('click', handleClickOutside)
+    return () => document.removeEventListener('click', handleClickOutside)
+  }, [gallerySortDropdownOpen])
+
+  useEffect(() => {
+    if (!gallerySortDropdownOpen) return
+    function handleEscape(e) {
+      if (e.key === 'Escape') setGallerySortDropdownOpen(false)
+    }
+    window.addEventListener('keydown', handleEscape)
+    return () => window.removeEventListener('keydown', handleEscape)
+  }, [gallerySortDropdownOpen])
 
   function refreshStatusMessage() {
     fetch('/api/status', { credentials: 'include', headers: { ...getApiAuthHeaders() } })
@@ -781,8 +803,7 @@ function MobileApp() {
     }
   }
 
-  function handleMobileGallerySortChange(e) {
-    const nextSortBy = e.target.value
+  function applyGallerySortChange(nextSortBy) {
     const nextSortDir = nextSortBy === 'score' ? 'desc' : 'asc'
     setSearchSortBy(nextSortBy)
     setSearchSortDir(nextSortDir)
@@ -836,18 +857,46 @@ function MobileApp() {
   )
   const effectiveSearchResultsViewMode = showMobileViewModeToggle ? searchResultsViewMode : 'list'
   const mobileGallerySortValue = searchSortBy === 'score' || searchSortBy === 'trove' ? searchSortBy : 'title'
+  const GALLERY_SORT_OPTIONS = [
+    { value: 'title', label: 'Title' },
+    { value: 'score', label: 'Score' },
+    { value: 'trove', label: 'Trove' }
+  ]
   const mobileGallerySortAfterFilterSlot = effectiveSearchResultsViewMode === 'gallery'
     ? (
-      <select
-        value={mobileGallerySortValue}
-        onChange={handleMobileGallerySortChange}
-        className="mobile-gallery-sort-select"
-        aria-label="Gallery sort"
-      >
-        <option value="title">Title</option>
-        <option value="score">Score</option>
-        <option value="trove">Trove</option>
-      </select>
+      <div className="mobile-gallery-sort-dropdown-wrap" ref={gallerySortDropdownRef}>
+        <div className="mobile-gallery-sort-trigger-wrap">
+          <button
+            type="button"
+            className="mobile-gallery-sort-trigger"
+            onClick={() => setGallerySortDropdownOpen((o) => !o)}
+            aria-expanded={gallerySortDropdownOpen}
+            aria-haspopup="listbox"
+            aria-label="Gallery sort"
+          >
+            {GALLERY_SORT_OPTIONS.find((o) => o.value === mobileGallerySortValue)?.label ?? mobileGallerySortValue}
+          </button>
+        </div>
+        {gallerySortDropdownOpen && (
+          <div className="mobile-gallery-sort-panel" role="listbox" aria-label="Gallery sort">
+            {GALLERY_SORT_OPTIONS.map((opt) => (
+              <button
+                key={opt.value}
+                type="button"
+                role="option"
+                aria-selected={mobileGallerySortValue === opt.value}
+                className="mobile-gallery-sort-option"
+                onClick={() => {
+                  applyGallerySortChange(opt.value)
+                  setGallerySortDropdownOpen(false)
+                }}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
     )
     : null
   const showSearchPaginationControls = totalPages > 1
