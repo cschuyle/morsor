@@ -32,8 +32,10 @@ function App() {
   const [freezeTroveListOrder, setFreezeTroveListOrder] = useState(false)
   const [boostTroveId, setBoostTroveId] = useState(null)
   const [sidebarOpen, setSidebarOpen] = useState(true)
-  const [sortBy, setSortBy] = useState(null)
-  const [sortDir, setSortDir] = useState('asc')
+  const [starSortBy, setStarSortBy] = useState(null)
+  const [starSortDir, setStarSortDir] = useState(null)
+  const [otherSortBy, setOtherSortBy] = useState(null)
+  const [otherSortDir, setOtherSortDir] = useState(null)
   const [searchParams, setSearchParams] = useSearchParams()
   const location = useLocation()
   const searchMode = (() => {
@@ -83,6 +85,9 @@ function App() {
   const fileTypeDropdownRef = useRef(null)
   const PAGE_SIZE_OPTIONS = [10, 25, 100, 500, 1000, 5000, 10000]
   queryRef.current = query
+  const isStarQuery = (query ?? '').trim() === '*'
+  const effectiveSortBy = isStarQuery ? (starSortBy ?? 'title') : (otherSortBy ?? 'score')
+  const effectiveSortDir = isStarQuery ? (starSortDir ?? 'asc') : (otherSortDir ?? 'desc')
 
   function refreshStatusMessage() {
     fetch('/api/status', { credentials: 'include', headers: { ...getApiAuthHeaders() } })
@@ -108,8 +113,8 @@ function App() {
       return
     }
     const troveIds = troveIdsOverride ?? selectedTroveIds
-    const nextSortBy = sortByOverride !== undefined && sortByOverride !== null ? sortByOverride : sortBy
-    const nextSortDir = sortDirOverride !== undefined && sortDirOverride !== null ? sortDirOverride : sortDir
+    const nextSortBy = sortByOverride !== undefined && sortByOverride !== null ? sortByOverride : effectiveSortBy
+    const nextSortDir = sortDirOverride !== undefined && sortDirOverride !== null ? sortDirOverride : effectiveSortDir
     const fileTypesToUse = fileTypesOverride !== undefined ? fileTypesOverride : fileTypeFilters
     const params = new URLSearchParams({
       query: q.trim(),
@@ -121,8 +126,13 @@ function App() {
     if (fileTypesToUse && fileTypesToUse.size > 0) params.set('fileTypes', [...fileTypesToUse].sort().join(','))
     if (thumbnailOnly) params.set('thumbs', '1')
     if (sortByOverride !== undefined || sortDirOverride !== undefined) {
-      setSortBy(nextSortBy || null)
-      setSortDir(nextSortDir)
+      if (isStarQuery) {
+        setStarSortBy(nextSortBy || null)
+        setStarSortDir(nextSortDir)
+      } else {
+        setOtherSortBy(nextSortBy || null)
+        setOtherSortDir(nextSortDir)
+      }
     }
     if (nextSortBy) {
       params.set('sortBy', nextSortBy)
@@ -229,8 +239,14 @@ function App() {
       const view = searchParams.get('view')
       setSearchResultsViewMode(view === 'gallery' ? 'gallery' : 'list')
       if (view === 'gallery') {
-        setSortBy('title')
-        setSortDir('asc')
+        const urlQ = (q ?? '').trim()
+        if (urlQ === '*') {
+          setStarSortBy('title')
+          setStarSortDir('asc')
+        } else if (urlQ) {
+          setOtherSortBy('score')
+          setOtherSortDir('desc')
+        }
       }
       const sizeParam = Number(searchParams.get('size'))
       if (Number.isFinite(sizeParam) && sizeParam > 0) {
@@ -660,31 +676,61 @@ function App() {
   function handleGallerySortChange(e) {
     const nextSortBy = e.target.value
     const nextSortDir = nextSortBy === 'score' ? 'desc' : 'asc'
-    setSortBy(nextSortBy)
-    setSortDir(nextSortDir)
+    if (isStarQuery) {
+      setStarSortBy(nextSortBy)
+      setStarSortDir(nextSortDir)
+    } else {
+      setOtherSortBy(nextSortBy)
+      setOtherSortDir(nextSortDir)
+    }
     const q = queryRef.current
     if (!q.trim()) return
     const pageNum = searchResult != null && typeof searchResult.page === 'number' ? searchResult.page : 0
     fetchSearch(pageNum, null, null, nextSortBy, nextSortDir)
   }
 
-  const gallerySortValue = sortBy === 'score' || sortBy === 'trove' ? sortBy : 'title'
+  function toggleGallerySortDir() {
+    const nextDir = effectiveSortDir === 'asc' ? 'desc' : 'asc'
+    if (isStarQuery) {
+      setStarSortDir(nextDir)
+    } else {
+      setOtherSortDir(nextDir)
+    }
+    const q = queryRef.current
+    if (!q.trim()) return
+    const pageNum = searchResult != null && typeof searchResult.page === 'number' ? searchResult.page : 0
+    fetchSearch(pageNum, null, null, effectiveSortBy, nextDir)
+  }
+
+  const gallerySortValue = effectiveSortBy === 'score' || effectiveSortBy === 'trove' ? effectiveSortBy : 'title'
   const gallerySortAfterFilterSlot = searchResultsViewMode === 'gallery'
     ? (
       <div className="gallery-sort-wrap">
-        <label className="gallery-sort-label">
-          Sort by{' '}
-          <select
-            value={gallerySortValue}
-            onChange={handleGallerySortChange}
-            className="gallery-sort-select"
-            aria-label="Gallery sort"
+        <div className="gallery-sort-trigger-wrap">
+          <button
+            type="button"
+            className="gallery-sort-dir-btn"
+            onClick={toggleGallerySortDir}
+            aria-label={effectiveSortDir === 'asc' ? 'Sort ascending, click to sort descending' : 'Sort descending, click to sort ascending'}
+            title={effectiveSortDir === 'asc' ? 'Sort ascending (click to toggle)' : 'Sort descending (click to toggle)'}
           >
-            <option value="title">Title</option>
-            <option value="score">Score</option>
-            <option value="trove">Trove</option>
-          </select>
-        </label>
+            {effectiveSortDir === 'asc' ? '↑' : '↓'}
+          </button>
+          <span className="gallery-sort-divider" aria-hidden="true" />
+          <label className="gallery-sort-label">
+            Sort by{' '}
+            <select
+              value={gallerySortValue}
+              onChange={handleGallerySortChange}
+              className="gallery-sort-select"
+              aria-label="Gallery sort"
+            >
+              <option value="title">Title</option>
+              <option value="score">Score</option>
+              <option value="trove">Trove</option>
+            </select>
+          </label>
+        </div>
       </div>
     )
     : null
@@ -1812,8 +1858,8 @@ aria-label="Clear compare troves"
                     </p>
                     <SearchResultsGrid
                       data={results}
-                      sortBy={sortBy}
-                      sortDir={sortDir}
+                      sortBy={effectiveSortBy}
+                      sortDir={effectiveSortDir}
                       onSortChange={handleGridSortChange}
                       showScoreColumn={query.trim() !== '*'}
                       viewMode={searchResultsViewMode}
@@ -1869,13 +1915,11 @@ aria-label="Clear compare troves"
                           onClick={() => {
                             skipViewModeSearchRef.current = true
                             lastFileTypeOrViewSearchRef.current = Date.now()
-                            setSortBy('title')
-                            setSortDir('asc')
                             setSearchResultsViewMode('gallery')
                             const q = queryRef.current
                             if (q.trim()) {
                               const pageNum = searchResult != null && typeof searchResult.page === 'number' ? searchResult.page : 0
-                              fetchSearch(pageNum, null, null, 'title', 'asc')
+                              fetchSearch(pageNum, null, null, effectiveSortBy, effectiveSortDir)
                             }
                           }}
                           aria-pressed={searchResultsViewMode === 'gallery'}
@@ -2013,8 +2057,8 @@ aria-label="Clear compare troves"
                   </div>
                   <SearchResultsGrid
                     data={results}
-                    sortBy={sortBy}
-                    sortDir={sortDir}
+                    sortBy={effectiveSortBy}
+                    sortDir={effectiveSortDir}
                     onSortChange={handleGridSortChange}
                     showScoreColumn={query.trim() !== '*'}
                     viewMode={searchResultsViewMode}

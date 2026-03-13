@@ -1335,9 +1335,91 @@
   color: #b8b8b8;
 }
 
+.card .grid-toolbar .gallery-sort-trigger-wrap {
+  border-color: #555;
+  background: #2a2a2a;
+}
+
+.card .grid-toolbar .gallery-sort-dir-btn {
+  color: #b8b8b8;
+}
+
+.card .grid-toolbar .gallery-sort-dir-btn:hover {
+  background: #3a3a3a;
+}
+
+.card .grid-toolbar .gallery-sort-divider {
+  background: #555;
+}
+
+.card .grid-toolbar .gallery-sort-select {
+  color: #b8b8b8;
+}
+
+.card .grid-toolbar .gallery-sort-select:hover {
+  background: #3a3a3a;
+}
+
 .gallery-sort-wrap {
   flex-shrink: 0;
   margin-left: auto;
+}
+
+.gallery-sort-trigger-wrap {
+  display: inline-flex;
+  align-items: stretch;
+  min-height: 2rem;
+  box-sizing: border-box;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  overflow: hidden;
+  background: #fff;
+}
+
+.gallery-sort-dir-btn {
+  flex-shrink: 0;
+  width: 2rem;
+  min-width: 2rem;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1rem;
+  font-family: inherit;
+  line-height: 1;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  color: #252525;
+  cursor: pointer;
+}
+
+.gallery-sort-dir-btn:hover {
+  background: #ede5f5;
+}
+
+.gallery-sort-divider {
+  width: 1px;
+  flex-shrink: 0;
+  align-self: stretch;
+  background: #ddd;
+}
+
+.gallery-sort-trigger-wrap .gallery-sort-label {
+  margin: 0;
+  padding: 0 0.5rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  border: none;
+  background: transparent;
+}
+
+.gallery-sort-trigger-wrap .gallery-sort-select {
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  min-width: 4.5rem;
 }
 .search-results-options {
   margin-top: 0.5rem;

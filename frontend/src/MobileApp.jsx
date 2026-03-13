@@ -45,8 +45,10 @@ function MobileApp() {
   const setCompareTroveIds = searchMode === 'duplicates' ? setDupCompareTroveIds : setUniqCompareTroveIds
   const [query, setQuery] = useState('')
   const [searchResult, setSearchResult] = useState(null)
-  const [searchSortBy, setSearchSortBy] = useState(null)
-  const [searchSortDir, setSearchSortDir] = useState('asc')
+  const [starSortBy, setStarSortBy] = useState(null)
+  const [starSortDir, setStarSortDir] = useState(null)
+  const [otherSortBy, setOtherSortBy] = useState(null)
+  const [otherSortDir, setOtherSortDir] = useState(null)
   const [searching, setSearching] = useState(false)
   const [page, setPage] = useState(0)
   const [duplicatesResult, setDuplicatesResult] = useState(null)
@@ -106,6 +108,9 @@ function MobileApp() {
   const [searchParams, setSearchParams] = useSearchParams()
   const location = useLocation()
   queryRef.current = query
+  const isStarQuery = (query ?? '').trim() === '*'
+  const effectiveSortBy = isStarQuery ? (starSortBy ?? 'title') : (otherSortBy ?? 'score')
+  const effectiveSortDir = isStarQuery ? (starSortDir ?? 'asc') : (otherSortDir ?? 'desc')
 
   const isDupOrUniques = searchMode === 'duplicates' || searchMode === 'uniques'
 
@@ -154,8 +159,14 @@ function MobileApp() {
       const view = searchParams.get('view')
       setSearchResultsViewMode(view === 'gallery' ? 'gallery' : 'list')
       if (view === 'gallery') {
-        setSearchSortBy('title')
-        setSearchSortDir('asc')
+        const urlQ = (q ?? '').trim()
+        if (urlQ === '*') {
+          setStarSortBy('title')
+          setStarSortDir('asc')
+        } else if (urlQ) {
+          setOtherSortBy('score')
+          setOtherSortDir('desc')
+        }
       }
       const pageParam = Number(searchParams.get('page'))
       setPage(Number.isFinite(pageParam) && pageParam > 0 ? pageParam - 1 : 0)
@@ -357,12 +368,17 @@ function MobileApp() {
       setSearchResult({ count: 0, results: [], page: 0, size })
       return
     }
-    const sortBy = sortByOverride ?? searchSortBy
-    const sortDir = sortDirOverride ?? searchSortDir
+    const sortBy = sortByOverride ?? effectiveSortBy
+    const sortDir = sortDirOverride ?? effectiveSortDir
     const fileTypesToUse = fileTypesOverride !== undefined ? fileTypesOverride : fileTypeFilters
     if (sortByOverride != null || sortDirOverride != null) {
-      setSearchSortBy(sortBy || null)
-      setSearchSortDir(sortDir)
+      if (isStarQuery) {
+        setStarSortBy(sortBy || null)
+        setStarSortDir(sortDir)
+      } else {
+        setOtherSortBy(sortBy || null)
+        setOtherSortDir(sortDir)
+      }
     }
     const params = new URLSearchParams({
       query: q,
@@ -805,18 +821,26 @@ function MobileApp() {
 
   function applyGallerySortChange(nextSortBy) {
     const nextSortDir = nextSortBy === 'score' ? 'desc' : 'asc'
-    setSearchSortBy(nextSortBy)
-    setSearchSortDir(nextSortDir)
+    if (isStarQuery) {
+      setStarSortBy(nextSortBy)
+      setStarSortDir(nextSortDir)
+    } else {
+      setOtherSortBy(nextSortBy)
+      setOtherSortDir(nextSortDir)
+    }
     const q = queryRef.current.trim()
     if (q) fetchSearch(page, nextSortBy, nextSortDir)
   }
 
   function toggleGallerySortDir() {
-    const nextDir = searchSortDir === 'asc' ? 'desc' : 'asc'
-    setSearchSortDir(nextDir)
+    const nextDir = effectiveSortDir === 'asc' ? 'desc' : 'asc'
+    if (isStarQuery) {
+      setStarSortDir(nextDir)
+    } else {
+      setOtherSortDir(nextDir)
+    }
     const q = queryRef.current.trim()
-    const sortBy = searchSortBy === 'score' || searchSortBy === 'trove' ? searchSortBy : 'title'
-    if (q) fetchSearch(page, sortBy, nextDir)
+    if (q) fetchSearch(page, effectiveSortBy, nextDir)
   }
 
   const sortedDuplicateRows = useMemo(() => {
@@ -864,7 +888,7 @@ function MobileApp() {
     [results, galleryDecorate]
   )
   const effectiveSearchResultsViewMode = showMobileViewModeToggle ? searchResultsViewMode : 'list'
-  const mobileGallerySortValue = searchSortBy === 'score' || searchSortBy === 'trove' ? searchSortBy : 'title'
+  const mobileGallerySortValue = effectiveSortBy === 'score' || effectiveSortBy === 'trove' ? effectiveSortBy : 'title'
   const GALLERY_SORT_OPTIONS = [
     { value: 'title', label: 'Title' },
     { value: 'score', label: 'Score' },
@@ -878,10 +902,10 @@ function MobileApp() {
             type="button"
             className="mobile-gallery-sort-dir-btn"
             onClick={(e) => { e.stopPropagation(); toggleGallerySortDir() }}
-            aria-label={searchSortDir === 'asc' ? 'Sort ascending, click to sort descending' : 'Sort descending, click to sort ascending'}
-            title={searchSortDir === 'asc' ? 'Sort ascending (click to toggle)' : 'Sort descending (click to toggle)'}
+            aria-label={effectiveSortDir === 'asc' ? 'Sort ascending, click to sort descending' : 'Sort descending, click to sort ascending'}
+            title={effectiveSortDir === 'asc' ? 'Sort ascending (click to toggle)' : 'Sort descending (click to toggle)'}
           >
-            {searchSortDir === 'asc' ? '↑' : '↓'}
+            {effectiveSortDir === 'asc' ? '↑' : '↓'}
           </button>
           <span className="mobile-gallery-sort-divider" aria-hidden="true" />
           <button
@@ -1452,11 +1476,9 @@ onClick={() => {
                   onClick={() => {
                     skipViewModeSearchRef.current = true
                     lastFileTypeOrViewSearchRef.current = Date.now()
-                    setSearchSortBy('title')
-                    setSearchSortDir('asc')
                     setSearchResultsViewMode('gallery')
                     const q = queryRef.current.trim()
-                    if (q) fetchSearch(page, 'title', 'asc')
+                    if (q) fetchSearch(page, effectiveSortBy, effectiveSortDir)
                   }}
                   aria-pressed={effectiveSearchResultsViewMode === 'gallery'}
                   aria-label="Gallery view"
@@ -1744,8 +1766,8 @@ onClick={() => {
                 )}
                 <SearchResultsGrid
                   data={results}
-                  sortBy={searchSortBy}
-                  sortDir={searchSortDir}
+                  sortBy={effectiveSortBy}
+                  sortDir={effectiveSortDir}
                   onSortChange={(col, dir) => fetchSearch(0, col, dir)}
                   showScoreColumn={query.trim() !== '*'}
                   viewMode={effectiveSearchResultsViewMode}
