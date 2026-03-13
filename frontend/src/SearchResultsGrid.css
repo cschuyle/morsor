@@ -110,6 +110,7 @@
 
 .grid-table {
   width: 100%;
+  table-layout: fixed;
   border-collapse: collapse;
   font-size: 0.9rem;
   color: #252525;
@@ -168,8 +169,15 @@
   color: #555;
 }
 
+.grid-table .col-title {
+  width: 100%;
+}
+
 .grid-table .col-trove {
-  width: 8rem;
+  width: 5rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .grid-table .col-score {
