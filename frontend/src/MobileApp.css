@@ -815,6 +815,11 @@
   color: #6633cc;
   cursor: pointer;
 }
+.mobile-trove-clear:hover:not(:disabled) {
+  background: #ede5f5;
+  border-radius: 4px;
+}
+
 .mobile-trove-clear:disabled {
   color: #999;
   cursor: default;
@@ -823,7 +828,7 @@
 .mobile-trove-list {
   list-style: none;
   margin: 0;
-  padding: 0 0.75rem 0.75rem;
+  padding: 0 0 0.75rem 0;
   overflow-y: auto;
   flex: 1;
   min-height: 0;
@@ -875,8 +880,12 @@
 
 .mobile-trove-label input {
   width: 1.1rem;
+  min-width: 1.1rem;
   height: 1.1rem;
+  min-height: 1.1rem;
+  flex-shrink: 0;
   accent-color: #6633cc;
+  box-sizing: border-box;
 }
 
 .mobile-trove-label span {
@@ -918,7 +927,7 @@
 }
 
 .mobile-trove-only-link:hover {
-  opacity: 0.85;
+  background: #ede5f5;
 }
 
 .mobile-trove-only-link .mobile-trove-only-icon {
@@ -937,6 +946,19 @@
 .mobile-trove-only-link--boost-active .trove-booster {
   color: #c00;
   font-weight: bold;
+}
+
+.mobile-trove-only-link--boost,
+.mobile-trove-only-link--target {
+  width: 2rem;
+  min-width: 2rem;
+  height: 2rem;
+  padding: 0;
+  justify-content: center;
+}
+
+.mobile-trove-only-link--boost {
+  margin-left: -0.4rem; /* ~20% overlap with target button */
 }
 
 .mobile-result-count {

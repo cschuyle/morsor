@@ -1546,7 +1546,7 @@ onClick={() => {
                             </label>
                             {(selectedTroveIds.size !== 1 || !selectedTroveIds.has(t.id)) && (
                               <span className="mobile-trove-only-actions">
-                                <button type="button" className="mobile-trove-only-link" onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleTargetClick(t.id) }} aria-label={`Search only ${t.name}`} title="Only this trove"><img src="/target.png" alt="" className="mobile-trove-only-icon" /></button>
+                                <button type="button" className="mobile-trove-only-link mobile-trove-only-link--target" onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleTargetClick(t.id) }} aria-label={`Search only ${t.name}`} title="Only this trove"><img src="/target.png" alt="" className="mobile-trove-only-icon" /></button>
                                 <button type="button" className={`mobile-trove-only-link mobile-trove-only-link--boost${boostTroveId === t.id ? ' mobile-trove-only-link--boost-active' : ''}`} onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleBoostClick(t.id) }} aria-label={boostTroveId === t.id ? `Boost on for ${t.name}` : `Boost ${t.name} in search results`} title={boostTroveId === t.id ? 'Boost on — results from this trove rank higher' : 'Boost this trove in search results'}><span className="trove-booster" aria-hidden="true">↑</span></button>
                               </span>
                             )}
