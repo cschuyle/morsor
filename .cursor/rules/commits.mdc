@@ -1,0 +1,13 @@
+---
+description: When committing, read AGENTS.md and follow the commit preferences there
+alwaysApply: true
+globs: 
+---
+
+# Commit preferences
+
+When the user asks to commit (e.g. "commit", "commit this", "commit with my usual style"):
+
+1. Read the project root file **AGENTS.md**.
+2. If it contains a **Commits** (or similar) section with preferences, follow those for the commit message and any related steps.
+3. If there are no commit preferences in AGENTS.md, use a clear, conventional commit message that describes the staged changes.
