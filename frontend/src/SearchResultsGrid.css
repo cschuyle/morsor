@@ -475,7 +475,8 @@
   position: fixed;
   max-width: min(66.67cqw, 66.67vw);
   animation-duration: 0.25s;
-  animation-timing-function: ease-out;
+  /* Superlinear acceleration: slow start, very fast finish */
+  animation-timing-function: cubic-bezier(0.6, 0, 1, 1);
   animation-fill-mode: forwards;
 }
 
