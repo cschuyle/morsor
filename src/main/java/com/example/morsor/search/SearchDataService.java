@@ -85,6 +85,9 @@ public class SearchDataService {
     @Value("${moocho.only.trove.ids:}")
     private String onlyTroveIds;
 
+    @Value("${moocho.exclude.trove.ids:}")
+    private String excludeTroveIds;
+
     private final Environment environment;
 
     private List<SearchResult> allResults = List.of();
@@ -118,22 +121,45 @@ public class SearchDataService {
      */
     public void reloadData(BiConsumer<Integer, Integer> progress, AtomicBoolean cancelled) {
         log.info("SearchDataService.reloadData() started");
-        Set<String> onlyIds = parseOnlyTroveIds(onlyTroveIds);
+        Set<String> onlyIds = parseTroveIds(onlyTroveIds);
+        Set<String> excludeIds = parseTroveIds(excludeTroveIds);
+        Set<String> loadedTroveIds = java.util.Collections.synchronizedSet(new TreeSet<>());
+        List<String> loadErrors = java.util.Collections.synchronizedList(new ArrayList<>());
         if (!onlyIds.isEmpty()) {
             log.info("Loading only trove IDs: {}", onlyIds);
+        }
+        if (!excludeIds.isEmpty()) {
+            log.info("Excluding trove IDs: {}", excludeIds);
         }
         List<SearchResult> combined = new ArrayList<>();
         boolean useS3 = environment.acceptsProfiles(Profiles.of("s3troves"));
         log.info("Trove load: useS3={}, bucketName={}", useS3, bucketName != null ? bucketName : "(null)");
         if (useS3) {
             requireS3EnvVars();
-            loadFromS3(combined, onlyIds, progress);
+            loadFromS3(combined, onlyIds, excludeIds, progress, loadedTroveIds, loadErrors);
         } else {
-            loadFromClasspath(combined, onlyIds, progress);
+            loadFromClasspath(combined, onlyIds, excludeIds, progress, loadedTroveIds, loadErrors);
         }
         if (cancelled != null && cancelled.get()) {
             log.info("Reload cancelled (client disconnected); existing data unchanged");
             return;
+        }
+        Map<String, Long> loadedItemCountsByTrove = combined.stream()
+                .filter(r -> r.troveId() != null && !r.troveId().isBlank())
+                .collect(Collectors.groupingBy(SearchResult::troveId, Collectors.counting()));
+        List<String> loadedTroveSummaries = loadedTroveIds.stream()
+                .sorted((a, b) -> {
+                    long ca = loadedItemCountsByTrove.getOrDefault(a, 0L);
+                    long cb = loadedItemCountsByTrove.getOrDefault(b, 0L);
+                    int byCount = Long.compare(cb, ca);
+                    if (byCount != 0) return byCount;
+                    return String.CASE_INSENSITIVE_ORDER.compare(a, b);
+                })
+                .map(id -> id + "(" + loadedItemCountsByTrove.getOrDefault(id, 0L) + ")")
+                .toList();
+        log.info("Trove load complete. Loaded trove IDs with item counts ({}): {}", loadedTroveSummaries.size(), loadedTroveSummaries);
+        if (!loadErrors.isEmpty()) {
+            log.warn("Trove load completed with {} errors: {}", loadErrors.size(), loadErrors);
         }
         buildLuceneIndex(combined);
         allResults = combined;
@@ -207,7 +233,7 @@ public class SearchDataService {
         }
     }
 
-    private static Set<String> parseOnlyTroveIds(String value) {
+    private static Set<String> parseTroveIds(String value) {
         if (value == null || value.isBlank()) return Set.of();
         return Arrays.stream(value.split(","))
                 .map(String::trim)
@@ -215,7 +241,13 @@ public class SearchDataService {
                 .collect(Collectors.toUnmodifiableSet());
     }
 
-    private void loadFromS3(List<SearchResult> combined, Set<String> onlyIds, BiConsumer<Integer, Integer> progress) {
+    private void loadFromS3(
+            List<SearchResult> combined,
+            Set<String> onlyIds,
+            Set<String> excludeIds,
+            BiConsumer<Integer, Integer> progress,
+            Set<String> loadedTroveIds,
+            List<String> loadErrors) {
         log.info("Loading from S3");
         // Region from AWS_REGION env var (e.g. us-west-2); fallback for local runs without it set
         String region = System.getenv().getOrDefault("AWS_REGION", "us-west-2");
@@ -260,6 +292,10 @@ public class SearchDataService {
                     log.debug("Skipping trove \"{}\" (not in moocho.only.trove.ids)", troveId);
                     continue;
                 }
+                if (excludeIds.contains(troveId)) {
+                    log.debug("Skipping trove \"{}\" (in moocho.exclude.trove.ids)", troveId);
+                    continue;
+                }
                 String key = bucketPrefix.isEmpty() ? troveId + ".json" : bucketPrefix + "/" + troveId + ".json";
                 toLoad.add(new TroveS3Key(troveId, key));
             }
@@ -275,6 +311,7 @@ public class SearchDataService {
                             JsonNode root2 = objectMapper.readTree(in);
                             List<SearchResult> results = CollectionToSearchResultMapper.mapRootToSearchResults(root2);
                             log.info("Loaded trove \"{}\": {} records", tk.troveId, results.size());
+                            loadedTroveIds.add(tk.troveId);
                             if (completed != null) {
                                 progress.accept(completed.incrementAndGet(), totalTroves);
                             }
@@ -285,6 +322,7 @@ public class SearchDataService {
                             } else {
                                 log.error("Failed to load trove \"{}\" from S3 (key={}): {}", tk.troveId, tk.key, e.getMessage(), e);
                             }
+                            loadErrors.add(tk.troveId + " (S3 key=" + tk.key + "): " + e.getMessage());
                             if (completed != null) {
                                 progress.accept(completed.incrementAndGet(), totalTroves);
                             }
@@ -296,10 +334,17 @@ public class SearchDataService {
             log.info("Trove load from S3 complete: {} total records", combined.size());
         } catch (Exception e) {
             log.error("Failed to load troves list from S3 (bucket={}): {}", bucketName, e.getMessage(), e);
+            loadErrors.add("troves-manifest (bucket=" + bucketName + "): " + e.getMessage());
         }
     }
 
-    private void loadFromClasspath(List<SearchResult> combined, Set<String> onlyIds, BiConsumer<Integer, Integer> progress) {
+    private void loadFromClasspath(
+            List<SearchResult> combined,
+            Set<String> onlyIds,
+            Set<String> excludeIds,
+            BiConsumer<Integer, Integer> progress,
+            Set<String> loadedTroveIds,
+            List<String> loadErrors) {
         log.info("Loading trove data from: {}", dataLocation);
         try {
             Resource[] resources = resourceResolver.getResources(dataLocation);
@@ -320,16 +365,25 @@ public class SearchDataService {
                         if (progress != null) progress.accept(i + 1, total);
                         continue;
                     }
+                    if (excludeIds.contains(troveId)) {
+                        log.debug("Skipping trove \"{}\" (in moocho.exclude.trove.ids)", troveId);
+                        if (progress != null) progress.accept(i + 1, total);
+                        continue;
+                    }
                     List<SearchResult> results = CollectionToSearchResultMapper.mapRootToSearchResults(root);
                     log.info("Loaded trove \"{}\": {} records", troveId, results.size());
+                    loadedTroveIds.add(troveId);
                     combined.addAll(results);
                 } catch (Exception e) {
                     log.error("Failed to load trove from {}: {}", resource.getDescription(), e.getMessage(), e);
+                    String source = resource.getFilename() != null ? resource.getFilename() : resource.getDescription();
+                    loadErrors.add(source + ": " + e.getMessage());
                 }
                 if (progress != null) progress.accept(i + 1, total);
             }
         } catch (Exception e) {
             log.error("Failed to resolve trove data from {}: {}", dataLocation, e.getMessage(), e);
+            loadErrors.add("resource-resolution (" + dataLocation + "): " + e.getMessage());
         }
     }
 

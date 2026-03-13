@@ -257,7 +257,8 @@ So-called "Production" mode: You would normally activate **postgres** and **s3tr
 
 **Other env vars:** 
 
-- `MOOCHO_ONLY_TROVE_IDS` limits which troves are loaded (all profiles). 
+- `MOOCHO_INCLUDE_TROVE_IDS` limits which troves are loaded (all profiles). If not set, all troves are loaded except those listed in MOOCHO_EXCLUDE_TROVE_IDS.
+- `MOOCHO_EXCLUDE_TROVE_IDS` excludes troves from loading (all profiles), even if those troves are listed in `MOOCHO_INCLUDE_TROVE_IDS`.
 - `MOOCHO_DATA_LOCATION` overrides where trove JSON files are loaded from when not using S3 (default: `file:./fixtures/data/*.json`; run from project root). 
 
 Search result cache ( See [envrc-template](./envrc-template) )

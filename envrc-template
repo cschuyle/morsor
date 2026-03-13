@@ -13,11 +13,17 @@ export MOOCHO_BUCKET_NAME=blah
 # When not using S3, trove JSON is loaded from this location (dev/default). Default is file:./fixtures/data/*.json when run from project root. Use to point at a different directory or classpath, e.g. classpath*:data/*.json.
 #export MOOCHO_DATA_LOCATION=file:./fixtures/data/*.json
 
-# Use this to only load a subset of troves. 
-# This can be useful if you have a LOT of data and you want to startup quicker, or have limited compute resources. 
-# This is especially important because the implementation uses embedded (in-memory) Lucene (search engine). 
-# All data is loaded and indexed at startup time.
-#export MOOCHO_ONLY_TROVE_IDS=trove-id-1,trove-id-2,...
+# Variables to limit which troves are loaded.
+# - This can be useful if you have a LOT of data and you want to startup quicker, or have limited compute resources,
+#   __NOTE__: This is especially important because the implementation uses embedded (in-memory) Lucene (search engine). 
+#   All data is loaded and indexed at startup time.
+# - Also useful if some troves are not useful.
+
+# limits which troves are loaded. If not set, all troves are loaded except those listed in MOOCHO_EXCLUDE_TROVE_IDS
+#export MOOCHO_INCLUDE_TROVE_IDS=trove-id-1,trove-id-2,...
+
+# limit which troves are loaded. If set, excludes the troves listed, even if they ARE listed in MOOCHO_INCLUDE_TROVE_IDS
+#export MOOCHO_EXCLUDE_TROVE_IDS=trove-id-3,trove-id-4,...
 
 # Search/duplicates/uniques result cache: TTL in minutes (default 720 = 12h), max memory in bytes (default 1073741824 = 1GB).
 # When the cache is full, new results are still returned but not cached; the UI shows a warning.
