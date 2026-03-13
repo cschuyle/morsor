@@ -8,25 +8,30 @@ const GROUPS = [
   { group: 'Images', types: IMAGE_TYPES },
   { group: 'Text', types: TEXT_TYPES },
   { group: 'Video', types: VIDEO_TYPES },
-  { group: 'Audio', types: AUDIO_TYPES }
+  { group: 'Audio', types: AUDIO_TYPES },
 ]
 
 /** All known file types from groups; used so dropdown can show full list (e.g. on mobile) even before API returns. */
-export const ALL_KNOWN_FILE_TYPES = [...IMAGE_TYPES, ...TEXT_TYPES, ...VIDEO_TYPES, ...AUDIO_TYPES]
+export const ALL_KNOWN_FILE_TYPES: string[] = [...IMAGE_TYPES, ...TEXT_TYPES, ...VIDEO_TYPES, ...AUDIO_TYPES]
+
+export interface FileTypeGroup {
+  group: string
+  types: string[]
+}
 
 /**
- * @param {string[]} availableFileTypes - Types returned by the API (any case)
- * @returns {{ group: string | null, types: string[] }[]} Groups with group label (or null) and types in display order (original case from available)
+ * @param availableFileTypes - Types returned by the API (any case)
+ * @returns Groups with group label and types in display order (original case from available)
  */
-export function groupFileTypes(availableFileTypes) {
-  const upper = (s) => (s || '').toUpperCase()
+export function groupFileTypes(availableFileTypes: string[] | undefined | null): FileTypeGroup[] {
+  const upper = (s: string) => (s || '').toUpperCase()
   const available = availableFileTypes || []
-  const byUpper = new Map()
-  available.forEach((t) => { byUpper.set(upper(t), t) })
-  const usedUpper = new Set()
-  const result = []
+  const byUpper = new Map<string, string>()
+  available.forEach((t) => byUpper.set(upper(t), t))
+  const usedUpper = new Set<string>()
+  const result: FileTypeGroup[] = []
   for (const { group, types } of GROUPS) {
-    const inThisGroup = types.filter((t) => byUpper.has(t)).map((t) => byUpper.get(t))
+    const inThisGroup = types.filter((t) => byUpper.has(t)).map((t) => byUpper.get(t)!)
     inThisGroup.forEach((t) => usedUpper.add(upper(t)))
     if (inThisGroup.length > 0) result.push({ group, types: inThisGroup })
   }
@@ -38,13 +43,13 @@ export function groupFileTypes(availableFileTypes) {
 /**
  * If the selected file types equal exactly one group (all types that group has in the dropdown, nothing else), return that group name for display (e.g. "Only Text").
  * Compares against the group's types that are present in allAvailableFileTypes (what we actually show), not the full group definition.
- * @param {Set<string>} selectedFileTypes
- * @param {string[]} [allAvailableFileTypes] - Types currently shown in the dropdown; used to know each group's actual options
- * @returns {string | null}
  */
-export function getGroupNameIfFullySelected(selectedFileTypes, allAvailableFileTypes) {
+export function getGroupNameIfFullySelected(
+  selectedFileTypes: Set<string> | undefined | null,
+  allAvailableFileTypes?: string[]
+): string | null {
   if (!selectedFileTypes || selectedFileTypes.size === 0) return null
-  const upper = (s) => (s || '').toUpperCase()
+  const upper = (s: string) => (s || '').toUpperCase()
   const selectedUpper = new Set([...selectedFileTypes].map(upper))
   const available = allAvailableFileTypes || []
   const availableUpper = new Set(available.map(upper))
@@ -56,7 +61,7 @@ export function getGroupNameIfFullySelected(selectedFileTypes, allAvailableFileT
       return group
     }
   }
-  const usedUpper = new Set()
+  const usedUpper = new Set<string>()
   GROUPS.forEach(({ types }) => types.forEach((t) => usedUpper.add(t)))
   const otherSet = new Set(available.map(upper).filter((t) => !usedUpper.has(t)))
   if (otherSet.size > 0 && otherSet.size === selectedUpper.size && [...otherSet].every((t) => selectedUpper.has(t))) {
@@ -69,21 +74,21 @@ export function getGroupNameIfFullySelected(selectedFileTypes, allAvailableFileT
 /**
  * If the selection is only full groups (no group has some but not all of its types selected), return the list of those group names for display (e.g. ["Images", "Text"]).
  * Used on desktop to show "Only Images, Text" instead of listing every child type.
- * @param {Set<string>} selectedFileTypes
- * @param {string[]} [allAvailableFileTypes]
- * @returns {string[] | null} Comma-delimited list of group names, or null if any group is partially selected
  */
-export function getFullySelectedGroupNames(selectedFileTypes, allAvailableFileTypes) {
+export function getFullySelectedGroupNames(
+  selectedFileTypes: Set<string> | undefined | null,
+  allAvailableFileTypes?: string[]
+): string[] | null {
   if (!selectedFileTypes || selectedFileTypes.size === 0) return null
-  const upper = (s) => (s || '').toUpperCase()
+  const upper = (s: string) => (s || '').toUpperCase()
   const selectedUpper = new Set([...selectedFileTypes].map(upper))
   const available = allAvailableFileTypes || []
   const availableUpper = new Set(available.map(upper))
-  const usedUpper = new Set()
+  const usedUpper = new Set<string>()
   GROUPS.forEach(({ types }) => types.forEach((t) => usedUpper.add(t)))
   const otherSet = new Set(available.map(upper).filter((t) => !usedUpper.has(t)))
-  const result = []
-  const unionSelected = new Set()
+  const result: string[] = []
+  const unionSelected = new Set<string>()
   for (const { group, types } of GROUPS) {
     const inDropdown = new Set(types.filter((t) => availableUpper.has(t)))
     if (inDropdown.size === 0) continue

@@ -1,13 +1,21 @@
 import { Fragment } from 'react'
+import type { DuplicateRow } from './types'
+
+interface DuplicateResultsViewProps {
+  rows?: DuplicateRow[]
+  sortBy?: string | null
+  sortDir?: 'asc' | 'desc'
+  onSortChange?: ((columnId: string, direction: 'asc' | 'desc') => void) | null
+}
 
 /**
  * Renders duplicate-finder results: each row has one primary item and N match rows (different style).
  * sortBy / sortDir / onSortChange: optional column sort (title, trove, score). Sorting uses primary row only.
  */
-export function DuplicateResultsView({ rows = [], sortBy = null, sortDir = 'asc', onSortChange }) {
-  const handleSort = (columnId) => {
+export function DuplicateResultsView({ rows = [], sortBy = null, sortDir = 'asc', onSortChange }: DuplicateResultsViewProps) {
+  const handleSort = (columnId: string) => {
     if (!onSortChange) return
-    const nextDir = sortBy === columnId && sortDir === 'asc' ? 'desc' : 'asc'
+    const nextDir = sortBy === columnId && sortDir === 'asc' ? 'desc' as const : 'asc' as const
     onSortChange(columnId, nextDir)
   }
 

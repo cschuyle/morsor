@@ -3,7 +3,7 @@ import AboutContent from './AboutContent'
 import { APP_VERSION } from './version'
 import './App.css'
 
-function About() {
+export default function About() {
   return (
     <>
       <svg className="about-viewport-border-svg" aria-hidden="true">
@@ -35,5 +35,3 @@ function About() {
     </>
   )
 }
-
-export default About

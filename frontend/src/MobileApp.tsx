@@ -1,3 +1,4 @@
+// @ts-nocheck - TODO: add explicit state/ref types (searchResult, troves, sort, abort refs, etc.)
 import { useState, useEffect, useLayoutEffect, useRef, useMemo } from 'react'
 import { Link, useSearchParams, useLocation } from 'react-router-dom'
 import { getApiAuthHeaders } from './apiAuth'

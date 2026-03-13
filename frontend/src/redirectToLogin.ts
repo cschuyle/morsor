@@ -1,4 +1,4 @@
-export function redirectToLogin() {
+export function redirectToLogin(): void {
   try {
     const { pathname, search, hash } = window.location
     const next = encodeURIComponent(`${pathname}${search}${hash}`)
@@ -7,4 +7,3 @@ export function redirectToLogin() {
     window.location.href = '/login'
   }
 }
-

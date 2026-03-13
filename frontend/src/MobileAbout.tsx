@@ -5,7 +5,7 @@ import { APP_VERSION } from './version'
 import './App.css'
 import './MobileApp.css'
 
-function MobileAbout() {
+export default function MobileAbout() {
   return (
     <div className="mobile-app">
       <svg className="about-viewport-border-svg" aria-hidden="true">
@@ -50,5 +50,3 @@ function MobileAbout() {
     </div>
   )
 }
-
-export default MobileAbout

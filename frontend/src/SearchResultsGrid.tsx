@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useCallback, useRef } from 'react'
+import { useState, useMemo, useEffect, useCallback, useRef, type MutableRefObject, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import {
   useReactTable,
@@ -6,17 +6,34 @@ import {
   getFilteredRowModel,
   flexRender,
 } from '@tanstack/react-table'
+import type { SearchResultRow, LightboxPayload } from './types'
 import './SearchResultsGrid.css'
+
+export interface SearchResultsGridProps {
+  data?: SearchResultRow[] | null
+  sortBy?: string | null
+  sortDir?: 'asc' | 'desc'
+  onSortChange?: ((columnId: string | null, direction: 'asc' | 'desc') => void) | null
+  showScoreColumn?: boolean
+  afterFilterSlot?: ReactNode
+  viewMode?: 'list' | 'gallery'
+  hideTroveInGallery?: boolean
+  hideTroveInList?: boolean
+  showPdfSashInGallery?: boolean
+  showGalleryDecorations?: boolean
+  allowThumbnailFallbackLightbox?: boolean
+  isMobile?: boolean
+}
 
 const AMAZON_PLACEHOLDER_THUMB = 'https://m.media-amazon.com/images/I/01RmK+J4pJL._SS135_.gif'
 
-function isPlaceholderThumb(url) {
+function isPlaceholderThumb(url: unknown): boolean {
   if (!url || !String(url).trim()) return false
   const u = String(url).trim()
   return u === AMAZON_PLACEHOLDER_THUMB || u.includes('/no_image')
 }
 
-function PopOutIcon({ className }) {
+function PopOutIcon({ className }: { className?: string }) {
   return (
     <svg className={className} xmlns="http://www.w3.org/2000/svg" viewBox="0 0 36 36" fill="currentColor" aria-hidden="true">
       <path d="M27,33H5a2,2,0,0,1-2-2V9A2,2,0,0,1,5,7H15V9H5V31H27V21h2V31A2,2,0,0,1,27,33Z" />
@@ -46,7 +63,7 @@ const textColumns = [
   },
 ]
 
-function getLightboxPayload(row) {
+function getLightboxPayload(row: SearchResultRow | undefined | null) {
   if (!row) return null
   const files = Array.isArray(row.files) ? row.files : []
   const pdfs = files.filter((u) => typeof u === 'string' && /\.pdf(\?|$)/i.test(u))
@@ -63,7 +80,7 @@ function getLightboxPayload(row) {
   return { imageUrl, pdfs, imageUrls, ebooks, videos, audios, otherFiles, itemUrl, rawSourceItem: row.rawSourceItem }
 }
 
-function getFileTypeTooltip(pdfs, imageUrls, ebooks, videos, audios, otherFiles, itemUrl, hasLargeImage) {
+function getFileTypeTooltip(pdfs: string[], imageUrls: string[], ebooks: string[], videos: string[], audios: string[], otherFiles: string[], itemUrl: string | null, hasLargeImage: boolean): string | null {
   const labels = new Set()
   if (itemUrl && hasLargeImage) labels.add('Link')
   if (pdfs.length > 0) labels.add('PDF')
@@ -95,7 +112,7 @@ function getFileTypeTooltip(pdfs, imageUrls, ebooks, videos, audios, otherFiles,
   return list.length > 0 ? `Media: ${list.join(', ')}` : null
 }
 
-function ThumbColumnHeader({ column }) {
+function ThumbColumnHeader({ column }: { column: { getIsSorted: () => false | 'asc' | 'desc' } }) {
   const sorted = column.getIsSorted()
   return (
     <span className="grid-thumb-header-icons">
@@ -105,7 +122,15 @@ function ThumbColumnHeader({ column }) {
   )
 }
 
-function thumbnailColumnDef(onThumbnailClick, allowThumbnailFallbackLightbox = false, isMobile = false, longPressTimerRef = null, longPressTriggeredRef = null, setRawSourceLightbox = null, hasThumbnails = true) {
+function thumbnailColumnDef(
+  onThumbnailClick: (payload: LightboxPayload) => void,
+  allowThumbnailFallbackLightbox = false,
+  isMobile = false,
+  longPressTimerRef: MutableRefObject<ReturnType<typeof setTimeout> | null> | null = null,
+  longPressTriggeredRef: MutableRefObject<boolean> | null = null,
+  setRawSourceLightbox: ((state: { title: string; rawSourceItem: string } | null) => void) | null = null,
+  hasThumbnails = true
+) {
   return {
     id: 'thumb',
     accessorKey: 'thumbnailUrl',
@@ -212,22 +237,22 @@ const scoreColumn = {
 const LONG_PRESS_MS = 500
 const RAW_SOURCE_NOT_AVAILABLE = 'Raw Source Not Available'
 
-function rawSourceDisplay(rawSourceItem) {
-  return (rawSourceItem != null && rawSourceItem !== '') ? rawSourceItem : RAW_SOURCE_NOT_AVAILABLE
+function rawSourceDisplay(rawSourceItem: unknown): string {
+  return (rawSourceItem != null && rawSourceItem !== '') ? String(rawSourceItem) : RAW_SOURCE_NOT_AVAILABLE
 }
 
-export function SearchResultsGrid({ data, sortBy = null, sortDir = 'asc', onSortChange, showScoreColumn = false, afterFilterSlot = null, viewMode = 'list', hideTroveInGallery = false, hideTroveInList = false, showPdfSashInGallery = false, showGalleryDecorations = true, allowThumbnailFallbackLightbox = false, isMobile = false }) {
+export function SearchResultsGrid({ data, sortBy = null, sortDir = 'asc', onSortChange, showScoreColumn = false, afterFilterSlot = null, viewMode = 'list', hideTroveInGallery = false, hideTroveInList = false, showPdfSashInGallery = false, showGalleryDecorations = true, allowThumbnailFallbackLightbox = false, isMobile = false }: SearchResultsGridProps) {
   const [globalFilter, setGlobalFilter] = useState('')
-  const [lightbox, setLightbox] = useState(null)
-  const [rawSourceLightbox, setRawSourceLightbox] = useState(null)
-  const galleryClickTimeoutRef = useRef(null)
-  const galleryLastClickRef = useRef({ rowId: null, time: 0 })
-  const tableRowLastClickRef = useRef({ rowId: null, time: 0 })
-  const longPressTimerRef = useRef(null)
+  const [lightbox, setLightbox] = useState<LightboxPayload | null>(null)
+  const [rawSourceLightbox, setRawSourceLightbox] = useState<{ title: string; rawSourceItem: string } | null>(null)
+  const galleryClickTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const galleryLastClickRef = useRef<{ rowId: string | number | null; time: number }>({ rowId: null, time: 0 })
+  const tableRowLastClickRef = useRef<{ rowId: string | number | null; time: number }>({ rowId: null, time: 0 })
+  const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const longPressTriggeredRef = useRef(false)
-  const [urlTooltipState, setUrlTooltipState] = useState(null)
-  const urlTooltipLeaveTimerRef = useRef(null)
-  const urlTooltipShowTimerRef = useRef(null)
+  const [urlTooltipState, setUrlTooltipState] = useState<{ startX: number; startY: number; endX: number; endY: number; above: boolean; url: string } | null>(null)
+  const urlTooltipLeaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const urlTooltipShowTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const closeLightbox = useCallback(() => setLightbox(null), [])
   const closeRawSourceLightbox = useCallback(() => setRawSourceLightbox(null), [])
@@ -302,7 +327,7 @@ export function SearchResultsGrid({ data, sortBy = null, sortDir = 'asc', onSort
 
   const columnSizeVars = useMemo(() => {
     const headers = table.getFlatHeaders()
-    const vars = {}
+    const vars: Record<string, string> = {}
     for (let i = 0; i < headers.length; i++) {
       const header = headers[i]
       vars[`--header-${header.id}-size`] = `${header.getSize()}px`
@@ -324,12 +349,12 @@ export function SearchResultsGrid({ data, sortBy = null, sortDir = 'asc', onSort
 
   const showGallery = viewMode === 'gallery'
   const [showBackToTop, setShowBackToTop] = useState(false)
-  const gridRef = useRef(null)
-  const [backToTopCenterX, setBackToTopCenterX] = useState(null)
-  const scrollContainerRef = useRef(null)
+  const gridRef = useRef<HTMLDivElement | null>(null)
+  const [backToTopCenterX, setBackToTopCenterX] = useState<number | null>(null)
+  const scrollContainerRef = useRef<HTMLElement | null>(null)
   useEffect(() => {
     const el = gridRef.current
-    const scrollContainer = el?.closest('.main') ?? null
+    const scrollContainer = (el?.closest('.main') ?? null) as HTMLElement | null
     scrollContainerRef.current = scrollContainer
     const threshold = 200
     const getScrollTop = () => (scrollContainer ? scrollContainer.scrollTop : window.scrollY)
@@ -365,10 +390,10 @@ export function SearchResultsGrid({ data, sortBy = null, sortDir = 'asc', onSort
         <div
           className={`search-results-gallery-url-tooltip search-results-gallery-url-tooltip--centered${urlTooltipState.above ? ' search-results-gallery-url-tooltip--above' : ' search-results-gallery-url-tooltip--below'}`}
           style={{
-            '--tooltip-start-x': `${urlTooltipState.startX}px`,
-            '--tooltip-start-y': `${urlTooltipState.startY}px`,
-            '--tooltip-end-x': `${urlTooltipState.endX}px`,
-            '--tooltip-end-y': `${urlTooltipState.endY}px`,
+            ['--tooltip-start-x' as string]: `${urlTooltipState.startX}px`,
+            ['--tooltip-start-y' as string]: `${urlTooltipState.startY}px`,
+            ['--tooltip-end-x' as string]: `${urlTooltipState.endX}px`,
+            ['--tooltip-end-y' as string]: `${urlTooltipState.endY}px`,
           }}
           onMouseEnter={() => {
             if (urlTooltipLeaveTimerRef.current) {
@@ -454,9 +479,9 @@ export function SearchResultsGrid({ data, sortBy = null, sortDir = 'asc', onSort
                     </a>
                   ))}
                 {Array.isArray(lightbox.pdfs) &&
-                  lightbox.pdfs.map((url, idx) => (
+                  (lightbox.pdfs ?? []).map((url, idx) => (
                     <a key={url} href={url} target="_blank" rel="noopener noreferrer" className="search-thumb-file-link">
-                      {lightbox.pdfs.length > 1 ? `PDF ${idx + 1}` : 'PDF'}
+                      {(lightbox.pdfs?.length ?? 0) > 1 ? `PDF ${idx + 1}` : 'PDF'}
                     </a>
                   ))}
                 {Array.isArray(lightbox.ebooks) &&
@@ -506,7 +531,7 @@ export function SearchResultsGrid({ data, sortBy = null, sortDir = 'asc', onSort
                     onClick={(e) => {
                       e.stopPropagation()
                       closeLightbox()
-                      setRawSourceLightbox({ title: lightbox.title, rawSourceItem: rawSourceDisplay(lightbox.rawSourceItem) })
+                      setRawSourceLightbox({ title: lightbox.title ?? '', rawSourceItem: rawSourceDisplay(lightbox.rawSourceItem) })
                     }}
                     aria-label="View raw source"
                   >
@@ -722,7 +747,7 @@ export function SearchResultsGrid({ data, sortBy = null, sortDir = 'asc', onSort
                   }
 
                   setUrlTooltipState({
-                    url: payload.itemUrl,
+                    url: payload.itemUrl ?? '',
                     startX,
                     startY,
                     endX: clampedEndX,
@@ -766,7 +791,7 @@ export function SearchResultsGrid({ data, sortBy = null, sortDir = 'asc', onSort
                           galleryClickTimeoutRef.current = null
                         }
                         setLightbox(null)
-                        setRawSourceLightbox({ title, rawSourceItem: rawSourceDisplay(rawSourceItem) })
+                        setRawSourceLightbox({ title: title ?? '', rawSourceItem: rawSourceDisplay(rawSourceItem) })
                         return
                       }
 
@@ -813,12 +838,12 @@ export function SearchResultsGrid({ data, sortBy = null, sortDir = 'asc', onSort
                   >
                   <span className="search-results-gallery-card-image">
                     {hasImage ? (
-                      <img src={thumbUrl} alt="" loading="lazy" />
+                      <img src={typeof thumbUrl === 'string' ? thumbUrl : ''} alt="" loading="lazy" />
                     ) : showLinkIcon ? (
                       galleryLinkIcon
                     ) : (
                       <span className="search-results-gallery-card-placeholder" aria-hidden="true">
-                        {title ? title.charAt(0).toUpperCase() : '?'}
+                        {typeof title === 'string' && title ? title.charAt(0).toUpperCase() : '?'}
                       </span>
                     )}
                     {showGalleryDecorations && showPdfSashInGallery && hasPdf && (
@@ -923,10 +948,7 @@ export function SearchResultsGrid({ data, sortBy = null, sortDir = 'asc', onSort
                       {flexRender(header.column.columnDef.header, header.getContext())}
                       {header.column.id !== 'thumb' && (
                         <span className="sort-indicator">
-                          {{
-                            asc: ' ↑',
-                            desc: ' ↓',
-                          }[header.column.getIsSorted()] ?? ''}
+                          {({ asc: ' ↑', desc: ' ↓' } as Record<string, string>)[String(header.column.getIsSorted())] ?? ''}
                         </span>
                       )}
                     </span>
@@ -1019,7 +1041,7 @@ export function SearchResultsGrid({ data, sortBy = null, sortDir = 'asc', onSort
           style={backToTopCenterX != null ? { left: backToTopCenterX } : undefined}
           onClick={() => {
             const sc = scrollContainerRef.current
-            if (sc) sc.scrollTo({ top: 0, behavior: 'smooth' })
+            if (sc && 'scrollTo' in sc) sc.scrollTo({ top: 0, behavior: 'smooth' })
             else window.scrollTo({ top: 0, behavior: 'smooth' })
           }}
           aria-label="Back to top"

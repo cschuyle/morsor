@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, FormEvent } from 'react'
 import { getCsrfToken } from './getCsrfToken'
 import './Login.css'
 
@@ -8,7 +8,7 @@ export default function Login() {
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [redirectTo, setRedirectTo] = useState(() => `${window.location.origin}/`)
-  const formRef = useRef(null)
+  const formRef = useRef<HTMLFormElement>(null)
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
@@ -29,7 +29,7 @@ export default function Login() {
     }
   }, [])
 
-  function handleSubmit(e) {
+  function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault()
     setSubmitting(true)
     setError('')
@@ -37,8 +37,8 @@ export default function Login() {
     let pass = password ?? ''
     // Safari/Firefox often don't fire onChange for password-manager autofill; read from DOM as fallback
     if ((!user || !pass) && formRef.current) {
-      const unInput = formRef.current.querySelector('[name=username]')
-      const pwInput = formRef.current.querySelector('[name=password]')
+      const unInput = formRef.current.querySelector<HTMLInputElement>('[name=username]')
+      const pwInput = formRef.current.querySelector<HTMLInputElement>('[name=password]')
       if (unInput && pwInput) {
         if (!user) user = (unInput.value ?? '').trim()
         if (!pass) pass = pwInput.value ?? ''
@@ -48,10 +48,10 @@ export default function Login() {
       setSubmitting(false)
       return
     }
-    const attemptLogin = () => {
+    const attemptLogin = (): Promise<Response> => {
       const csrf = getCsrfToken()
       const body = new URLSearchParams({ username: user, password: pass })
-      const headers = { 'Content-Type': 'application/x-www-form-urlencoded' }
+      const headers: Record<string, string> = { 'Content-Type': 'application/x-www-form-urlencoded' }
       if (csrf) headers['X-XSRF-TOKEN'] = csrf
       return fetch('/login', {
         method: 'POST',
@@ -68,12 +68,11 @@ export default function Login() {
           window.location.href = redirectTo
           return
         }
-        // If unauthorized/forbidden, refresh CSRF/session once and retry
         if (res.status === 401 || res.status === 403) {
           try {
             await fetch('/api/status', { credentials: 'include' })
           } catch {
-            // ignore, we'll still retry once
+            // ignore
           }
           const retry = await attemptLogin()
           if (retry.type === 'opaqueredirect' || retry.status === 302 || retry.status === 200) {

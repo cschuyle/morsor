@@ -1,3 +1,4 @@
+// @ts-nocheck - TODO: add explicit state/ref types (searchResult, troves, sort, abort refs, etc.)
 import { useMemo, useState, useEffect, useRef } from 'react'
 import { Link, useSearchParams, useLocation } from 'react-router-dom'
 import { SearchResultsGrid } from './SearchResultsGrid'

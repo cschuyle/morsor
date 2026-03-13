@@ -1,25 +1,33 @@
 import { useState, useEffect } from 'react'
+import type { UniqueResultRow, SearchResultRow } from './types'
+
+interface UniquesResultsViewProps {
+  results?: UniqueResultRow[]
+  sortBy?: string | null
+  sortDir?: 'asc' | 'desc'
+  onSortChange?: ((columnId: string, direction: 'asc' | 'desc') => void) | null
+}
 
 /**
  * Renders "find uniques" results: items in primary trove that have no match in compare troves.
  * Each result has item (SearchResult), score (nearest-miss), and nearMisses (top possible duplicates).
  * sortBy / sortDir / onSortChange: optional column sort (title, trove, score).
  */
-export function UniquesResultsView({ results = [], sortBy = null, sortDir = 'asc', onSortChange }) {
-  const [dialogRow, setDialogRow] = useState(null)
+export function UniquesResultsView({ results = [], sortBy = null, sortDir = 'asc', onSortChange }: UniquesResultsViewProps) {
+  const [dialogRow, setDialogRow] = useState<number | null>(null)
 
   useEffect(() => {
     if (dialogRow == null) return
-    const onKeyDown = (e) => {
+    const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') setDialogRow(null)
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [dialogRow])
 
-  const handleSort = (columnId) => {
+  const handleSort = (columnId: string) => {
     if (!onSortChange) return
-    const nextDir = sortBy === columnId && sortDir === 'asc' ? 'desc' : 'asc'
+    const nextDir = sortBy === columnId && sortDir === 'asc' ? 'desc' as const : 'asc' as const
     onSortChange(columnId, nextDir)
   }
 
@@ -30,7 +38,8 @@ export function UniquesResultsView({ results = [], sortBy = null, sortDir = 'asc
   }
 
   const nearMisses = dialogRow != null ? (results[dialogRow]?.nearMisses ?? []) : []
-  const primaryTitle = dialogRow != null ? (results[dialogRow]?.item ?? results[dialogRow])?.title : ''
+  const primaryItem = dialogRow != null ? (results[dialogRow]?.item ?? results[dialogRow]) as SearchResultRow | undefined : undefined
+  const primaryTitle = primaryItem?.title ?? ''
 
   return (
     <div className="duplicate-results uniques-results">
@@ -63,7 +72,7 @@ export function UniquesResultsView({ results = [], sortBy = null, sortDir = 'asc
         </thead>
         <tbody>
           {results.map((row, idx) => {
-            const item = row?.item ?? row
+            const item = (row?.item ?? row) as SearchResultRow | undefined
             const score = typeof row?.score === 'number' ? row.score : null
             return (
               <tr key={idx} className="duplicate-row-primary">
@@ -86,7 +95,6 @@ export function UniquesResultsView({ results = [], sortBy = null, sortDir = 'asc
           })}
         </tbody>
       </table>
-
       {dialogRow != null && (
         <div className="uniques-dialog-backdrop" onClick={() => setDialogRow(null)}>
           <div className="uniques-dialog" role="dialog" aria-modal="true" aria-labelledby="uniques-dialog-title" onClick={(e) => e.stopPropagation()}>
@@ -104,7 +112,7 @@ export function UniquesResultsView({ results = [], sortBy = null, sortDir = 'asc
             {primaryTitle && <p className="uniques-dialog-primary">For: {primaryTitle}</p>}
             <ul className="uniques-dialog-list">
               {nearMisses.map((m, i) => {
-                const r = m?.result ?? m
+                const r = (m?.result ?? m) as SearchResultRow | undefined
                 const s = typeof m?.score === 'number' ? m.score : null
                 return (
                   <li key={i} className="uniques-dialog-item">

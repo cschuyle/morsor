@@ -2,14 +2,14 @@ import { StrictMode, useState, useEffect } from 'react'
 import { createRoot } from 'react-dom/client'
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import './index.css'
-import App from './App.jsx'
-import About from './About.jsx'
-import MobileApp from './MobileApp.jsx'
-import MobileAbout from './MobileAbout.jsx'
-import Login from './Login.jsx'
-import { RequireAuth } from './RequireAuth.jsx'
+import App from './App'
+import About from './About'
+import MobileApp from './MobileApp'
+import MobileAbout from './MobileAbout'
+import Login from './Login'
+import { RequireAuth } from './RequireAuth'
 
-function isMobileDevice() {
+function isMobileDevice(): boolean {
   if (typeof navigator === 'undefined' || typeof window === 'undefined') return false
   return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ||
     (window.innerWidth > 0 && window.innerWidth < 768)
@@ -17,7 +17,7 @@ function isMobileDevice() {
 
 const PREFER_DESKTOP_KEY = 'morsorPreferDesktop'
 
-function getPreferDesktop() {
+function getPreferDesktop(): boolean {
   try {
     return sessionStorage.getItem(PREFER_DESKTOP_KEY) === 'true'
   } catch {
@@ -27,7 +27,7 @@ function getPreferDesktop() {
 
 function RootOrRedirect() {
   const location = useLocation()
-  const [mobile, setMobile] = useState(null)
+  const [mobile, setMobile] = useState<boolean | null>(null)
   const [preferDesktop, setPreferDesktop] = useState(getPreferDesktop)
   useEffect(() => {
     setMobile(isMobileDevice())
@@ -38,7 +38,7 @@ function RootOrRedirect() {
   return <App />
 }
 
-createRoot(document.getElementById('root')).render(
+createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <BrowserRouter>
       <Routes>

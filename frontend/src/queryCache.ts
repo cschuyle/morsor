@@ -4,9 +4,15 @@
  * TTL 5 minutes.
  */
 const TTL_MS = 5 * 60 * 1000
-const cache = new Map()
 
-function get(key) {
+interface CacheEntry {
+  data: unknown
+  at: number
+}
+
+const cache = new Map<string, CacheEntry>()
+
+function get(key: string): unknown {
   const entry = cache.get(key)
   if (!entry) return null
   if (Date.now() - entry.at > TTL_MS) {
@@ -16,7 +22,7 @@ function get(key) {
   return entry.data
 }
 
-function set(key, data) {
+function set(key: string, data: unknown): void {
   cache.set(key, { data, at: Date.now() })
 }
 
