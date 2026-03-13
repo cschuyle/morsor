@@ -474,7 +474,7 @@
 .search-results-gallery-url-tooltip--centered {
   position: fixed;
   max-width: min(66.67cqw, 66.67vw);
-  animation-duration: 0.5s;
+  animation-duration: 0.25s;
   animation-timing-function: ease-out;
   animation-fill-mode: forwards;
 }

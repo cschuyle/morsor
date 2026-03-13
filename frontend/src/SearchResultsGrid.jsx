@@ -352,7 +352,7 @@ export function SearchResultsGrid({ data, sortBy = null, sortDir = 'asc', onSort
     <div className="search-results-grid" ref={gridRef}>
       {urlTooltipState && showGallery && (
         <div
-          className={`search-results-gallery-url-tooltip search-results-gallery-url-tooltip--centered${urlTooltipState.above ? ' search-results-gallery-url-tooltip--above' : ' search-results-gallery-url-tooltip--below'}${isMobile ? ' search-results-gallery-url-tooltip--mobile' : ''}`}
+          className={`search-results-gallery-url-tooltip search-results-gallery-url-tooltip--centered${urlTooltipState.above ? ' search-results-gallery-url-tooltip--above' : ' search-results-gallery-url-tooltip--below'}`}
           style={{
             '--tooltip-start-x': `${urlTooltipState.startX}px`,
             '--tooltip-start-y': `${urlTooltipState.startY}px`,
@@ -581,6 +581,7 @@ export function SearchResultsGrid({ data, sortBy = null, sortDir = 'asc', onSort
                   const startY = cardRect.top + cardRect.height / 2
 
                   const gridEl = gridRef.current
+                  const tooltipApproxHalfHeight = 24
                   let clampedEndX = startX
                   let endY
                   let above
@@ -599,32 +600,46 @@ export function SearchResultsGrid({ data, sortBy = null, sortDir = 'asc', onSort
                     }
 
                     if (isMobile) {
-                      const gap = 40
-                      const preferredAboveY = cardRect.top - gap
+                      const margin = 6
+                      const preferredAboveCenterY = cardRect.top - tooltipApproxHalfHeight - margin
+                      const tooltipTopIfAbove = preferredAboveCenterY - tooltipApproxHalfHeight
                       const controlsBottom = gridRect.top + 8
                       const viewportTopMargin = 8
-                      const canPlaceAbove = preferredAboveY > Math.max(controlsBottom, viewportTopMargin)
+                      const canPlaceAbove = tooltipTopIfAbove > Math.max(controlsBottom, viewportTopMargin)
                       if (canPlaceAbove) {
-                        endY = preferredAboveY
+                        endY = preferredAboveCenterY
                         above = true
                       } else {
-                        endY = cardRect.bottom + gap
+                        const preferredBelowCenterY = cardRect.bottom + tooltipApproxHalfHeight + margin
+                        endY = preferredBelowCenterY
                         above = false
                       }
                     } else {
                       const spaceAbove = cardRect.top - gridRect.top
                       const showAbove = spaceAbove > 120
-                      const gap = 40
-                      endY = showAbove ? (cardRect.top - gap) : (cardRect.bottom + gap)
+                      const margin = 6
+                      if (showAbove) {
+                        endY = cardRect.top - tooltipApproxHalfHeight - margin
+                      } else {
+                        endY = cardRect.bottom + tooltipApproxHalfHeight + margin
+                      }
                       above = showAbove
                     }
                   } else {
                     // Fallback if gridRef is missing
                     const viewportTopMargin = 8
-                    const preferredAboveY = cardRect.top - 8
-                    const canPlaceAbove = preferredAboveY > viewportTopMargin
-                    endY = canPlaceAbove ? preferredAboveY : (cardRect.bottom + 8)
-                    above = canPlaceAbove
+                    const margin = 6
+                    const preferredAboveCenterY = cardRect.top - tooltipApproxHalfHeight - margin
+                    const tooltipTopIfAbove = preferredAboveCenterY - tooltipApproxHalfHeight
+                    const canPlaceAbove = tooltipTopIfAbove > viewportTopMargin
+                    if (canPlaceAbove) {
+                      endY = preferredAboveCenterY
+                      above = true
+                    } else {
+                      const preferredBelowCenterY = cardRect.bottom + tooltipApproxHalfHeight + margin
+                      endY = preferredBelowCenterY
+                      above = false
+                    }
                   }
 
                   setUrlTooltipState({
