@@ -1,7 +1,22 @@
 set -e
 
-if [ -n "$(git status --porcelain)" ]; then
-  echo "Error: there are uncommitted changes. Commit or stash them before deploying." >&2
+usage() {
+  echo "Usage: $0 [-h|--help] [-f|--force]
+    --force allow uncommitted changes to be deployed" >&2
+}
+
+force=false
+while [ $# -gt 0 ]; do
+  case "$1" in
+    -h|--help) usage; exit 0 ;;
+    -f|--force) force=true ;;
+    *) usage; exit 1 ;;
+  esac
+  shift
+done
+
+if [ "$force" != true ] && [ -n "$(git status --porcelain)" ]; then
+  echo "Error: there are uncommitted changes. Commit or stash them before deploying, or use -f to force." >&2
   exit 1
 fi
 
@@ -22,20 +37,20 @@ echo "Using MOOCHO_VERSION=${MOOCHO_VERSION}"
 # Note: MOOCHO_ARCHITECTURE for cloud is probably linux/amd64
 if [ -n "${MOOCHO_ARCHITECTURE}" ]; then
   echo "Building for architecture: ${MOOCHO_ARCHITECTURE}"
-  docker build --platform "${MOOCHO_ARCHITECTURE}" \
+  (set -x && docker build --platform "${MOOCHO_ARCHITECTURE}" \
     --build-arg MOOCHO_VERSION="${MOOCHO_VERSION}" \
     -t morsor \
     -t "${MOOCHO_REGISTRY}:${MOOCHO_VERSION}" \
     -t "${MOOCHO_REGISTRY}:latest" \
-    . || true
+    .)
 else
   echo "Building for host architecture"
-  docker build \
+  (set -x && docker build \
     --build-arg MOOCHO_VERSION="${MOOCHO_VERSION}" \
     -t morsor \
     -t "${MOOCHO_REGISTRY}:${MOOCHO_VERSION}" \
     -t "${MOOCHO_REGISTRY}:latest" \
-    . || true
+    .)
 fi
 docker push "${MOOCHO_REGISTRY}:${MOOCHO_VERSION}"
 docker push "${MOOCHO_REGISTRY}:latest"
