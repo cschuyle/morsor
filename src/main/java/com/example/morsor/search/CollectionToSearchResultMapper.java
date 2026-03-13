@@ -65,7 +65,7 @@ public final class CollectionToSearchResultMapper {
         int index = 0;
         for (JsonNode itemWrapper : items) {
             if (!itemWrapper.isObject()) continue;
-            String rawSourceItem = toRawSourceJson(itemWrapper);
+            String rawSourceItem = toRawSourceItem(itemWrapper);
             JsonNode item = unwrapItem(itemWrapper);
             if (item == null) continue;
             SearchResult r = mapItemToSearchResult(item, rawSourceItem, troveName, troveId, index);
@@ -81,7 +81,7 @@ public final class CollectionToSearchResultMapper {
         for (int i = 0; i < titlesArray.size(); i++) {
             JsonNode titleNode = titlesArray.get(i);
             String title = titleNode != null && titleNode.isTextual() ? titleNode.asText() : (titleNode != null ? titleNode.toString() : "");
-            String rawSourceItem = titleNode != null && titleNode.isObject() ? toRawSourceJson(titleNode) : title;
+            String rawSourceItem = toRawSourceItem(titleNode);
             String id = troveId != null && !troveId.isEmpty() ? troveId + "-" + i : "trove-" + i;
             out.add(new SearchResult(id, title, title, troveName, troveId, false, null, null, List.of(), null, null, rawSourceItem));
         }
@@ -99,11 +99,18 @@ public final class CollectionToSearchResultMapper {
         return value;
     }
 
-    private static String toRawSourceJson(JsonNode node) {
+    /**
+     * Serialize the node to a string for rawSourceItem. Uses pretty-printed JSON for objects/arrays
+     * so all fields are included. For primitives (string, number, etc.) returns the value.
+     * Never returns null.
+     */
+    private static String toRawSourceItem(JsonNode node) {
+        if (node == null || node.isNull()) return "";
+        if (node.isTextual()) return node.asText();
         try {
             return PRETTY_MAPPER.writeValueAsString(node);
         } catch (JsonProcessingException e) {
-            return node != null ? node.toString() : "";
+            return node.toString();
         }
     }
 

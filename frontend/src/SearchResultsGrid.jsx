@@ -162,14 +162,22 @@ const scoreColumn = {
 export function SearchResultsGrid({ data, sortBy = null, sortDir = 'asc', onSortChange, showScoreColumn = false, afterFilterSlot = null, viewMode = 'list', hideTroveInGallery = false, showPdfSashInGallery = false, showGalleryDecorations = true, allowThumbnailFallbackLightbox = false }) {
   const [globalFilter, setGlobalFilter] = useState('')
   const [lightbox, setLightbox] = useState(null)
+  const [rawSourceLightbox, setRawSourceLightbox] = useState(null)
+  const galleryClickTimeoutRef = useRef(null)
 
   const closeLightbox = useCallback(() => setLightbox(null), [])
+  const closeRawSourceLightbox = useCallback(() => setRawSourceLightbox(null), [])
   useEffect(() => {
-    if (!lightbox) return
-    const onKey = (e) => { if (e.key === 'Escape') closeLightbox() }
+    const active = lightbox || rawSourceLightbox
+    if (!active) return
+    const onKey = (e) => { if (e.key === 'Escape') { closeLightbox(); closeRawSourceLightbox() } }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [lightbox, closeLightbox])
+  }, [lightbox, rawSourceLightbox, closeLightbox, closeRawSourceLightbox])
+
+  useEffect(() => () => {
+    if (galleryClickTimeoutRef.current) clearTimeout(galleryClickTimeoutRef.current)
+  }, [])
 
   const hasThumbnails = useMemo(
     () => Array.isArray(data) && data.some((row) => row && row.itemType === 'littlePrinceItem' && (row.thumbnailUrl || (row.itemUrl && String(row.itemUrl).trim()))),
@@ -266,6 +274,25 @@ export function SearchResultsGrid({ data, sortBy = null, sortDir = 'asc', onSort
 
   return (
     <div className="search-results-grid" ref={gridRef}>
+      {rawSourceLightbox && (
+        <div
+          className="search-raw-source-lightbox"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Raw source"
+          onClick={closeRawSourceLightbox}
+        >
+          <button type="button" className="search-thumb-lightbox-close" onClick={closeRawSourceLightbox} aria-label="Close">×</button>
+          <div className="search-raw-source-lightbox-content" onClick={(e) => e.stopPropagation()}>
+            {rawSourceLightbox.title && (
+              <div className="search-thumb-lightbox-title">
+                {rawSourceLightbox.title}
+              </div>
+            )}
+            <pre className="search-raw-source-lightbox-pre">{rawSourceLightbox.rawSourceItem ?? ''}</pre>
+          </div>
+        </div>
+      )}
       {lightbox && (
         <div
           className={`search-thumb-lightbox${lightbox?.isFallbackThumbnail ? ' search-thumb-lightbox--thumb-fallback' : ''}`}
@@ -403,6 +430,8 @@ export function SearchResultsGrid({ data, sortBy = null, sortDir = 'asc', onSort
                   <PopOutIcon className="search-results-gallery-card-link-icon-img" />
                 </span>
               )
+              const rawSourceItem = row?.rawSourceItem
+              const canShowRawSource = rawSourceItem != null && rawSourceItem !== ''
               return (
                 <button
                   key={row.id ?? idx}
@@ -410,15 +439,33 @@ export function SearchResultsGrid({ data, sortBy = null, sortDir = 'asc', onSort
                   className={`search-results-gallery-card${hideTroveInGallery ? ' search-results-gallery-card--title-wraps' : ''}`}
                   onClick={() => {
                     if (!payload) return
+                    if (galleryClickTimeoutRef.current) {
+                      clearTimeout(galleryClickTimeoutRef.current)
+                      galleryClickTimeoutRef.current = null
+                    }
                     const next = { ...payload, title }
                     if (next.itemUrl && !next.imageUrl) {
                       window.open(next.itemUrl, '_blank', 'noopener,noreferrer')
                       return
                     }
-                    setLightbox(next)
+                    galleryClickTimeoutRef.current = setTimeout(() => {
+                      galleryClickTimeoutRef.current = null
+                      setLightbox(next)
+                    }, 250)
                   }}
-                  disabled={!payload}
-                  title={payload ? 'View full size' : title}
+                  onDoubleClick={(e) => {
+                    e.preventDefault()
+                    if (galleryClickTimeoutRef.current) {
+                      clearTimeout(galleryClickTimeoutRef.current)
+                      galleryClickTimeoutRef.current = null
+                    }
+                    if (canShowRawSource) {
+                      setLightbox(null)
+                      setRawSourceLightbox({ title, rawSourceItem })
+                    }
+                  }}
+                  disabled={!payload && !canShowRawSource}
+                  title={payload ? 'View full size (double-click for raw source)' : (canShowRawSource ? 'Double-click for raw source' : title)}
                 >
                   <span className="search-results-gallery-card-image">
                     {hasImage ? (
@@ -495,15 +542,28 @@ export function SearchResultsGrid({ data, sortBy = null, sortDir = 'asc', onSort
                 </td>
               </tr>
             ) : (
-              table.getRowModel().rows.map((row) => (
-                <tr key={row.id}>
-                  {row.getVisibleCells().map((cell) => (
-                    <td key={cell.id} className={`col-${cell.column.id}`}>
-                      {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                    </td>
-                  ))}
-                </tr>
-              ))
+              table.getRowModel().rows.map((row) => {
+                const rowData = row.original
+                const rawSourceItem = rowData?.rawSourceItem
+                return (
+                  <tr
+                    key={row.id}
+                    className={rawSourceItem ? 'grid-row-double-clickable' : ''}
+                    title={rawSourceItem ? 'Double-click for raw source' : undefined}
+                    onDoubleClick={() => {
+                      if (rawSourceItem != null && rawSourceItem !== '') {
+                        setRawSourceLightbox({ title: rowData?.title ?? '', rawSourceItem })
+                      }
+                    }}
+                  >
+                    {row.getVisibleCells().map((cell) => (
+                      <td key={cell.id} className={`col-${cell.column.id}`}>
+                        {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                      </td>
+                    ))}
+                  </tr>
+                )
+              })
             )}
           </tbody>
         </table>
