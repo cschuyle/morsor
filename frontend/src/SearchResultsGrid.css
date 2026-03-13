@@ -47,16 +47,48 @@
   flex-wrap: wrap;
 }
 
-.grid-filter-input {
-  width: 100%;
+.grid-filter-wrap {
+  position: relative;
+  flex: 1;
+  min-width: 0;
   max-width: 20rem;
   flex-shrink: 0;
-  padding: 0.5rem 0.75rem;
+}
+
+.grid-filter-input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 0.5rem 2.25rem 0.5rem 0.75rem;
   border: 1px solid #ddd;
   border-radius: 6px;
   background: #ffffff;
   color: #213547;
   font-size: 0.95rem;
+}
+
+.grid-filter-clear {
+  position: absolute;
+  top: 50%;
+  right: 0.25rem;
+  transform: translateY(-50%);
+  width: 1.75rem;
+  height: 1.75rem;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.1rem;
+  line-height: 1;
+  border: none;
+  background: transparent;
+  color: #666;
+  cursor: pointer;
+  border-radius: 4px;
+}
+
+.grid-filter-clear:hover {
+  background: #e0e0ff;
+  color: #333;
 }
 
 .grid-filter-input::placeholder {

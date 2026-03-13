@@ -1646,10 +1646,11 @@
   margin-top: 0.35rem !important;
 }
 
-.mobile-search-results-grid .grid-filter-input {
-  flex: 1;
-  min-width: 0;
+.mobile-search-results-grid .grid-filter-wrap {
   max-width: none;
+}
+
+.mobile-search-results-grid .grid-filter-input {
   color: #252525;
 }
 
