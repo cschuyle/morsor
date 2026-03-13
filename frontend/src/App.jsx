@@ -851,17 +851,16 @@ function App() {
                             className="sidebar-trove-filter-input primary-trove-filter-input"
                             aria-label="Filter primary troves by name"
                           />
-                          <span className="search-query-actions">
+                          {primaryTroveFilter && (
                             <button
                               type="button"
-                              className="search-query-btn search-query-btn-clear"
-                              title="Clear filter"
+                              className="sidebar-trove-filter-clear"
                               onClick={() => setPrimaryTroveFilter('')}
                               aria-label="Clear filter"
                             >
                               ×
                             </button>
-                          </span>
+                          )}
                         </div>
                         <ul className="trove-list primary-trove-list" aria-label="Primary trove options">
                           {primarySelectedTrove && (
@@ -961,17 +960,16 @@ aria-label="Clear compare troves"
                           className="sidebar-trove-filter-input"
                           aria-label="Filter compare troves by name"
                         />
-                        <span className="search-query-actions">
+                        {troveFilter && (
                           <button
                             type="button"
-                            className="search-query-btn search-query-btn-clear"
-                            title="Clear filter"
+                            className="sidebar-trove-filter-clear"
                             onClick={() => setTroveFilter('')}
                             aria-label="Clear filter"
                           >
                             ×
                           </button>
-                        </span>
+                        )}
                       </div>
                       <ul className="trove-list">
                         {selectedTroves.map((t) => (
@@ -1064,17 +1062,16 @@ aria-label="Clear compare troves"
               className="sidebar-trove-filter-input"
               aria-label={searchMode === 'duplicates' ? 'Filter compare troves by name' : 'Filter troves by name'}
             />
-            <span className="search-query-actions">
+            {troveFilter && (
               <button
                 type="button"
-                className="search-query-btn search-query-btn-clear"
-                title="Clear filter"
+                className="sidebar-trove-filter-clear"
                 onClick={() => setTroveFilter('')}
                 aria-label="Clear trove filter"
               >
                 ×
               </button>
-            </span>
+            )}
           </div>
           <ul className="trove-list">
             {selectedTroves.map((t) => (
@@ -1245,15 +1242,34 @@ aria-label="Clear compare troves"
             <form onSubmit={handleSearch} className="search-form">
               <div className="search-form-row">
                 <div className="search-query-wrap">
-                  <input
-                    type="text"
-                    value={query}
-                    onChange={(e) => { setQuery(e.target.value); setFreezeTroveListOrder(false) }}
-                    onKeyDown={(e) => { if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); setQuery(''); queryRef.current = ''; setSearchResult({ count: 0, results: [], page: 0, size: pageSize }) } }}
-                    placeholder="e.g. Greek, Prince, Albanian, Alien — or * for all"
-                    className="search-query-input"
-                    aria-label="Query"
-                  />
+                  <div className="search-query-input-wrap">
+                    <input
+                      type="text"
+                      value={query}
+                      onChange={(e) => { setQuery(e.target.value); setFreezeTroveListOrder(false) }}
+                      onKeyDown={(e) => { if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); setQuery(''); queryRef.current = ''; setSearchResult({ count: 0, results: [], page: 0, size: pageSize }) } }}
+                      placeholder="e.g. Greek, Prince, Albanian, Alien — or * for all"
+                      className="search-query-input"
+                      aria-label="Query"
+                    />
+                    {query && (
+                      <button
+                        type="button"
+                        className="search-query-clear"
+                        onClick={() => {
+                          setQuery('')
+                          queryRef.current = ''
+                          setFreezeTroveListOrder(false)
+                          setSearchResult({ count: 0, results: [], page: 0, size: pageSize })
+                          setDuplicatesResult(null)
+                          setUniquesResult(null)
+                        }}
+                        aria-label="Clear query"
+                      >
+                        ×
+                      </button>
+                    )}
+                  </div>
                   <span className="search-query-actions">
                     <button
                       type="button"
@@ -1279,20 +1295,6 @@ aria-label="Clear compare troves"
                       }}
                     >
                       <span className="search-query-asterisk" aria-hidden="true">*</span>
-                    </button>
-                    <button
-                      type="button"
-                      className="search-query-btn search-query-btn-clear"
-                      title="Clear"
-                      onClick={() => {
-                        setQuery('')
-                        setFreezeTroveListOrder(false)
-                        setSearchResult({ count: 0, results: [], page: 0, size: pageSize })
-                        setDuplicatesResult(null)
-                        setUniquesResult(null)
-                      }}
-                    >
-                      ×
                     </button>
                   </span>
                 </div>
