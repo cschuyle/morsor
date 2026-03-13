@@ -1773,6 +1773,7 @@ onClick={() => {
                   viewMode={effectiveSearchResultsViewMode}
                   afterFilterSlot={mobileGallerySortAfterFilterSlot}
                   hideTroveInGallery={selectedTroveIds.size === 1}
+                  hideTroveInList={selectedTroveIds.size === 1}
                   showPdfSashInGallery
                   showGalleryDecorations={galleryDecorate}
                   allowThumbnailFallbackLightbox

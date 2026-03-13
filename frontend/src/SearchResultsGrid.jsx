@@ -192,7 +192,7 @@ function rawSourceDisplay(rawSourceItem) {
   return (rawSourceItem != null && rawSourceItem !== '') ? rawSourceItem : RAW_SOURCE_NOT_AVAILABLE
 }
 
-export function SearchResultsGrid({ data, sortBy = null, sortDir = 'asc', onSortChange, showScoreColumn = false, afterFilterSlot = null, viewMode = 'list', hideTroveInGallery = false, showPdfSashInGallery = false, showGalleryDecorations = true, allowThumbnailFallbackLightbox = false, isMobile = false }) {
+export function SearchResultsGrid({ data, sortBy = null, sortDir = 'asc', onSortChange, showScoreColumn = false, afterFilterSlot = null, viewMode = 'list', hideTroveInGallery = false, hideTroveInList = false, showPdfSashInGallery = false, showGalleryDecorations = true, allowThumbnailFallbackLightbox = false, isMobile = false }) {
   const [globalFilter, setGlobalFilter] = useState('')
   const [lightbox, setLightbox] = useState(null)
   const [rawSourceLightbox, setRawSourceLightbox] = useState(null)
@@ -221,6 +221,10 @@ export function SearchResultsGrid({ data, sortBy = null, sortDir = 'asc', onSort
     () => Array.isArray(data) && data.some((row) => row && row.itemType === 'littlePrinceItem' && (row.thumbnailUrl || (row.itemUrl && String(row.itemUrl).trim()))),
     [data]
   )
+  const listTextColumns = useMemo(
+    () => (hideTroveInList ? textColumns.filter((c) => c.id !== 'trove') : textColumns),
+    [hideTroveInList]
+  )
   const baseColumns = useMemo(
     () => (hasThumbnails ? [thumbnailColumnDef((payload) => {
       if (longPressTriggeredRef.current) {
@@ -232,8 +236,8 @@ export function SearchResultsGrid({ data, sortBy = null, sortDir = 'asc', onSort
         return
       }
       setLightbox(payload)
-    }, allowThumbnailFallbackLightbox, isMobile, longPressTimerRef, longPressTriggeredRef, setRawSourceLightbox), ...textColumns] : textColumns),
-    [hasThumbnails, allowThumbnailFallbackLightbox, isMobile]
+    }, allowThumbnailFallbackLightbox, isMobile, longPressTimerRef, longPressTriggeredRef, setRawSourceLightbox), ...listTextColumns] : listTextColumns),
+    [hasThumbnails, allowThumbnailFallbackLightbox, isMobile, listTextColumns]
   )
   const columns = useMemo(
     () => (showScoreColumn ? [...baseColumns, scoreColumn] : baseColumns),

@@ -2064,6 +2064,7 @@ aria-label="Clear compare troves"
                     viewMode={searchResultsViewMode}
                     afterFilterSlot={gallerySortAfterFilterSlot}
                     hideTroveInGallery={selectedTroveIds.size === 1}
+                    hideTroveInList={selectedTroveIds.size === 1}
                     showPdfSashInGallery
                     showGalleryDecorations={galleryDecorate}
                   />
