@@ -706,6 +706,7 @@
   overflow: hidden;
   animation: mobile-trove-picker-slide-in 0.25s ease-out;
   color: #252525;
+  text-align: left;
 }
 
 /* On compare tabs, move filter box down so it sits below the Primary/Compare tabs */
@@ -826,6 +827,7 @@
   overflow-y: auto;
   flex: 1;
   min-height: 0;
+  text-align: left;
 }
 
 .mobile-trove-item {
@@ -834,6 +836,7 @@
   align-items: center;
   justify-content: space-between;
   gap: 0.4rem;
+  text-align: left;
 }
 
 .mobile-trove-item.mobile-trove-item--selected {
@@ -860,18 +863,24 @@
 .mobile-trove-label {
   display: flex;
   align-items: center;
+  justify-content: flex-start;
   gap: 0.5rem;
   padding: 0.4rem 0;
   cursor: pointer;
   font-size: 0.9rem;
   flex: 1;
   min-width: 0;
+  text-align: left;
 }
 
 .mobile-trove-label input {
   width: 1.1rem;
   height: 1.1rem;
   accent-color: #6633cc;
+}
+
+.mobile-trove-label span {
+  text-align: left;
 }
 
 .mobile-trove-only-actions {
