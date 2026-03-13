@@ -214,6 +214,9 @@ export function SearchResultsGrid({ data, sortBy = null, sortDir = 'asc', onSort
   const tableRowLastClickRef = useRef({ rowId: null, time: 0 })
   const longPressTimerRef = useRef(null)
   const longPressTriggeredRef = useRef(false)
+  const [urlTooltipState, setUrlTooltipState] = useState(null)
+  const urlTooltipLeaveTimerRef = useRef(null)
+  const urlTooltipShowTimerRef = useRef(null)
 
   const closeLightbox = useCallback(() => setLightbox(null), [])
   const closeRawSourceLightbox = useCallback(() => setRawSourceLightbox(null), [])
@@ -347,6 +350,34 @@ export function SearchResultsGrid({ data, sortBy = null, sortDir = 'asc', onSort
 
   return (
     <div className="search-results-grid" ref={gridRef}>
+      {urlTooltipState && showGallery && (
+        <div
+          className={`search-results-gallery-url-tooltip search-results-gallery-url-tooltip--centered${urlTooltipState.above ? ' search-results-gallery-url-tooltip--above' : ' search-results-gallery-url-tooltip--below'}`}
+          style={{
+            '--tooltip-start-x': `${urlTooltipState.startX}px`,
+            '--tooltip-start-y': `${urlTooltipState.startY}px`,
+            '--tooltip-end-x': `${urlTooltipState.endX}px`,
+            '--tooltip-end-y': `${urlTooltipState.endY}px`,
+          }}
+          onMouseEnter={() => {
+            if (urlTooltipLeaveTimerRef.current) {
+              clearTimeout(urlTooltipLeaveTimerRef.current)
+              urlTooltipLeaveTimerRef.current = null
+            }
+          }}
+          onMouseLeave={() => setUrlTooltipState(null)}
+        >
+          Open{' '}
+          <a
+            href={urlTooltipState.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {urlTooltipState.url}
+          </a>
+        </div>
+      )}
       {rawSourceLightbox && (
         <div
           className="search-raw-source-lightbox"
@@ -532,10 +563,57 @@ export function SearchResultsGrid({ data, sortBy = null, sortDir = 'asc', onSort
                 setLightbox(null)
                 setRawSourceLightbox({ title, rawSourceItem: rawSourceDisplay(rawSourceItem) })
               }
+              const showUrlTooltip = payload?.itemUrl && !payload?.imageUrl
+              const handleUrlTooltipEnter = (e) => {
+                if (!showUrlTooltip) return
+                if (urlTooltipLeaveTimerRef.current) {
+                  clearTimeout(urlTooltipLeaveTimerRef.current)
+                  urlTooltipLeaveTimerRef.current = null
+                }
+                if (urlTooltipShowTimerRef.current) {
+                  clearTimeout(urlTooltipShowTimerRef.current)
+                  urlTooltipShowTimerRef.current = null
+                }
+                const cardEl = e.currentTarget
+                urlTooltipShowTimerRef.current = setTimeout(() => {
+                  const cardRect = cardEl.getBoundingClientRect()
+                  const spaceAbove = cardRect.top
+                  const showAbove = spaceAbove > 120
+                  const startX = cardRect.left + cardRect.width / 2
+                  const startY = cardRect.top
+                  const viewportWidth = window.innerWidth || document.documentElement.clientWidth || 0
+                  let clampedEndX = startX
+                  if (viewportWidth > 0) {
+                    const frac = startX / viewportWidth
+                    const minFrac = 1 / 3
+                    const maxFrac = 2 / 3
+                    const clampedFrac = Math.min(Math.max(frac, minFrac), maxFrac)
+                    clampedEndX = clampedFrac * viewportWidth
+                  }
+                  const endY = showAbove ? cardRect.top - 8 : cardRect.bottom + 8
+                  setUrlTooltipState({
+                    url: payload.itemUrl,
+                    startX,
+                    startY,
+                    endX: clampedEndX,
+                    endY,
+                    above: showAbove,
+                  })
+                }, 500)
+              }
+              const handleUrlTooltipLeave = () => {
+                if (urlTooltipShowTimerRef.current) {
+                  clearTimeout(urlTooltipShowTimerRef.current)
+                  urlTooltipShowTimerRef.current = null
+                }
+                urlTooltipLeaveTimerRef.current = setTimeout(() => setUrlTooltipState(null), 150)
+              }
               return (
                 <div
                   key={row.id ?? idx}
                   className="search-results-gallery-card-wrap"
+                  onMouseEnter={showUrlTooltip ? handleUrlTooltipEnter : undefined}
+                  onMouseLeave={showUrlTooltip ? handleUrlTooltipLeave : undefined}
                 >
                   <div
                     role="button"
@@ -600,8 +678,8 @@ export function SearchResultsGrid({ data, sortBy = null, sortDir = 'asc', onSort
                       e.stopPropagation()
                       openRawSource(e)
                     }}
-                    title={payload ? 'View full size' : undefined}
-                    aria-label={payload ? 'View full size' : undefined}
+                    title={payload && !showUrlTooltip ? 'View full size' : undefined}
+                    aria-label={payload ? (showUrlTooltip ? `Open ${payload.itemUrl}` : 'View full size') : undefined}
                   >
                   <span className="search-results-gallery-card-image">
                     {hasImage ? (
