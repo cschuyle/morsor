@@ -15,7 +15,14 @@ The second part of the commit, generate your own bried description that you norm
 If I specify "with details", then after the first and second parts (above), I want you to paste in the summary (or summaries) you gave me for the actions you took on my behalf that are part of this commit.
 
 - **Code style:** Conventions to follow.
-- **Other:** Any other instructions you want agents to follow.
+
+- **Other:** When changing code in an area listed below, read the "Known regressions and fixes" section so the same issues are not reintroduced.
+
+## Known regressions and fixes
+
+Document regressions here (what broke, where, and how it was fixed) so agents can avoid reintroducing them.
+
+- **Lightbox / mobile scroll:** On mobile, when scrolled down, the lightbox can appear off the top of the screen. **Cause:** Lightbox was rendered inside the scrollable container, so `position: fixed` was relative to the wrong containing block. **Fix:** Render the lightbox via `createPortal(..., document.body)` when `isMobile` so it is a direct child of `body` and stays viewport-fixed.-->
 
 ---
 

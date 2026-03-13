@@ -1,0 +1,13 @@
+---
+description: Before changing code, read AGENTS.md "Known regressions and fixes" to avoid reintroducing issues
+alwaysApply: true
+globs: 
+---
+
+# Known regressions
+
+When editing code in this repo (especially frontend, mobile app, or areas mentioned in AGENTS.md):
+
+1. Read the project root file **AGENTS.md**.
+2. Check the **"Known regressions and fixes"** section.
+3. If your changes touch an area that has a documented regression, follow the fix or pattern described there so the same issue is not reintroduced.
