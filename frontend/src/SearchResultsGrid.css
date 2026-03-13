@@ -424,14 +424,11 @@
   transform: rotate(-45deg);
   transform-origin: bottom right;
   opacity: 0;
-  pointer-events: none;
+  pointer-events: auto;
   transition: opacity 0.15s, background 0.15s;
 }
-.search-results-gallery-card-wrap:hover .search-results-gallery-card-raw-btn {
-  opacity: 1;
-  pointer-events: auto;
-}
 .search-results-gallery-card-raw-btn:hover {
+  opacity: 1;
   background: rgba(255, 0, 255, 0.7);
 }
 .search-results-gallery-card-raw-btn:focus-visible {
