@@ -756,6 +756,10 @@
   font-weight: 600;
 }
 
+.trove-count-suffix {
+  color: #6633cc;
+}
+
 .trove-list-separator {
   list-style: none;
   margin: 0;

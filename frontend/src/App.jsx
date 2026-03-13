@@ -989,7 +989,7 @@ aria-label="Clear compare troves"
                                 onChange={() => toggleTrove(t.id)}
                               />
                               <span className="trove-name">
-                                {t.name} ({searchResult != null ? `${formatCount(t.resultCount)}/${formatCount(t.count)}` : formatCount(t.count)})
+                                {t.name} {searchResult != null ? <span className="trove-count-suffix">({formatCount(t.resultCount)}/{formatCount(t.count)})</span> : `(${formatCount(t.count)})`}
                               </span>
                             </label>
                           </li>
@@ -1011,7 +1011,7 @@ aria-label="Clear compare troves"
                                 onChange={() => toggleTrove(t.id)}
                               />
                               <span className="trove-name">
-                                {t.name} ({searchResult != null ? `${formatCount(t.resultCount)}/${formatCount(t.count)}` : formatCount(t.count)})
+                                {t.name} {searchResult != null ? <span className="trove-count-suffix">({formatCount(t.resultCount)}/{formatCount(t.count)})</span> : `(${formatCount(t.count)})`}
                               </span>
                             </label>
                           </li>
@@ -1091,7 +1091,7 @@ aria-label="Clear compare troves"
                     onChange={() => toggleTrove(t.id)}
                   />
                   <span className="trove-name">
-                    {t.name} ({searchResult != null ? `${formatCount(t.resultCount)}/${formatCount(t.count)}` : formatCount(t.count)})
+                    {t.name} {searchResult != null ? <span className="trove-count-suffix">({formatCount(t.resultCount)}/{formatCount(t.count)})</span> : `(${formatCount(t.count)})`}
                   </span>
                 </label>
                 {(selectedTroveIds.size !== 1 || !selectedTroveIds.has(t.id)) && (
@@ -1137,7 +1137,7 @@ aria-label="Clear compare troves"
                     onChange={() => toggleTrove(t.id)}
                   />
                   <span className="trove-name">
-                    {t.name} ({searchResult != null ? `${formatCount(t.resultCount)}/${formatCount(t.count)}` : formatCount(t.count)})
+                    {t.name} {searchResult != null ? <span className="trove-count-suffix">({formatCount(t.resultCount)}/{formatCount(t.count)})</span> : `(${formatCount(t.count)})`}
                   </span>
                 </label>
                 {(selectedTroveIds.size !== 1 || !selectedTroveIds.has(t.id)) && (
