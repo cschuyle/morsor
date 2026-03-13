@@ -6,6 +6,7 @@ import { performLogout } from './performLogout'
 import { queryCache } from './queryCache'
 import { formatCount } from './formatCount'
 import { groupFileTypes, getGroupNameIfFullySelected, ALL_KNOWN_FILE_TYPES } from './fileTypeGroups'
+import { FileTypeQuickMode, normalizeFileTypeQuickMode } from './fileTypeQuickMode'
 import { SearchResultsGrid } from './SearchResultsGrid'
 import { DuplicateResultsView } from './DuplicateResultsView'
 import { UniquesResultsView } from './UniquesResultsView'
@@ -22,10 +23,6 @@ function hasUsableThumbnail(row) {
   if (!thumbnailUrl || !String(thumbnailUrl).trim()) return false
   const normalized = String(thumbnailUrl).trim()
   return normalized !== AMAZON_PLACEHOLDER_THUMB && !normalized.includes('/no_image')
-}
-
-function normalizeFileTypeQuickMode(value) {
-  return value === 'any' || value === 'meh' ? value : 'custom'
 }
 
 function MobileApp() {
@@ -74,7 +71,7 @@ function MobileApp() {
     const ftAll = new URLSearchParams(window.location.search).getAll('fileTypes')
     return new Set(ftAll.filter((f) => f != null && f.trim()).map((f) => (f.trim() === 'URL' ? 'Link' : f.trim())))
   })
-  const [fileTypeQuickMode, setFileTypeQuickMode] = useState(() => normalizeFileTypeQuickMode(new URLSearchParams(window.location.search).get('ftq')))
+  const [fileTypeQuickMode, setFileTypeQuickMode] = useState(() => normalizeFileTypeQuickMode(new URLSearchParams(window.location.search).get('ftq'))) // Any | Meh only, default Meh
   const [thumbnailOnly, setThumbnailOnly] = useState(() => new URLSearchParams(window.location.search).get('thumbs') === '1')
   const [allAvailableFileTypes, setAllAvailableFileTypes] = useState([])
   const [fileTypeDropdownOpen, setFileTypeDropdownOpen] = useState(false)
@@ -200,7 +197,7 @@ function MobileApp() {
       const ft = fileTypesSet ?? fileTypeFilters
       ft.forEach((f) => next.append('fileTypes', f))
       const useQuickMode = quickModeOverride === undefined ? fileTypeQuickMode : quickModeOverride
-      if (useQuickMode !== 'custom') next.set('ftq', useQuickMode)
+      next.set('ftq', useQuickMode)
       const useThumbnailOnly = thumbnailOnlyOverride === undefined ? thumbnailOnly : thumbnailOnlyOverride
       if (useThumbnailOnly) next.set('thumbs', '1')
       next.set('view', searchResultsViewMode === 'gallery' ? 'gallery' : 'list')
@@ -229,7 +226,7 @@ function MobileApp() {
       Array.from(selectedTroveIds).map((id) => urlTroveId(id, troves) ?? id).filter(Boolean).forEach((id) => next.append('trove', id))
       const boostId = boostTroveId ? (urlTroveId(boostTroveId, troves) ?? boostTroveId) : null
       if (boostId) next.set('boost', boostId)
-      if (fileTypeQuickMode !== 'custom') next.set('ftq', fileTypeQuickMode)
+      next.set('ftq', fileTypeQuickMode)
       if (thumbnailOnly) next.set('thumbs', '1')
       next.set('view', searchResultsViewMode === 'gallery' ? 'gallery' : 'list')
     } else {
@@ -1237,8 +1234,8 @@ onClick={() => {
             const selectedUpper = new Set([...fileTypesForLabel].map(upper))
             const allSelected = availableUpper.size > 0 && availableUpper.size === selectedUpper.size && [...availableUpper].every((t) => selectedUpper.has(t))
             const hasFileTypeFilter = fileTypesForLabel.size > 0 && !allSelected
-            const anyQuickSelected = fileTypeQuickMode === 'any'
-            const mehQuickSelected = fileTypeQuickMode === 'meh'
+            const anyQuickSelected = fileTypeQuickMode === FileTypeQuickMode.Any
+            const mehQuickSelected = fileTypeQuickMode === FileTypeQuickMode.Meh
             const hasThumbFilter = thumbnailOnly
             return (
               <div className="mobile-filetype-dropdown-wrap mobile-filetype-dropdown-wrap--form" ref={fileTypeDropdownRef}>
@@ -1293,15 +1290,15 @@ onClick={() => {
                     <button
                       type="button"
                       className={`mobile-filetype-quick-btn ${anyQuickSelected ? 'mobile-filetype-quick-btn--active' : ''}`}
-                      disabled={allSelected}
                       onClick={(e) => {
                         e.preventDefault()
+                        if (anyQuickSelected) return
                         skipFileTypeSearchRef.current = true
                         lastFileTypeOrViewSearchRef.current = Date.now()
                         const next = new Set(displayFileTypes)
-                        setFileTypeQuickMode('any')
+                        setFileTypeQuickMode(FileTypeQuickMode.Any)
                         setFileTypeFilters(next)
-                        setSearchParams(buildSearchParams(next, null, undefined, undefined, 'any'), { replace: true })
+                        setSearchParams(buildSearchParams(next, null, undefined, undefined, FileTypeQuickMode.Any), { replace: true })
                         fetchSearch(0, null, null, next)
                       }}
                     >
@@ -1310,15 +1307,15 @@ onClick={() => {
                     <button
                       type="button"
                       className={`mobile-filetype-quick-btn ${mehQuickSelected ? 'mobile-filetype-quick-btn--active' : ''}`}
-                      disabled={fileTypeFilters.size === 0}
                       onClick={(e) => {
                         e.preventDefault()
+                        if (mehQuickSelected) return
                         skipFileTypeSearchRef.current = true
                         lastFileTypeOrViewSearchRef.current = Date.now()
                         const next = new Set()
-                        setFileTypeQuickMode('meh')
+                        setFileTypeQuickMode(FileTypeQuickMode.Meh)
                         setFileTypeFilters(next)
-                        setSearchParams(buildSearchParams(next, null, undefined, undefined, 'meh'), { replace: true })
+                        setSearchParams(buildSearchParams(next, null, undefined, undefined, FileTypeQuickMode.Meh), { replace: true })
                         fetchSearch(0, null, null, next)
                       }}
                     >
@@ -1343,9 +1340,9 @@ onClick={() => {
                                   const next = new Set(fileTypeFilters)
                                   if (allSelectedGroup) types.forEach((t) => next.delete(t))
                                   else types.forEach((t) => next.add(t))
-                                  setFileTypeQuickMode('custom')
+                                  if (anyQuickSelected) setFileTypeQuickMode(FileTypeQuickMode.Meh)
                                   setFileTypeFilters(next)
-                                  setSearchParams(buildSearchParams(next, null, undefined, undefined, 'custom'), { replace: true })
+                                  setSearchParams(buildSearchParams(next, null, undefined, undefined, anyQuickSelected ? FileTypeQuickMode.Meh : fileTypeQuickMode), { replace: true })
                                   fetchSearch(0, null, null, next)
                                 }}
                               />
@@ -1367,9 +1364,9 @@ onClick={() => {
                                   if (next.has(t)) next.delete(t)
                                   else next.add(t)
                                 })
-                                setFileTypeQuickMode('custom')
+                                if (anyQuickSelected) setFileTypeQuickMode(FileTypeQuickMode.Meh)
                                 setFileTypeFilters(next)
-                                setSearchParams(buildSearchParams(next, null, undefined, undefined, 'custom'), { replace: true })
+                                setSearchParams(buildSearchParams(next, null, undefined, undefined, anyQuickSelected ? FileTypeQuickMode.Meh : fileTypeQuickMode), { replace: true })
                                 fetchSearch(0, null, null, next)
                               }}
                             >
@@ -1388,9 +1385,9 @@ onClick={() => {
                                 const next = new Set(fileTypeFilters)
                                 if (next.has(ft)) next.delete(ft)
                                 else next.add(ft)
-                                setFileTypeQuickMode('custom')
+                                if (anyQuickSelected) setFileTypeQuickMode(FileTypeQuickMode.Meh)
                                 setFileTypeFilters(next)
-                                setSearchParams(buildSearchParams(next, null, undefined, undefined, 'custom'), { replace: true })
+                                setSearchParams(buildSearchParams(next, null, undefined, undefined, anyQuickSelected ? FileTypeQuickMode.Meh : fileTypeQuickMode), { replace: true })
                                 fetchSearch(0, null, null, next)
                               }}
                             />
