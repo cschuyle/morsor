@@ -93,8 +93,26 @@ class CollectionToSearchResultMapperTest {
                 },
                 {
                   "littlePrinceItem": {
-                    "title": "Item without itemUrl",
-                    "smallImageUrl": "https://example.com/s2.jpg"
+                    "title": "Item with the kitchen sink thrown in",
+                    "smallImageUrl": "https://example.com/s2.jpg",
+                    "display-title": "The Little Prince, in Ancient Greek",
+                    "format": "paperback",
+                    "language": "Ancient Greek",
+                    "original-title": "Le petit prince",
+                    "author": "Antoine de Saint-Exupéry",
+                    "translation-title": "Τὸ βασιλείδιον",
+                    "translation-title-transliterated": "To Basileidion",
+                    "translator": "Juan Coderch",
+                    "year": "2017",
+                    "publication-location": "St. Andrews",
+                    "isbn13": "978-0-9571387-4-2",
+                    "publisher": "Juan Coderch",
+                    "tags": [
+                      "language isolate*",
+                      "dead language"
+                    ],
+                    "date-added": "2019-07-04",
+                    "lpid": "PP-4277"
                   }
                 },
                 {
@@ -116,5 +134,62 @@ class CollectionToSearchResultMapperTest {
         assertThat(results.get(1).itemUrl()).isNull();
         assertThat(results.get(2).itemType()).isEqualTo("movie");
         assertThat(results.get(2).itemUrl()).isNull();
+
+        // rawSourceItem: JSON items get pretty-printed multi-line JSON
+        assertThat(results.get(0).rawSourceItem()).contains("littlePrinceItem");
+        assertThat(results.get(0).rawSourceItem()).contains("\n");
+        assertThat(results.get(0).rawSourceItem()).contains("Item with URL");
+
+        SearchResult kitchenSink = results.get(1);
+
+// fields mapped directly onto SearchResult
+        assertThat(kitchenSink.trove()).isEqualTo("Test");
+        assertThat(kitchenSink.troveId()).isEqualTo("test-trove");
+        assertThat(kitchenSink.id()).isEqualTo("PP-4277");
+        assertThat(kitchenSink.title()).isEqualTo("The Little Prince, in Ancient Greek");
+        assertThat(kitchenSink.snippet()).isEqualTo("Ancient Greek · Antoine de Saint-Exupéry · 2017");
+        assertThat(kitchenSink.hasThumbnail()).isTrue();
+        assertThat(kitchenSink.thumbnailUrl()).isEqualTo("https://example.com/s2.jpg");
+        assertThat(kitchenSink.largeImageUrl()).isNull();
+        assertThat(kitchenSink.files()).isEmpty();
+        assertThat(kitchenSink.itemType()).isEqualTo("littlePrinceItem");
+        assertThat(kitchenSink.itemUrl()).isNull();
+
+// fields not modeled in SearchResult are preserved in rawSourceItem
+        JsonNode kitchenSinkRaw = objectMapper.readTree(kitchenSink.rawSourceItem()).get("littlePrinceItem");
+        assertThat(kitchenSinkRaw).isNotNull();
+
+        assertThat(kitchenSinkRaw.get("title").asText()).isEqualTo("Item with the kitchen sink thrown in");
+        assertThat(kitchenSinkRaw.get("smallImageUrl").asText()).isEqualTo("https://example.com/s2.jpg");
+        assertThat(kitchenSinkRaw.get("display-title").asText()).isEqualTo("The Little Prince, in Ancient Greek");
+        assertThat(kitchenSinkRaw.get("format").asText()).isEqualTo("paperback");
+        assertThat(kitchenSinkRaw.get("language").asText()).isEqualTo("Ancient Greek");
+        assertThat(kitchenSinkRaw.get("original-title").asText()).isEqualTo("Le petit prince");
+        assertThat(kitchenSinkRaw.get("author").asText()).isEqualTo("Antoine de Saint-Exupéry");
+        assertThat(kitchenSinkRaw.get("translation-title").asText()).isEqualTo("Τὸ βασιλείδιον");
+        assertThat(kitchenSinkRaw.get("translation-title-transliterated").asText()).isEqualTo("To Basileidion");
+        assertThat(kitchenSinkRaw.get("translator").asText()).isEqualTo("Juan Coderch");
+        assertThat(kitchenSinkRaw.get("year").asText()).isEqualTo("2017");
+        assertThat(kitchenSinkRaw.get("publication-location").asText()).isEqualTo("St. Andrews");
+        assertThat(kitchenSinkRaw.get("isbn13").asText()).isEqualTo("978-0-9571387-4-2");
+        assertThat(kitchenSinkRaw.get("publisher").asText()).isEqualTo("Juan Coderch");
+        assertThat(kitchenSinkRaw.get("date-added").asText()).isEqualTo("2019-07-04");
+        assertThat(kitchenSinkRaw.get("lpid").asText()).isEqualTo("PP-4277");
+
+        assertThat(kitchenSinkRaw.get("tags").isArray()).isTrue();
+        assertThat(kitchenSinkRaw.get("tags").get(0).asText()).isEqualTo("language isolate*");
+        assertThat(kitchenSinkRaw.get("tags").get(1).asText()).isEqualTo("dead language");
+    }
+
+    @Test
+    void rawSourceItemForTitlesIsTheTitleString() throws Exception {
+        String json = """
+            {"id": "t", "titles": ["Title A", "Title B"]}
+            """;
+        JsonNode root = objectMapper.readTree(json);
+        List<SearchResult> results = CollectionToSearchResultMapper.mapRootToSearchResults(root);
+        assertThat(results).hasSize(2);
+        assertThat(results.get(0).rawSourceItem()).isEqualTo("Title A");
+        assertThat(results.get(1).rawSourceItem()).isEqualTo("Title B");
     }
 }

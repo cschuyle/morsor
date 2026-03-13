@@ -1,6 +1,9 @@
 package com.example.morsor.search;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 
 import java.util.ArrayList;
@@ -18,6 +21,7 @@ import java.util.stream.StreamSupport;
  */
 public final class CollectionToSearchResultMapper {
     private static final String AMAZON_PLACEHOLDER_THUMB = "https://m.media-amazon.com/images/I/01RmK+J4pJL._SS135_.gif";
+    private static final ObjectMapper PRETTY_MAPPER = new ObjectMapper().enable(SerializationFeature.INDENT_OUTPUT);
 
     private CollectionToSearchResultMapper() {}
 
@@ -61,9 +65,10 @@ public final class CollectionToSearchResultMapper {
         int index = 0;
         for (JsonNode itemWrapper : items) {
             if (!itemWrapper.isObject()) continue;
+            String rawSourceItem = toRawSourceJson(itemWrapper);
             JsonNode item = unwrapItem(itemWrapper);
             if (item == null) continue;
-            SearchResult r = mapItemToSearchResult(item, troveName, troveId, index);
+            SearchResult r = mapItemToSearchResult(item, rawSourceItem, troveName, troveId, index);
             if (r != null) {
                 out.add(r);
             }
@@ -76,8 +81,9 @@ public final class CollectionToSearchResultMapper {
         for (int i = 0; i < titlesArray.size(); i++) {
             JsonNode titleNode = titlesArray.get(i);
             String title = titleNode != null && titleNode.isTextual() ? titleNode.asText() : (titleNode != null ? titleNode.toString() : "");
+            String rawSourceItem = titleNode != null && titleNode.isObject() ? toRawSourceJson(titleNode) : title;
             String id = troveId != null && !troveId.isEmpty() ? troveId + "-" + i : "trove-" + i;
-            out.add(new SearchResult(id, title, title, troveName, troveId, false, null, null, List.of(), null, null));
+            out.add(new SearchResult(id, title, title, troveName, troveId, false, null, null, List.of(), null, null, rawSourceItem));
         }
     }
 
@@ -93,7 +99,15 @@ public final class CollectionToSearchResultMapper {
         return value;
     }
 
-    private static SearchResult mapItemToSearchResult(JsonNode item, String troveName, String troveId, int index) {
+    private static String toRawSourceJson(JsonNode node) {
+        try {
+            return PRETTY_MAPPER.writeValueAsString(node);
+        } catch (JsonProcessingException e) {
+            return node != null ? node.toString() : "";
+        }
+    }
+
+    private static SearchResult mapItemToSearchResult(JsonNode item, String rawSourceItem, String troveName, String troveId, int index) {
         String id = text(item, "lpid");
         if (id == null || id.isEmpty()) {
             id = text(item, "id");
@@ -118,7 +132,7 @@ public final class CollectionToSearchResultMapper {
         String itemType = text(item, "_itemType");
         String itemUrl = "littlePrinceItem".equals(itemType) ? text(item, "itemUrl") : null;
 
-        return new SearchResult(id, title, snippet, troveName, troveId, hasThumbnail, thumbnailUrl, largeImageUrl, files, itemType, itemUrl);
+        return new SearchResult(id, title, snippet, troveName, troveId, hasThumbnail, thumbnailUrl, largeImageUrl, files, itemType, itemUrl, rawSourceItem);
     }
 
     private static boolean hasRealThumbnail(String thumbnailUrl) {

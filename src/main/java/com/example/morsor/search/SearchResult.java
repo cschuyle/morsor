@@ -13,4 +13,5 @@ public record SearchResult(
         String largeImageUrl,
         List<String> files,
         String itemType,
-        String itemUrl) {}
+        String itemUrl,
+        String rawSourceItem) {}
