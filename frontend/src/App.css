@@ -1287,6 +1287,14 @@
 .card .search-results-options .pagination-ellipsis {
   color: #b8b8b8;
 }
+.card .grid-toolbar .gallery-sort-label {
+  color: #b8b8b8;
+}
+
+.gallery-sort-wrap {
+  flex-shrink: 0;
+  margin-left: auto;
+}
 .search-results-options {
   margin-top: 0.5rem;
   margin-bottom: 0.5rem;

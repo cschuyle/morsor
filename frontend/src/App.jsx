@@ -671,16 +671,21 @@ function App() {
   const gallerySortValue = sortBy === 'score' || sortBy === 'trove' ? sortBy : 'title'
   const gallerySortAfterFilterSlot = searchResultsViewMode === 'gallery'
     ? (
-      <select
-        value={gallerySortValue}
-        onChange={handleGallerySortChange}
-        className="gallery-sort-select"
-        aria-label="Gallery sort"
-      >
-        <option value="title">Title</option>
-        <option value="score">Score</option>
-        <option value="trove">Trove</option>
-      </select>
+      <div className="gallery-sort-wrap">
+        <label className="gallery-sort-label">
+          Sort by{' '}
+          <select
+            value={gallerySortValue}
+            onChange={handleGallerySortChange}
+            className="gallery-sort-select"
+            aria-label="Gallery sort"
+          >
+            <option value="title">Title</option>
+            <option value="score">Score</option>
+            <option value="trove">Trove</option>
+          </select>
+        </label>
+      </div>
     )
     : null
 
