@@ -885,13 +885,13 @@ function MobileApp() {
                 type="button"
                 role="option"
                 aria-selected={mobileGallerySortValue === opt.value}
-                className="mobile-gallery-sort-option"
+                className={`mobile-gallery-sort-option${mobileGallerySortValue === opt.value ? ' mobile-gallery-sort-option--selected' : ''}`}
                 onClick={() => {
                   applyGallerySortChange(opt.value)
                   setGallerySortDropdownOpen(false)
                 }}
               >
-                {opt.label}
+                {mobileGallerySortValue === opt.value ? '✓ ' : ''}{opt.label}
               </button>
             ))}
           </div>
@@ -1704,13 +1704,13 @@ onClick={() => {
                               type="button"
                               role="option"
                               aria-selected={pageSize === n}
-                              className="mobile-page-size-option"
+                              className={`mobile-page-size-option${pageSize === n ? ' mobile-page-size-option--selected' : ''}`}
                               onClick={() => {
                                 applyPageSizeChange(n)
                                 setPageSizeDropdownOpen(false)
                               }}
                             >
-                              {formatCount(n)}
+                              {pageSize === n ? '✓ ' : ''}{formatCount(n)}
                             </button>
                           ))}
                         </div>

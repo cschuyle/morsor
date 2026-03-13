@@ -1541,6 +1541,11 @@
   background: #e0e0ff;
 }
 
+.mobile-page-size-option--selected {
+  background: #e0e0ff;
+  font-weight: 500;
+}
+
 .mobile-gallery-decorate-wrap {
   display: inline-flex;
   align-items: center;
@@ -1725,6 +1730,11 @@
 
 .mobile-search-results-grid .mobile-gallery-sort-option:hover {
   background: #e0e0ff;
+}
+
+.mobile-search-results-grid .mobile-gallery-sort-option--selected {
+  background: #e0e0ff;
+  font-weight: 500;
 }
 
 /* When file type dropdown is open, allow it to extend below the result set without being clipped */
