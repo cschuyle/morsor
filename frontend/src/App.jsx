@@ -70,6 +70,7 @@ function App() {
   const skipCheckboxSearchRef = useRef(true)
   const skipFileTypeSearchRef = useRef(false)
   const skipViewModeSearchRef = useRef(false)
+  const skipPageNavSearchRef = useRef(false)
   const lastFileTypeOrViewSearchRef = useRef(0)
   const abortControllerRef = useRef(null)
   const reloadAbortControllerRef = useRef(null)
@@ -315,6 +316,10 @@ function App() {
     }
     if (skipViewModeSearchRef.current) {
       skipViewModeSearchRef.current = false
+      return
+    }
+    if (skipPageNavSearchRef.current) {
+      skipPageNavSearchRef.current = false
       return
     }
     if (Date.now() - lastFileTypeOrViewSearchRef.current < 600) return
@@ -609,6 +614,7 @@ function App() {
 
   function goToPage(nextPage) {
     fetchSearch(nextPage)
+    skipPageNavSearchRef.current = true
     const nextParams = new URLSearchParams(searchParams)
     nextParams.set('page', String(nextPage + 1))
     setSearchParams(nextParams, { replace: true })

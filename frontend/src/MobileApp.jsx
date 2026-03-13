@@ -83,6 +83,7 @@ function MobileApp() {
   const skipSearchRef = useRef(true)
   const skipFileTypeSearchRef = useRef(false)
   const skipViewModeSearchRef = useRef(false)
+  const skipPageNavSearchRef = useRef(false)
   const lastFileTypeOrViewSearchRef = useRef(0)
   const abortRef = useRef(null)
   const reloadAbortControllerRef = useRef(null)
@@ -519,6 +520,10 @@ function MobileApp() {
       skipViewModeSearchRef.current = false
       return
     }
+    if (skipPageNavSearchRef.current) {
+      skipPageNavSearchRef.current = false
+      return
+    }
     if (Date.now() - lastFileTypeOrViewSearchRef.current < 600) return
     const t = setTimeout(() => {
       const pageParam = Number(searchParams.get('page'))
@@ -692,6 +697,7 @@ function MobileApp() {
   function goToPage(nextPage) {
     fetchSearch(nextPage)
     setPage(nextPage)
+    skipPageNavSearchRef.current = true
     const nextParams = buildSearchParams()
     nextParams.set('page', String(nextPage + 1))
     nextParams.set('size', String(pageSize))
