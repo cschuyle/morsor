@@ -135,19 +135,9 @@ function thumbnailColumnDef(onThumbnailClick, allowThumbnailFallbackLightbox = f
         <button
           type="button"
           className="search-thumb-btn"
-          title={
-            isMobile
-              ? (hasThumbnailImage ? (fileTypeTooltip ?? 'View full size') : 'Long-press for raw source')
-              : (fileTypeTooltip ?? undefined)
-          }
+          title={fileTypeTooltip ?? (hasThumbnailImage || showLinkIconOnly ? 'View full size' : undefined)}
           onClick={() => canClick && onThumbnailClick(payload)}
-          aria-label={
-            showLinkIconOnly ? 'Open link' : (
-              isMobile
-                ? (hasThumbnailImage ? (fileTypeTooltip ?? 'View full size') : 'Long-press for raw source')
-                : 'View full size'
-            )
-          }
+          aria-label={showLinkIconOnly ? 'Open link' : (fileTypeTooltip ?? 'View full size')}
           onTouchStart={isMobile && longPressTimerRef ? () => {
             longPressTimerRef.current = setTimeout(() => {
               longPressTimerRef.current = null
@@ -579,16 +569,8 @@ export function SearchResultsGrid({ data, sortBy = null, sortDir = 'asc', onSort
                       e.stopPropagation()
                       openRawSource(e)
                     }}
-                    title={
-                      isMobile
-                        ? (payload ? 'View full size' : 'Long-press for raw source')
-                        : (payload ? 'View full size (double-click for raw source)' : 'Double-click for raw source')
-                    }
-                    aria-label={
-                      isMobile
-                        ? (payload ? 'View full size' : 'Long-press for raw source')
-                        : undefined
-                    }
+                    title={payload ? 'View full size' : undefined}
+                    aria-label={payload ? 'View full size' : undefined}
                   >
                   <span className="search-results-gallery-card-image">
                     {hasImage ? (
@@ -727,7 +709,6 @@ export function SearchResultsGrid({ data, sortBy = null, sortDir = 'asc', onSort
                   <tr
                     key={row.id}
                     className="grid-row-double-clickable"
-                    title={isMobile ? 'Long-press for raw source' : 'Double-click for raw source'}
                     onClick={handleRowClick}
                     onTouchStart={isMobile ? () => {
                       longPressTimerRef.current = setTimeout(() => {
