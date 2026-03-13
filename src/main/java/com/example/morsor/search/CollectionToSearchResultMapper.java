@@ -17,6 +17,7 @@ import java.util.stream.StreamSupport;
  * </ul>
  */
 public final class CollectionToSearchResultMapper {
+    private static final String AMAZON_PLACEHOLDER_THUMB = "https://m.media-amazon.com/images/I/01RmK+J4pJL._SS135_.gif";
 
     private CollectionToSearchResultMapper() {}
 
@@ -76,7 +77,7 @@ public final class CollectionToSearchResultMapper {
             JsonNode titleNode = titlesArray.get(i);
             String title = titleNode != null && titleNode.isTextual() ? titleNode.asText() : (titleNode != null ? titleNode.toString() : "");
             String id = troveId != null && !troveId.isEmpty() ? troveId + "-" + i : "trove-" + i;
-            out.add(new SearchResult(id, title, title, troveName, troveId, null, null, List.of(), null, null));
+            out.add(new SearchResult(id, title, title, troveName, troveId, false, null, null, List.of(), null, null));
         }
     }
 
@@ -111,12 +112,21 @@ public final class CollectionToSearchResultMapper {
 
         String snippet = buildSnippet(item);
         String thumbnailUrl = text(item, "smallImageUrl");
+        boolean hasThumbnail = hasRealThumbnail(thumbnailUrl);
         String largeImageUrl = text(item, "largeImageUrl");
         List<String> files = textArray(item, "files");
         String itemType = text(item, "_itemType");
         String itemUrl = "littlePrinceItem".equals(itemType) ? text(item, "itemUrl") : null;
 
-        return new SearchResult(id, title, snippet, troveName, troveId, thumbnailUrl, largeImageUrl, files, itemType, itemUrl);
+        return new SearchResult(id, title, snippet, troveName, troveId, hasThumbnail, thumbnailUrl, largeImageUrl, files, itemType, itemUrl);
+    }
+
+    private static boolean hasRealThumbnail(String thumbnailUrl) {
+        if (thumbnailUrl == null) return false;
+        String normalized = thumbnailUrl.trim();
+        return !normalized.isEmpty()
+                && !AMAZON_PLACEHOLDER_THUMB.equals(normalized)
+                && !normalized.contains("/no_image");
     }
 
     private static String buildSnippet(JsonNode item) {

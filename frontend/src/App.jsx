@@ -11,15 +11,6 @@ import { formatCount, formatCacheBytes } from './formatCount'
 import { groupFileTypes, getGroupNameIfFullySelected, getFullySelectedGroupNames } from './fileTypeGroups'
 import './App.css'
 
-const AMAZON_PLACEHOLDER_THUMB = 'https://m.media-amazon.com/images/I/01RmK+J4pJL._SS135_.gif'
-
-function hasUsableThumbnail(row) {
-  const thumbnailUrl = row?.thumbnailUrl
-  if (!thumbnailUrl || !String(thumbnailUrl).trim()) return false
-  const normalized = String(thumbnailUrl).trim()
-  return normalized !== AMAZON_PLACEHOLDER_THUMB && !normalized.includes('/no_image')
-}
-
 function normalizeFileTypeQuickMode(value) {
   return value === 'any' || value === 'meh' ? value : 'custom'
 }
@@ -128,6 +119,7 @@ function App() {
     troveIds.forEach((id) => params.append('trove', id))
     if (boostTroveId) params.set('boostTrove', boostTroveId)
     if (fileTypesToUse && fileTypesToUse.size > 0) params.set('fileTypes', [...fileTypesToUse].sort().join(','))
+    if (thumbnailOnly) params.set('thumbs', '1')
     if (sortByOverride !== undefined || sortDirOverride !== undefined) {
       setSortBy(nextSortBy || null)
       setSortDir(nextSortDir)
@@ -1768,7 +1760,6 @@ aria-label="Clear compare troves"
             })()}
             {searchMode === 'search' && searchResult != null && (() => {
               const results = Array.isArray(searchResult.results) ? searchResult.results : []
-              const filteredResults = thumbnailOnly ? results.filter(hasUsableThumbnail) : results
               const hasQuery = query.trim() !== ''
               if (!hasQuery) {
                 return (
@@ -1777,7 +1768,7 @@ aria-label="Clear compare troves"
                       Enter a query to search. Optionally, select troves.
                     </p>
                     <SearchResultsGrid
-                      data={filteredResults}
+                      data={results}
                       sortBy={sortBy}
                       sortDir={sortDir}
                       onSortChange={handleGridSortChange}
@@ -1972,7 +1963,7 @@ aria-label="Clear compare troves"
                     </span>
                   </div>
                   <SearchResultsGrid
-                    data={filteredResults}
+                    data={results}
                     sortBy={sortBy}
                     sortDir={sortDir}
                     onSortChange={handleGridSortChange}

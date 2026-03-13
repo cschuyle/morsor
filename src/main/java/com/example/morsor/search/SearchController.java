@@ -26,8 +26,6 @@ import java.util.stream.Collectors;
 @RequestMapping("/api")
 public class SearchController {
 
-    private static final String AMAZON_PLACEHOLDER_THUMB = "https://m.media-amazon.com/images/I/01RmK+J4pJL._SS135_.gif";
-
     private final SearchDataService searchDataService;
     private final SearchCache searchCache;
     private final ObjectMapper objectMapper;
@@ -111,6 +109,7 @@ public class SearchController {
             @RequestParam(required = false) String boostTrove,
             @RequestParam(required = false, defaultValue = "") String query,
             @RequestParam(required = false) String fileTypes,
+            @RequestParam(required = false, defaultValue = "false") boolean thumbs,
             @RequestParam(required = false, defaultValue = "0") int page,
             @RequestParam(required = false, defaultValue = "500") int size,
             @RequestParam(required = false) String sortBy,
@@ -147,6 +146,11 @@ public class SearchController {
             Set<String> extSet = fileTypesFilter.stream().map(String::toUpperCase).collect(Collectors.toSet());
             all = all.stream()
                     .filter(r -> hasFileWithAnyExtension(r.result(), extSet))
+                    .toList();
+        }
+        if (thumbs) {
+            all = all.stream()
+                    .filter(r -> r.result().hasThumbnail())
                     .toList();
         }
         List<String> availableFileTypes = collectFileTypes(all);
@@ -424,9 +428,6 @@ public class SearchController {
 
     /** True if the result has a real thumbnail (non-blank, not the Amazon placeholder, and does not contain "/no_image"). Rows with real thumbnails sort before pop-out-only rows (asc = real first, pop-out last). */
     private static boolean hasRealThumbnail(SearchResultWithScore r) {
-        String u = r.result().thumbnailUrl();
-        return u != null && !u.isBlank()
-                && !AMAZON_PLACEHOLDER_THUMB.equals(u.trim())
-                && !u.contains("/no_image");
+        return r.result().hasThumbnail();
     }
 }

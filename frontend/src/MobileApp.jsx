@@ -17,6 +17,7 @@ const DUP_UNIQUES_PAGE_SIZE = 50
 const AMAZON_PLACEHOLDER_THUMB = 'https://m.media-amazon.com/images/I/01RmK+J4pJL._SS135_.gif'
 
 function hasUsableThumbnail(row) {
+  if (row?.hasThumbnail === true) return true
   const thumbnailUrl = row?.thumbnailUrl
   if (!thumbnailUrl || !String(thumbnailUrl).trim()) return false
   const normalized = String(thumbnailUrl).trim()
@@ -327,6 +328,7 @@ function MobileApp() {
     selectedTroveIds.forEach((id) => params.append('trove', id))
     if (boostTroveId) params.set('boostTrove', boostTroveId)
     if (fileTypesToUse && fileTypesToUse.size > 0) params.set('fileTypes', [...fileTypesToUse].sort().join(','))
+    if (thumbnailOnly) params.set('thumbs', '1')
     if (sortBy) {
       params.set('sortBy', sortBy)
       params.set('sortDir', sortDir)
@@ -793,16 +795,12 @@ function MobileApp() {
   }, [duplicatesResult?.rows, duplicatesSortBy, duplicatesSortDir])
 
   const results = searchResult?.results ?? []
-  const filteredSearchResults = useMemo(
-    () => (thumbnailOnly ? results.filter(hasUsableThumbnail) : results),
-    [results, thumbnailOnly]
-  )
   const count = searchResult?.count ?? 0
   const searchSize = typeof searchResult?.size === 'number' ? searchResult.size : pageSize
   const totalPages = Math.ceil(count / searchSize) || 0
   const showMobileViewModeToggle = useMemo(
-    () => Array.isArray(filteredSearchResults) && filteredSearchResults.some((row) => row?.itemType === 'littlePrinceItem' && hasUsableThumbnail(row)),
-    [filteredSearchResults]
+    () => Array.isArray(results) && results.some((row) => row?.itemType === 'littlePrinceItem' && hasUsableThumbnail(row)),
+    [results]
   )
   const showMobileFileTypePicker = useMemo(
     () => (
@@ -1543,10 +1541,10 @@ onClick={() => {
 
         {searchMode === 'search' && searchResult != null && (
           <>
-            {filteredSearchResults.length === 0 && query.trim() && !searching && (
+            {results.length === 0 && query.trim() && !searching && (
               <p className="mobile-no-results">No items.</p>
             )}
-            {filteredSearchResults.length > 0 && (
+            {results.length > 0 && (
               <div className={`mobile-search-results-grid${fileTypeDropdownOpen ? ' mobile-filetype-dropdown-open' : ''}${!showSearchPaginationControls ? ' mobile-search-results-grid--no-pager' : ''}`}>
                 {showSearchPaginationControls && (
                   <div className="mobile-view-mode-row">
@@ -1601,7 +1599,7 @@ onClick={() => {
                   </div>
                 )}
                 <SearchResultsGrid
-                  data={filteredSearchResults}
+                  data={results}
                   sortBy={searchSortBy}
                   sortDir={searchSortDir}
                   onSortChange={(col, dir) => fetchSearch(0, col, dir)}

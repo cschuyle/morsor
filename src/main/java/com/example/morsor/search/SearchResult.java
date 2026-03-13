@@ -8,6 +8,7 @@ public record SearchResult(
         String snippet,
         String trove,
         String troveId,
+        boolean hasThumbnail,
         String thumbnailUrl,
         String largeImageUrl,
         List<String> files,
