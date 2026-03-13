@@ -941,7 +941,8 @@ function MobileApp() {
       </div>
     )
     : null
-  const showSearchPaginationControls = totalPages > 1
+  const wouldProduceMultiplePages = count > Math.min(...MOBILE_PAGE_SIZE_OPTIONS)
+  const showSearchPaginationControls = totalPages > 1 || wouldProduceMultiplePages
   const displayFileTypes = useMemo(() => {
     const upper = (s) => (s || '').toUpperCase()
     const seen = new Set(ALL_KNOWN_FILE_TYPES.map(upper))

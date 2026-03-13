@@ -30,12 +30,18 @@ const textColumns = [
     accessorKey: 'title',
     header: 'Title',
     cell: (info) => info.getValue(),
+    size: 500,
+    minSize: 80,
+    maxSize: 1200,
   },
   {
     id: 'trove',
     accessorKey: 'trove',
     header: 'Trove',
     cell: (info) => info.getValue(),
+    size: 80,
+    minSize: 40,
+    maxSize: 400,
   },
 ]
 
@@ -93,6 +99,10 @@ function thumbnailColumnDef(onThumbnailClick, allowThumbnailFallbackLightbox = f
     id: 'thumb',
     accessorKey: 'thumbnailUrl',
     header: '',
+    size: 80,
+    minSize: 40,
+    maxSize: 200,
+    enableResizing: false,
     cell: (info) => {
       const row = info.row.original
       const url = info.getValue()
@@ -183,6 +193,9 @@ const scoreColumn = {
     const v = info.getValue()
     return typeof v === 'number' ? v.toFixed(2) : '—'
   },
+  size: 80,
+  minSize: 50,
+  maxSize: 150,
 }
 
 const LONG_PRESS_MS = 500
@@ -266,9 +279,23 @@ export function SearchResultsGrid({ data, sortBy = null, sortDir = 'asc', onSort
     },
     onGlobalFilterChange: setGlobalFilter,
     manualSorting: true,
+    enableColumnResizing: true,
+    columnResizeMode: 'onChange',
+    defaultColumn: { minSize: 40, maxSize: 1200 },
     getCoreRowModel: getCoreRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
   })
+
+  const columnSizeVars = useMemo(() => {
+    const headers = table.getFlatHeaders()
+    const vars = {}
+    for (let i = 0; i < headers.length; i++) {
+      const header = headers[i]
+      vars[`--header-${header.id}-size`] = `${header.getSize()}px`
+      vars[`--col-${header.column.id}-size`] = `${header.column.getSize()}px`
+    }
+    return vars
+  }, [table.getState().columnSizingInfo, table.getState().columnSizing])
 
   const filteredRowsForGallery = useMemo(() => {
     const rows = data ?? []
@@ -659,7 +686,21 @@ export function SearchResultsGrid({ data, sortBy = null, sortDir = 'asc', onSort
         </div>
       ) : (
       <div className="grid-wrapper">
-        <table className="grid-table">
+        <table
+          className={`grid-table${isMobile ? ' grid-table--mobile' : ''}`}
+          style={{
+            ...columnSizeVars,
+            width: isMobile ? '100%' : ('max(100%, ' + table.getTotalSize() + 'px)'),
+          }}
+        >
+          <colgroup>
+            {table.getFlatHeaders().map((header) => (
+              <col
+                key={header.id}
+                style={{ width: header.column.id === 'title' ? '100%' : `var(--header-${header.id}-size)` }}
+              />
+            ))}
+          </colgroup>
           <thead>
             {table.getHeaderGroups().map((headerGroup) => (
               <tr key={headerGroup.id}>
@@ -667,15 +708,30 @@ export function SearchResultsGrid({ data, sortBy = null, sortDir = 'asc', onSort
                   <th
                     key={header.id}
                     className={`col-${header.column.id} ${header.column.getCanSort() ? 'sortable' : ''}`}
+                    style={{ width: header.column.id === 'title' ? '100%' : `var(--header-${header.id}-size)` }}
                     onClick={header.column.getToggleSortingHandler()}
                   >
-                    {flexRender(header.column.columnDef.header, header.getContext())}
-                    <span className="sort-indicator">
-                      {{
-                        asc: ' ↑',
-                        desc: ' ↓',
-                      }[header.column.getIsSorted()] ?? ''}
+                    <span className="grid-th-content">
+                      {flexRender(header.column.columnDef.header, header.getContext())}
+                      <span className="sort-indicator">
+                        {{
+                          asc: ' ↑',
+                          desc: ' ↓',
+                        }[header.column.getIsSorted()] ?? ''}
+                      </span>
                     </span>
+                    {header.column.getCanResize() && (
+                      <div
+                        className={`grid-col-resizer ${header.column.getIsResizing() ? 'is-resizing' : ''}`}
+                        onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); header.getResizeHandler()(e) }}
+                        onTouchStart={(e) => { e.preventDefault(); header.getResizeHandler()(e) }}
+                        onDoubleClick={() => header.column.resetSize()}
+                        onClick={(e) => e.stopPropagation()}
+                        role="separator"
+                        aria-orientation="vertical"
+                        aria-label="Resize column"
+                      />
+                    )}
                   </th>
                 ))}
               </tr>
