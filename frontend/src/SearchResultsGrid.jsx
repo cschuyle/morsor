@@ -88,7 +88,7 @@ function getFileTypeTooltip(pdfs, imageUrls, ebooks, videos, audios, otherFiles,
   return list.length > 0 ? `Media: ${list.join(', ')}` : null
 }
 
-function thumbnailColumnDef(onThumbnailClick) {
+function thumbnailColumnDef(onThumbnailClick, allowThumbnailFallbackLightbox = false) {
   return {
     id: 'thumb',
     accessorKey: 'thumbnailUrl',
@@ -109,12 +109,15 @@ function thumbnailColumnDef(onThumbnailClick) {
       const otherFiles = files.filter((u) => typeof u === 'string' && !known.has(u))
       const isLittlePrince = itemType === 'littlePrinceItem'
       const thumbIsPlaceholder = isPlaceholderThumb(url)
+      const fallbackThumbUrl = !thumbIsPlaceholder && url ? String(url).trim() : null
+      const lightboxImageUrl = largeUrl || (allowThumbnailFallbackLightbox ? fallbackThumbUrl : null)
+      const isFallbackThumbnail = !!(!largeUrl && lightboxImageUrl && fallbackThumbUrl)
       const showLinkIconInsteadOfThumb = isLittlePrince && (!url || thumbIsPlaceholder)
       const showLinkIconOnly = isLittlePrince && !url && itemUrl
       if (!isLittlePrince || (!url && !itemUrl)) return <span aria-hidden="true">&nbsp;</span>
       const fileTypeTooltip = getFileTypeTooltip(pdfs, imageUrls, ebooks, videos, audios, otherFiles, itemUrl, !!largeUrl)
-      const payload = { imageUrl: largeUrl, title: row?.title ?? '', pdfs, imageUrls, ebooks, videos, audios, otherFiles, itemUrl }
-      const canClick = largeUrl || itemUrl || pdfs.length > 0 || imageUrls.length > 0 || ebooks.length > 0 || videos.length > 0 || audios.length > 0 || otherFiles.length > 0
+      const payload = { imageUrl: lightboxImageUrl, title: row?.title ?? '', pdfs, imageUrls, ebooks, videos, audios, otherFiles, itemUrl, isFallbackThumbnail }
+      const canClick = lightboxImageUrl || itemUrl || pdfs.length > 0 || imageUrls.length > 0 || ebooks.length > 0 || videos.length > 0 || audios.length > 0 || otherFiles.length > 0
       const linkIcon = (
         <span className="search-thumb-link-icon" aria-hidden="true">
           <PopOutIcon className="search-thumb-link-icon-img" />
@@ -156,7 +159,7 @@ const scoreColumn = {
   },
 }
 
-export function SearchResultsGrid({ data, sortBy = null, sortDir = 'asc', onSortChange, showScoreColumn = false, afterFilterSlot = null, viewMode = 'list', hideTroveInGallery = false, showPdfSashInGallery = false, showGalleryDecorations = true }) {
+export function SearchResultsGrid({ data, sortBy = null, sortDir = 'asc', onSortChange, showScoreColumn = false, afterFilterSlot = null, viewMode = 'list', hideTroveInGallery = false, showPdfSashInGallery = false, showGalleryDecorations = true, allowThumbnailFallbackLightbox = false }) {
   const [globalFilter, setGlobalFilter] = useState('')
   const [lightbox, setLightbox] = useState(null)
 
@@ -179,8 +182,8 @@ export function SearchResultsGrid({ data, sortBy = null, sortDir = 'asc', onSort
         return
       }
       setLightbox(payload)
-    }), ...textColumns] : textColumns),
-    [hasThumbnails]
+    }, allowThumbnailFallbackLightbox), ...textColumns] : textColumns),
+    [hasThumbnails, allowThumbnailFallbackLightbox]
   )
   const columns = useMemo(
     () => (showScoreColumn ? [...baseColumns, scoreColumn] : baseColumns),
@@ -265,7 +268,7 @@ export function SearchResultsGrid({ data, sortBy = null, sortDir = 'asc', onSort
     <div className="search-results-grid" ref={gridRef}>
       {lightbox && (
         <div
-          className="search-thumb-lightbox"
+          className={`search-thumb-lightbox${lightbox?.isFallbackThumbnail ? ' search-thumb-lightbox--thumb-fallback' : ''}`}
           role="dialog"
           aria-modal="true"
           aria-label="Image full size"

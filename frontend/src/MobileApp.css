@@ -45,6 +45,12 @@
   display: none;
 }
 
+/* Ensure fixed-position lightbox is anchored to viewport on mobile.
+   A filtered ancestor can create a containing block and shift the overlay with scroll. */
+.mobile-app:has(.search-thumb-lightbox) .mobile-main:not(.mobile-about-main) {
+  filter: none;
+}
+
 .mobile-brand {
   font-weight: 900;
   font-size: 1.55rem;
@@ -1584,6 +1590,12 @@
 .mobile-search-results-grid .search-thumb {
   max-width: 4.32rem;
   max-height: 4.32rem;
+}
+
+/* When lightbox falls back to thumbnail, let it consume maximum space while reserving room for title/footer controls. */
+.search-thumb-lightbox.search-thumb-lightbox--thumb-fallback .search-thumb-lightbox-content img {
+  max-width: min(100%, calc(100dvw - 2rem));
+  max-height: calc(100dvh - 5rem);
 }
 
 /* Mobile gallery: tiles 1/2 size (height and width) */

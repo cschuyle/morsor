@@ -1635,6 +1635,7 @@ onClick={() => {
                   hideTroveInGallery={selectedTroveIds.size === 1}
                   showPdfSashInGallery
                   showGalleryDecorations={galleryDecorate}
+                  allowThumbnailFallbackLightbox
                 />
               </div>
             )}
