@@ -1492,6 +1492,12 @@
   color: #333;
 }
 
+.search-compare-progress-timer {
+  flex-shrink: 0;
+  font-size: 0.75rem;
+  color: #666;
+}
+
 /* Duplicate / Uniques results (base styles; mobile doesn't load App.css) */
 .mobile-search-results-grid {
   margin-top: 0.35rem;

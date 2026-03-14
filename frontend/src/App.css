@@ -1958,6 +1958,12 @@
   color: #333;
 }
 
+.search-compare-progress-timer {
+  flex-shrink: 0;
+  font-size: 0.75rem;
+  color: #666;
+}
+
 .search-mode-toggle {
   display: flex;
   gap: 0;

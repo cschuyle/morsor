@@ -73,6 +73,8 @@ function MobileApp() {
   const [cacheEntries, setCacheEntries] = useState(0)
   const [cacheLabel, setCacheLabel] = useState('')
   const [compareProgress, setCompareProgress] = useState({ current: 0, total: 0 })
+  const [compareElapsedSec, setCompareElapsedSec] = useState(0)
+  const [lastCompareQueryTimeSec, setLastCompareQueryTimeSec] = useState<number | null>(null)
   const [reloadTrovesInProgress, setReloadTrovesInProgress] = useState(false)
   const [reloadTrovesProgress, setReloadTrovesProgress] = useState({ current: 0, total: 0 })
   const [fileTypeFilters, setFileTypeFilters] = useState<Set<string>>(() => {
@@ -104,6 +106,8 @@ function MobileApp() {
   const abortRef = useRef<AbortController | null>(null)
   const searchRequestIdRef = useRef(0)
   const reloadAbortControllerRef = useRef<AbortController | null>(null)
+  const compareTimerStartRef = useRef<number | null>(null)
+  const compareIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const fileTypeDropdownRef = useRef<HTMLDivElement | null>(null)
   const pageSizeDropdownRef = useRef<HTMLDivElement | null>(null)
   const gallerySortDropdownRef = useRef<HTMLDivElement | null>(null)
@@ -526,6 +530,12 @@ function MobileApp() {
     setSearching(true)
     setSearchError(null)
     setCompareProgress({ current: 0, total: 0 })
+    if (compareIntervalRef.current) clearInterval(compareIntervalRef.current)
+    compareTimerStartRef.current = Date.now()
+    setCompareElapsedSec(0)
+    compareIntervalRef.current = setInterval(() => {
+      setCompareElapsedSec(Math.floor((Date.now() - (compareTimerStartRef.current ?? 0)) / 1000))
+    }, 1000)
     readCompareStream(streamUrl, controller.signal, (current, total) => setCompareProgress({ current, total }), (result) => {
       const data = result as DuplicatesResultData
       queryCache.set(restUrl, data)
@@ -533,7 +543,19 @@ function MobileApp() {
       setDuplicatesPage(pageNum)
       setCompareProgress({ current: 0, total: 0 })
       refreshStatusMessage()
-    }).catch((err) => { if (err.name !== 'AbortError') setSearchError(err.message) }).finally(() => { setSearching(false); setCompareProgress({ current: 0, total: 0 }) })
+    }).catch((err) => { if (err.name !== 'AbortError') setSearchError(err.message) }).finally(() => {
+      if (compareIntervalRef.current) {
+        clearInterval(compareIntervalRef.current)
+        compareIntervalRef.current = null
+      }
+      if (compareTimerStartRef.current != null) {
+        setLastCompareQueryTimeSec(Math.round((Date.now() - compareTimerStartRef.current) / 1000))
+        compareTimerStartRef.current = null
+      }
+      setCompareElapsedSec(0)
+      setSearching(false)
+      setCompareProgress({ current: 0, total: 0 })
+    })
   }
 
   function fetchUniques(pageNum: number, sortByOverride: string | null = null, sortDirOverride: 'asc' | 'desc' | null = null): void {
@@ -577,6 +599,12 @@ function MobileApp() {
     setSearching(true)
     setSearchError(null)
     setCompareProgress({ current: 0, total: 0 })
+    if (compareIntervalRef.current) clearInterval(compareIntervalRef.current)
+    compareTimerStartRef.current = Date.now()
+    setCompareElapsedSec(0)
+    compareIntervalRef.current = setInterval(() => {
+      setCompareElapsedSec(Math.floor((Date.now() - (compareTimerStartRef.current ?? 0)) / 1000))
+    }, 1000)
     readCompareStream(streamUrl, controller.signal, (current, total) => setCompareProgress({ current, total }), (result) => {
       const data = result as UniquesResultData
       queryCache.set(restUrl, data)
@@ -584,7 +612,19 @@ function MobileApp() {
       setUniquesPage(pageNum)
       setCompareProgress({ current: 0, total: 0 })
       refreshStatusMessage()
-    }).catch((err) => { if (err.name !== 'AbortError') setSearchError(err.message) }).finally(() => { setSearching(false); setCompareProgress({ current: 0, total: 0 }) })
+    }).catch((err) => { if (err.name !== 'AbortError') setSearchError(err.message) }).finally(() => {
+      if (compareIntervalRef.current) {
+        clearInterval(compareIntervalRef.current)
+        compareIntervalRef.current = null
+      }
+      if (compareTimerStartRef.current != null) {
+        setLastCompareQueryTimeSec(Math.round((Date.now() - compareTimerStartRef.current) / 1000))
+        compareTimerStartRef.current = null
+      }
+      setCompareElapsedSec(0)
+      setSearching(false)
+      setCompareProgress({ current: 0, total: 0 })
+    })
   }
 
   useEffect(() => {
@@ -1022,16 +1062,19 @@ function MobileApp() {
       const total = duplicatesResult.total ?? 0
       const selfCompare = compareTroveIds.size === 1 && compareTroveIds.has(primaryTroveId)
       const name = troves.find((t) => t.id === primaryTroveId)?.name ?? primaryTroveId
-      if (selfCompare && total > 0) return `${name} · Self-compare. ${formatCount(total)} item${total !== 1 ? 's' : ''} with possible duplicates.`
-      if (total > 0) return `${formatCount(total)} dups · ${primaryTroveId ? `${name} · Compare: ${formatCount(compareTroveIds.size)}` : 'Set primary & compare troves'}`
-      return primaryTroveId ? `${name} · Compare: ${formatCount(compareTroveIds.size)}` : 'Set primary & compare troves'
+      const durationPart = lastCompareQueryTimeSec != null ? <> <strong>Duration</strong>: {lastCompareQueryTimeSec}s.</> : null
+      if (selfCompare && total > 0) return <>{name} · Self-compare.{durationPart} {formatCount(total)} item{total !== 1 ? 's' : ''} with possible duplicates.</>
+      if (total > 0) return <>{formatCount(total)} dups · {primaryTroveId ? <>{name} · Compare: {formatCount(compareTroveIds.size)}.{durationPart}</> : 'Set primary & compare troves'}</>
+      return primaryTroveId ? <>{name} · Compare: {formatCount(compareTroveIds.size)}.{durationPart}</> : 'Set primary & compare troves'
     }
     if (searchMode === 'uniques' && uniquesResult != null) {
       const total = uniquesResult.total ?? 0
       if (compareTroveIds.size === 1 && compareTroveIds.has(primaryTroveId)) return 'Primary trove cannot be in compare list.'
+      const durationPart = lastCompareQueryTimeSec != null ? <> <strong>Duration</strong>: {lastCompareQueryTimeSec}s.</> : null
       const uniqPart = total > 0 ? `${formatCount(total)} uniques · ` : ''
-      const trovePart = primaryTroveId ? `${troves.find((t) => t.id === primaryTroveId)?.name ?? primaryTroveId} · Compare: ${formatCount(compareTroveIds.size)}` : 'Set primary & compare troves'
-      return (uniqPart + trovePart).trim() || 'Troves?'
+      const troveName = primaryTroveId ? troves.find((t) => t.id === primaryTroveId)?.name ?? primaryTroveId : ''
+      const trovePart = primaryTroveId ? <>{troveName} · Compare: {formatCount(compareTroveIds.size)}.{durationPart}</> : 'Set primary & compare troves'
+      return (uniqPart ? <>{uniqPart}{trovePart}</> : trovePart) as React.ReactNode
     }
     return 'Troves?'
   })()
@@ -1489,6 +1532,7 @@ onClick={() => {
                 <span className="search-compare-progress-count">{compareProgress.current} / {compareProgress.total}</span>
               )}
             </div>
+            <span className="search-compare-progress-timer" aria-label="Elapsed time">{compareElapsedSec}s</span>
           </div>
         )}
 

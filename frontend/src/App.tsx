@@ -71,6 +71,8 @@ function App() {
   const [searchResultsViewMode, setSearchResultsViewMode] = useState<'list' | 'gallery'>('list')
   const [galleryDecorate, setGalleryDecorate] = useState(true)
   const [compareProgress, setCompareProgress] = useState({ current: 0, total: 0 })
+  const [compareElapsedSec, setCompareElapsedSec] = useState(0)
+  const [lastCompareQueryTimeSec, setLastCompareQueryTimeSec] = useState<number | null>(null)
   const [reloadTrovesInProgress, setReloadTrovesInProgress] = useState(false)
   const [reloadTrovesProgress, setReloadTrovesProgress] = useState({ current: 0, total: 0 })
   const queryRef = useRef(query)
@@ -82,6 +84,8 @@ function App() {
   const abortControllerRef = useRef<AbortController | null>(null)
   const searchRequestIdRef = useRef(0)
   const reloadAbortControllerRef = useRef<AbortController | null>(null)
+  const compareTimerStartRef = useRef<number | null>(null)
+  const compareIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const fileTypeDropdownRef = useRef<HTMLDivElement | null>(null)
   const PAGE_SIZE_OPTIONS = [10, 25, 100, 500, 1000, 5000, 10000]
   queryRef.current = query
@@ -541,6 +545,12 @@ function App() {
     setSearching(true)
     setSearchError(null)
     setCompareProgress({ current: 0, total: 0 })
+    if (compareIntervalRef.current) clearInterval(compareIntervalRef.current)
+    compareTimerStartRef.current = Date.now()
+    setCompareElapsedSec(0)
+    compareIntervalRef.current = setInterval(() => {
+      setCompareElapsedSec(Math.floor((Date.now() - (compareTimerStartRef.current ?? 0)) / 1000))
+    }, 1000)
     readCompareStream(
       streamUrl,
       controller.signal,
@@ -556,6 +566,15 @@ function App() {
     ).catch((err) => {
       if (err.name !== 'AbortError') setSearchError(err.message)
     }).finally(() => {
+      if (compareIntervalRef.current) {
+        clearInterval(compareIntervalRef.current)
+        compareIntervalRef.current = null
+      }
+      if (compareTimerStartRef.current != null) {
+        setLastCompareQueryTimeSec(Math.round((Date.now() - compareTimerStartRef.current) / 1000))
+        compareTimerStartRef.current = null
+      }
+      setCompareElapsedSec(0)
       setSearching(false)
       setCompareProgress({ current: 0, total: 0 })
     })
@@ -608,6 +627,12 @@ function App() {
     setSearching(true)
     setSearchError(null)
     setCompareProgress({ current: 0, total: 0 })
+    if (compareIntervalRef.current) clearInterval(compareIntervalRef.current)
+    compareTimerStartRef.current = Date.now()
+    setCompareElapsedSec(0)
+    compareIntervalRef.current = setInterval(() => {
+      setCompareElapsedSec(Math.floor((Date.now() - (compareTimerStartRef.current ?? 0)) / 1000))
+    }, 1000)
     readCompareStream(
       streamUrl,
       controller.signal,
@@ -623,6 +648,15 @@ function App() {
     ).catch((err) => {
       if (err.name !== 'AbortError') setSearchError(err.message)
     }).finally(() => {
+      if (compareIntervalRef.current) {
+        clearInterval(compareIntervalRef.current)
+        compareIntervalRef.current = null
+      }
+      if (compareTimerStartRef.current != null) {
+        setLastCompareQueryTimeSec(Math.round((Date.now() - compareTimerStartRef.current) / 1000))
+        compareTimerStartRef.current = null
+      }
+      setCompareElapsedSec(0)
       setSearching(false)
       setCompareProgress({ current: 0, total: 0 })
     })
@@ -1646,6 +1680,7 @@ aria-label="Clear compare troves"
                     <span className="search-compare-progress-count">{compareProgress.current} / {compareProgress.total}</span>
                   )}
                 </div>
+                <span className="search-compare-progress-timer" aria-label="Elapsed time">{compareElapsedSec}s</span>
               </div>
             )}
             {searchMode === 'duplicates' && duplicatesResult != null && !searching && (() => {
@@ -1663,7 +1698,7 @@ aria-label="Clear compare troves"
               return (
                 <>
                   <p className="search-count search-count-detail">
-                    <><strong>Primary:</strong> {primaryName} · {compareSummary}. </>{formatCount(total)} {selectedTroveIds.size === 1 && selectedTroveIds.has(primaryTroveId) ? '' : 'primary '}item{total !== 1 ? 's' : ''} with possible duplicates.
+                    <><strong>Primary:</strong> {primaryName} · {compareSummary}.{lastCompareQueryTimeSec != null && <> <strong>Duration</strong>: {lastCompareQueryTimeSec}s.</>} </>{formatCount(total)} {selectedTroveIds.size === 1 && selectedTroveIds.has(primaryTroveId) ? '' : 'primary '}item{total !== 1 ? 's' : ''} with possible duplicates.
                     {totalPages > 1 && ` Showing ${formatCount(from)}–${formatCount(to)}.`}
                   </p>
                   <div className="search-results-options">
@@ -1788,7 +1823,7 @@ aria-label="Clear compare troves"
               return (
                 <>
                   <p className="search-count search-count-detail">
-                    <><strong>Primary:</strong> {primaryName} · {compareSummary}. </>{formatCount(total)} item{total !== 1 ? 's' : ''}{selectedTroveIds.size === 1 && selectedTroveIds.has(primaryTroveId) ? ' ' : ' in primary '}are either unique or have no obvious match.
+                    <><strong>Primary:</strong> {primaryName} · {compareSummary}.{lastCompareQueryTimeSec != null && <> <strong>Duration</strong>: {lastCompareQueryTimeSec}s.</>} </>{formatCount(total)} item{total !== 1 ? 's' : ''}{selectedTroveIds.size === 1 && selectedTroveIds.has(primaryTroveId) ? ' ' : ' in primary '}are either unique or have no obvious match.
                     {totalPages > 1 && ` Showing ${formatCount(from)}–${formatCount(to)}.`}
                   </p>
                   <div className="search-results-options">
