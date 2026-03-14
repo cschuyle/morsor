@@ -1580,6 +1580,9 @@ aria-label="Clear compare troves"
                                   }}
                                 />
                                 {ft}
+                                {searchResult?.fileTypeCounts != null && typeof searchResult.fileTypeCounts[ft] === 'number' && (
+                                  <span className="search-filetype-option-count" aria-hidden="true"> ({formatCount(searchResult.fileTypeCounts[ft])})</span>
+                                )}
                                 {ft === 'Link' && <img src="/link.png" alt="" className="search-filetype-option-icon" aria-hidden="true" />}
                                 {ft === 'PDF' && <img src="/pdf.png" alt="" className="search-filetype-option-icon" aria-hidden="true" />}
                                 {['JPG', 'JPEG', 'GIF', 'WEBP', 'TIFF', 'PNG'].includes(ft) && <img src="/image.png" alt="" className="search-filetype-option-icon" aria-hidden="true" />}

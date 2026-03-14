@@ -654,6 +654,12 @@
   margin-right: 0.5rem;
 }
 
+.mobile-filetype-option-count {
+  color: #6633cc;
+  font-weight: bold;
+  margin-left: 0.15rem;
+}
+
 .mobile-filetype-option-icon {
   margin-left: auto;
   width: 1.3rem;

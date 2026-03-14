@@ -1277,6 +1277,12 @@
   margin-right: 0.5rem;
 }
 
+.search-filetype-option-count {
+  color: #6633cc;
+  font-weight: bold;
+  margin-left: 0.15rem;
+}
+
 .search-filetype-option-icon {
   margin-left: auto;
   width: 1.3rem;

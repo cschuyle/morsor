@@ -1432,6 +1432,9 @@ onClick={() => {
                               }}
                             />
                             {ft}
+                            {searchResult?.fileTypeCounts != null && typeof searchResult.fileTypeCounts[ft] === 'number' && (
+                              <span className="mobile-filetype-option-count" aria-hidden="true"> ({formatCount(searchResult.fileTypeCounts[ft])})</span>
+                            )}
                             {ft === 'Link' && <img src="/link.png" alt="" className="mobile-filetype-option-icon" aria-hidden="true" />}
                             {ft === 'PDF' && <img src="/pdf.png" alt="" className="mobile-filetype-option-icon" aria-hidden="true" />}
                             {['JPG', 'JPEG', 'GIF', 'WEBP', 'TIFF', 'PNG'].includes(ft) && <img src="/image.png" alt="" className="mobile-filetype-option-icon" aria-hidden="true" />}

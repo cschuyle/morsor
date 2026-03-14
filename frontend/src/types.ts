@@ -21,6 +21,8 @@ export interface SearchResultData {
   warning?: string
   troveCounts?: Record<string, number>
   availableFileTypes?: string[]
+  /** Hit count per file type for the full search result (for media dropdown). */
+  fileTypeCounts?: Record<string, number>
 }
 
 /** Trove from /api/troves */

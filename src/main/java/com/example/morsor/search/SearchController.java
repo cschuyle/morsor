@@ -145,7 +145,7 @@ public class SearchController {
         if (!fileTypesFilter.isEmpty()) {
             Set<String> extSet = fileTypesFilter.stream().map(String::toUpperCase).collect(Collectors.toSet());
             all = all.stream()
-                    .filter(r -> hasFileWithAnyExtension(r.result(), extSet))
+                    .filter(r -> FileTypeCounts.hasFileWithAnyExtension(r.result(), extSet))
                     .toList();
         }
         if (thumbs) {
@@ -153,55 +153,17 @@ public class SearchController {
                     .filter(r -> r.result().hasThumbnail())
                     .toList();
         }
-        List<String> availableFileTypes = collectFileTypes(all);
+        List<String> availableFileTypes = FileTypeCounts.collectFileTypes(all);
         long total = all.size();
         Map<String, Long> troveCounts = all.stream()
                 .filter(r -> r.result().troveId() != null && !r.result().troveId().isBlank())
                 .collect(Collectors.groupingBy(r -> r.result().troveId(), Collectors.counting()));
+        Map<String, Long> fileTypeCounts = FileTypeCounts.countPerFileType(all);
         int from = (int) Math.min((long) page * size, total);
         int to = (int) Math.min(from + size, total);
         List<SearchResultWithScore> pageResults = from < to ? all.subList(from, to) : List.of();
         String warning = cacheResult.cached() ? null : "Result not cached (cache memory limit reached). Pagination may be slower.";
-        return new SearchResponse(total, pageResults, page, size, troveCounts, availableFileTypes, warning);
-    }
-
-    /** Returns true if the result has at least one file whose extension is in the set (disjunction: any match), or has itemUrl when "Link" is requested. */
-    private static boolean hasFileWithAnyExtension(SearchResult result, Set<String> extensions) {
-        if (extensions == null || extensions.isEmpty()) return false;
-        if ((extensions.contains("LINK") || extensions.contains("URL")) && result.itemUrl() != null && !result.itemUrl().isBlank()) return true;
-        if (result.files() == null) return false;
-        for (String url : result.files()) {
-            if (url != null) {
-                String ext = extractExtension(url);
-                if (ext != null && extensions.contains(ext)) return true;
-            }
-        }
-        return false;
-    }
-
-    private static String extractExtension(String url) {
-        if (url == null) return null;
-        int q = url.indexOf('?');
-        String path = q >= 0 ? url.substring(0, q) : url;
-        int lastDot = path.lastIndexOf('.');
-        if (lastDot >= 0 && lastDot < path.length() - 1) {
-            return path.substring(lastDot + 1).toUpperCase();
-        }
-        return null;
-    }
-
-    private static List<String> collectFileTypes(List<SearchResultWithScore> results) {
-        Set<String> types = new TreeSet<>();
-        for (SearchResultWithScore r : results) {
-            if (r.result().itemUrl() != null && !r.result().itemUrl().isBlank()) types.add("Link");
-            if (r.result().files() != null) {
-                for (String url : r.result().files()) {
-                    String ext = extractExtension(url);
-                    if (ext != null && !ext.isEmpty()) types.add(ext);
-                }
-            }
-        }
-        return List.copyOf(types);
+        return new SearchResponse(total, pageResults, page, size, troveCounts, availableFileTypes, fileTypeCounts, warning);
     }
 
     private static final int DEFAULT_DUPLICATES_MAX_MATCHES = 20;
