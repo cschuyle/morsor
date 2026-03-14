@@ -785,6 +785,18 @@ function MobileApp() {
     }
   }
 
+  function clearPrimaryTroves() {
+    if (!isDupOrUniques) return
+    setPrimaryTroveId('')
+    setSearchParams(buildSearchParamsForMode(searchMode, '', compareTroveIds), { replace: true })
+  }
+
+  function clearCompareTroves() {
+    if (!isDupOrUniques) return
+    setCompareTroveIds(new Set())
+    setSearchParams(buildSearchParamsForMode(searchMode, primaryTroveId, new Set()), { replace: true })
+  }
+
   function handleBoostClick(troveId) {
     if (!isDupOrUniques) {
       setFreezeTroveListOrder(true)
@@ -1716,7 +1728,24 @@ onClick={() => {
               </p>
             )}
             <div className="mobile-trove-clear-row">
-              <button type="button" onClick={clearTroves} className="mobile-trove-clear">Clear all</button>
+              {isDupOrUniques ? (
+                <>
+                  {trovePickerSubTab === 'primary' && primaryTroveId && (
+                    <button type="button" onClick={clearPrimaryTroves} className="mobile-trove-clear" aria-label="Clear primary trove">
+                      Clear
+                    </button>
+                  )}
+                  {trovePickerSubTab === 'compare' && compareTroveIds.size > 0 && (
+                    <button type="button" onClick={clearCompareTroves} className="mobile-trove-clear" aria-label="Clear compare troves">
+                      Clear
+                    </button>
+                  )}
+                </>
+              ) : (
+                <button type="button" onClick={clearTroves} className="mobile-trove-clear" aria-label="Clear selection">
+                  Clear
+                </button>
+              )}
               {searchMode === 'duplicates' && primaryTroveId && (
                 <span
                   className={`mobile-compare-to-self-text ${isCompareToSelfVisible(primaryTroveId, compareTroveIds) ? '' : 'mobile-compare-to-self--invisible'}`}
