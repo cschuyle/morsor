@@ -1514,7 +1514,7 @@ onClick={() => {
         )}
         {isDupOrUniques && searching && (
           <div className="mobile-search-loading" aria-live="polite" aria-busy="true">
-            <span>Searching{"\u2026"}</span>
+            <span className="mobile-search-spinner" aria-hidden="true" />
             <div
               className="search-compare-progress-wrap"
               role="progressbar"
