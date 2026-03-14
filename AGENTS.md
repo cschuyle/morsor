@@ -30,6 +30,6 @@ Document regressions here (what broke, where, and how it was fixed) so agents ca
 
 ---
 
-- If I say "A question" then I implicitly mean that I don't want you to modify any files. I am just asking a question.
+- If I say "A question", "Question:" or just "Q:" or even "Q", then I implicitly mean that I don't want you to modify any files. I am just asking a question."
 
 *(Write your preferences above this line.)*
