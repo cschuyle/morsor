@@ -2107,6 +2107,14 @@
   color: #999;
 }
 
+.trove-picker-compare-to-self-text {
+  color: #000;
+}
+
+.trove-picker-compare-to-self-text--invisible {
+  visibility: hidden;
+}
+
 .search-trove-summary-row {
   display: flex;
   justify-content: space-between;

@@ -907,8 +907,11 @@ function App() {
         <div className={`sidebar-wrapper ${sidebarOpen ? 'sidebar-wrapper--open' : ''}`}>
           <aside className="sidebar">
             <div className="trove-picker-panel">
-              {(searchMode === 'duplicates' || searchMode === 'uniques') ? (
-                <>
+              {(searchMode === 'duplicates' || searchMode === 'uniques') ? ((() => {
+                const compareIds = searchMode === 'duplicates' ? dupCompareTroveIds : uniqCompareTroveIds
+                const compareToSelfVisible = primaryTroveId && (compareIds.size === 0 || (compareIds.size === 1 && compareIds.has(primaryTroveId)))
+                return (
+                  <>
                   <div className="trove-picker-tabs" role="tablist" aria-label="Trove selection">
                     {(() => {
                       const primaryTabInvalid = searchMode === 'duplicates' ? !dupPrimaryTroveId : !uniqPrimaryTroveId
@@ -963,15 +966,14 @@ function App() {
                             ) : (
                               <span />
                             )}
-                            <button
-                              type="button"
-                              className="trove-picker-clear"
-                              onClick={() => { if (dupPrimaryTroveId) setDupCompareTroveIds(new Set([dupPrimaryTroveId])) }}
-                              disabled={!dupPrimaryTroveId}
-                              aria-label="Compare to self"
-                            >
-                              Compare to self
-                            </button>
+                            {primaryTroveId && (
+                              <span
+                                className={`trove-picker-compare-to-self-text ${compareToSelfVisible ? '' : 'trove-picker-compare-to-self-text--invisible'}`}
+                                aria-hidden="true"
+                              >
+                                Comparing to self
+                              </span>
+                            )}
                           </div>
                         </div>
                         <div className="sidebar-trove-filter-wrap">
@@ -1054,19 +1056,18 @@ function App() {
                             type="button"
                             className="trove-picker-clear"
                             onClick={clearTroves}
-aria-label="Clear compare troves"
-                        >
-                          Clear
-                        </button>
-                          <button
-                            type="button"
-                            className="trove-picker-clear"
-                            onClick={() => { if (dupPrimaryTroveId) setDupCompareTroveIds(new Set([dupPrimaryTroveId])) }}
-                            disabled={!dupPrimaryTroveId}
-                            aria-label="Compare to self"
+                            aria-label="Clear compare troves"
                           >
-                            Compare to self
+                            Clear
                           </button>
+                          {primaryTroveId && (
+                            <span
+                              className={`trove-picker-compare-to-self-text ${compareToSelfVisible ? '' : 'trove-picker-compare-to-self-text--invisible'}`}
+                              aria-hidden="true"
+                            >
+                              Comparing to self
+                            </span>
+                          )}
                         </div>
                       </div>
                       <div className="sidebar-show-wrap">
@@ -1148,8 +1149,9 @@ aria-label="Clear compare troves"
                       </ul>
                     </div>
                   )}
-                </>
-              ) : (
+                  </>
+                )
+              })()) : (
                 <>
                   <h2 className="trove-picker-heading">Troves</h2>
                   <div className="search-trove-summary-row">

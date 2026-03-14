@@ -1714,15 +1714,14 @@ onClick={() => {
             )}
             <div className="mobile-trove-clear-row">
               <button type="button" onClick={clearTroves} className="mobile-trove-clear">Clear all</button>
-              {searchMode === 'duplicates' && (
+              {searchMode === 'duplicates' && primaryTroveId && (
                 <button
                   type="button"
                   className="mobile-trove-clear"
-                  onClick={() => { if (primaryTroveId) setCompareTroveIds(new Set([primaryTroveId])) }}
-                  disabled={!primaryTroveId}
-                  aria-label="Compare to self"
+                  onClick={() => setCompareTroveIds(new Set([primaryTroveId]))}
+                  aria-label="Comparing to self"
                 >
-                  Compare to self
+                  Comparing to self
                 </button>
               )}
             </div>
