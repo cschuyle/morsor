@@ -1060,9 +1060,9 @@ function MobileApp() {
   const mobileTroveDropdownLabel = (() => {
     if (searchMode === 'search') {
       const itemsPart = searchResult != null && count > 0 ? `${formatCount(count)} item${count !== 1 ? 's' : ''} · ` : ''
-      const trovePart = selectedTroveIds.size === 0 ? 'All troves' : `${formatCount(selectedTroveIds.size)} trove${selectedTroveIds.size !== 1 ? 's' : ''}`
+      const trovePart = selectedTroveIds.size === 0 ? 'All troves. Click to change' : `${formatCount(selectedTroveIds.size)} trove${selectedTroveIds.size !== 1 ? 's' : ''}`
       const s = itemsPart + trovePart
-      return s.trim() || 'Troves?'
+      return s.trim() || 'All troves. Click to change'
     }
     if (searchMode === 'duplicates' && duplicatesResult != null) {
       const total = duplicatesResult.total ?? 0
@@ -1070,8 +1070,8 @@ function MobileApp() {
       const name = troves.find((t) => t.id === primaryTroveId)?.name ?? primaryTroveId
       const durationPart = lastCompareQueryTimeSec != null ? <> <strong>Duration</strong>: {lastCompareQueryTimeSec}s.</> : null
       if (selfCompare && total > 0) return <>{name} · Self-compare.{durationPart} {formatCount(total)} item{total !== 1 ? 's' : ''} with possible duplicates.</>
-      if (total > 0) return <>{formatCount(total)} dups · {primaryTroveId ? <>{name} · Compare: {formatCount(compareTroveIds.size)}.{durationPart}</> : 'Set primary & compare troves'}</>
-      return primaryTroveId ? <>{name} · Compare: {formatCount(compareTroveIds.size)}.{durationPart}</> : 'Set primary & compare troves'
+      if (total > 0) return <>{formatCount(total)} dups · {primaryTroveId ? <>{name} · Compare: {formatCount(compareTroveIds.size)}.{durationPart}</> : 'Choose troves to search'}</>
+      return primaryTroveId ? <>{name} · Compare: {formatCount(compareTroveIds.size)}.{durationPart}</> : 'Choose troves to search'
     }
     if (searchMode === 'uniques' && uniquesResult != null) {
       const total = uniquesResult.total ?? 0
@@ -1079,10 +1079,19 @@ function MobileApp() {
       const durationPart = lastCompareQueryTimeSec != null ? <> <strong>Duration</strong>: {lastCompareQueryTimeSec}s.</> : null
       const uniqPart = total > 0 ? `${formatCount(total)} uniques · ` : ''
       const troveName = primaryTroveId ? troves.find((t) => t.id === primaryTroveId)?.name ?? primaryTroveId : ''
-      const trovePart = primaryTroveId ? <>{troveName} · Compare: {formatCount(compareTroveIds.size)}.{durationPart}</> : 'Set primary & compare troves'
+      const trovePart = primaryTroveId ? <>{troveName} · Compare: {formatCount(compareTroveIds.size)}.{durationPart}</> : 'Choose troves to search'
       return (uniqPart ? <>{uniqPart}{trovePart}</> : trovePart) as React.ReactNode
     }
-    return 'Troves?'
+    if (searchMode === 'duplicates') {
+      const name = troves.find((t) => t.id === primaryTroveId)?.name ?? primaryTroveId
+      return primaryTroveId && compareTroveIds.size > 0 ? <>{name} · Compare: {formatCount(compareTroveIds.size)}</> : 'Choose troves to search'
+    }
+    if (searchMode === 'uniques') {
+      if (compareTroveIds.size === 1 && compareTroveIds.has(primaryTroveId)) return 'Primary trove cannot be in compare list.'
+      const troveName = primaryTroveId ? troves.find((t) => t.id === primaryTroveId)?.name ?? primaryTroveId : ''
+      return primaryTroveId && compareTroveIds.size > 0 ? <>{troveName} · Compare: {formatCount(compareTroveIds.size)}</> : 'Choose troves to search'
+    }
+    return 'All troves. Click to change'
   })()
   const filteredTroves = troves.filter((t) => {
     const q = trovePickerFilter.trim().toLowerCase()
@@ -1307,7 +1316,7 @@ onClick={() => {
               </button>
             </span>
           </div>
-          <button type="submit" className="mobile-search-btn" disabled={searching} aria-label="Search">
+          <button type="submit" className="mobile-search-btn" disabled={searching || (isDupOrUniques && (!primaryTroveId || compareTroveIds.size === 0))} aria-label="Search">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
               <circle cx="11" cy="11" r="8" />
               <path d="m21 21-4.35-4.35" />

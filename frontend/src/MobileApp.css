@@ -328,7 +328,9 @@
 }
 
 .mobile-search-btn:disabled {
-  opacity: 0.7;
+  background: #e0d0ee;
+  border-color: #c9b8e8;
+  color: #6633cc;
   cursor: not-allowed;
 }
 
@@ -728,7 +730,7 @@
   margin: -0.2rem;
   box-sizing: content-box;
   border-radius: 4px;
-  background-color: #e0e0ff;
+  background-color: #5522aa;
   -webkit-mask-image: url(/question.png);
   mask-image: url(/question.png);
   -webkit-mask-size: contain;
@@ -737,10 +739,6 @@
   mask-repeat: no-repeat;
   -webkit-mask-position: center;
   mask-position: center;
-}
-
-.mobile-troves-btn:hover .mobile-troves-btn-change {
-  background-color: #6633cc;
 }
 
 .mobile-trove-picker {
