@@ -84,6 +84,8 @@ function App() {
   const abortControllerRef = useRef<AbortController | null>(null)
   const searchRequestIdRef = useRef(0)
   const reloadAbortControllerRef = useRef<AbortController | null>(null)
+  const reloadRunIdRef = useRef(0)
+  const reloadInProgressRef = useRef(false)
   const compareTimerStartRef = useRef<number | null>(null)
   const compareIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const fileTypeDropdownRef = useRef<HTMLDivElement | null>(null)
@@ -2191,6 +2193,9 @@ aria-label="Clear compare troves"
                 type="button"
                 className="app-footer-link app-footer-clear-cache"
                 onClick={async () => {
+                  if (reloadInProgressRef.current) return
+                  reloadInProgressRef.current = true
+                  const runId = ++reloadRunIdRef.current
                   setReloadTrovesInProgress(true)
                   setReloadTrovesProgress({ current: 0, total: 0 })
                   const controller = new AbortController()
@@ -2202,7 +2207,10 @@ aria-label="Clear compare troves"
                     const res = await fetch('/api/troves/reload/stream', { method: 'POST', credentials: 'include', headers, signal: controller.signal })
                     if (res.status === 401) { window.location.href = '/login'; return }
                     if (!res.ok || !res.body) {
-                      setReloadTrovesInProgress(false)
+                      if (runId === reloadRunIdRef.current) {
+                        reloadInProgressRef.current = false
+                        setReloadTrovesInProgress(false)
+                      }
                       return
                     }
                     const reader = res.body.getReader()
@@ -2229,7 +2237,10 @@ aria-label="Clear compare troves"
                     }
                   } catch (_) {}
                   setReloadTrovesProgress({ current: 0, total: 0 })
-                  setReloadTrovesInProgress(false)
+                  if (runId === reloadRunIdRef.current) {
+                    reloadInProgressRef.current = false
+                    setReloadTrovesInProgress(false)
+                  }
                 }}
               >
                 Reload Troves

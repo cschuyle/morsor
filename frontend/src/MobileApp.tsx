@@ -106,6 +106,8 @@ function MobileApp() {
   const abortRef = useRef<AbortController | null>(null)
   const searchRequestIdRef = useRef(0)
   const reloadAbortControllerRef = useRef<AbortController | null>(null)
+  const reloadRunIdRef = useRef(0)
+  const reloadInProgressRef = useRef(false)
   const compareTimerStartRef = useRef<number | null>(null)
   const compareIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const fileTypeDropdownRef = useRef<HTMLDivElement | null>(null)
@@ -1957,6 +1959,9 @@ onClick={() => {
               className="mobile-footer-link mobile-clear-cache-btn"
               aria-label="Reload troves"
               onClick={async () => {
+                if (reloadInProgressRef.current) return
+                reloadInProgressRef.current = true
+                const runId = ++reloadRunIdRef.current
                 setReloadTrovesInProgress(true)
                 setReloadTrovesProgress({ current: 0, total: 0 })
                 const controller = new AbortController()
@@ -1968,7 +1973,10 @@ onClick={() => {
                   const res = await fetch('/api/troves/reload/stream', { method: 'POST', credentials: 'include', headers, signal: controller.signal })
                   if (res.status === 401) { window.location.href = '/login'; return }
                   if (!res.ok || !res.body) {
-                    setReloadTrovesInProgress(false)
+                    if (runId === reloadRunIdRef.current) {
+                      reloadInProgressRef.current = false
+                      setReloadTrovesInProgress(false)
+                    }
                     return
                   }
                   const reader = res.body.getReader()
@@ -1995,7 +2003,10 @@ onClick={() => {
                   }
                 } catch (_) {}
                 setReloadTrovesProgress({ current: 0, total: 0 })
-                setReloadTrovesInProgress(false)
+                if (runId === reloadRunIdRef.current) {
+                  reloadInProgressRef.current = false
+                  setReloadTrovesInProgress(false)
+                }
               }}
             >
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
