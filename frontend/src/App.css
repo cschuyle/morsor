@@ -1973,6 +1973,9 @@
   color: #fff;
   pointer-events: none;
 }
+.search-compare-progress-percent-over-track {
+  color: #333;
+}
 
 .search-compare-progress-count {
   color: #000;

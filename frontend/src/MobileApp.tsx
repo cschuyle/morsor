@@ -1528,9 +1528,12 @@ onClick={() => {
                   className={`search-compare-progress-bar ${compareProgress.total === 0 ? 'search-compare-progress-indeterminate' : ''}`}
                   style={compareProgress.total > 0 ? { width: `${(compareProgress.current / compareProgress.total) * 100}%` } : undefined}
                 />
-                {compareProgress.total > 0 && (
-                  <span className="search-compare-progress-percent">{Math.round((compareProgress.current / compareProgress.total) * 100)}%</span>
-                )}
+                {compareProgress.total > 0 && (() => {
+                  const pct = Math.round((compareProgress.current / compareProgress.total) * 100)
+                  return (
+                    <span className={`search-compare-progress-percent ${pct < 50 ? 'search-compare-progress-percent-over-track' : ''}`}>{pct}%</span>
+                  )
+                })()}
               </div>
               <span className="search-compare-progress-stats">
                 <span className="search-compare-progress-timer" aria-label="Elapsed time">{compareElapsedSec}s</span>
