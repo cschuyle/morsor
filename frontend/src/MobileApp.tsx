@@ -12,6 +12,7 @@ import { FileTypeQuickMode, normalizeFileTypeQuickMode } from './fileTypeQuickMo
 import { SearchResultsGrid } from './SearchResultsGrid'
 import { DuplicateResultsView } from './DuplicateResultsView'
 import { UniquesResultsView } from './UniquesResultsView'
+import { isCompareToSelfVisible } from './compareToSelfVisible'
 import './MobileApp.css'
 
 const MOBILE_PAGE_SIZE = 100
@@ -1719,7 +1720,7 @@ onClick={() => {
               {searchMode === 'duplicates' && primaryTroveId && (
                 <button
                   type="button"
-                  className="mobile-trove-clear"
+                  className={`mobile-trove-clear ${isCompareToSelfVisible(primaryTroveId, compareTroveIds) ? '' : 'mobile-compare-to-self--invisible'}`}
                   onClick={() => setCompareTroveIds(new Set([primaryTroveId]))}
                   aria-label="Comparing to self"
                 >

@@ -888,6 +888,10 @@
   cursor: default;
 }
 
+.mobile-compare-to-self--invisible {
+  visibility: hidden;
+}
+
 .mobile-trove-list {
   list-style: none;
   margin: 0;

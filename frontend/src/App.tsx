@@ -12,6 +12,7 @@ import { queryCache } from './queryCache'
 import { formatCount, formatCacheBytes } from './formatCount'
 import { groupFileTypes, getGroupNameIfFullySelected, getFullySelectedGroupNames } from './fileTypeGroups'
 import { FileTypeQuickMode, normalizeFileTypeQuickMode } from './fileTypeQuickMode'
+import { isCompareToSelfVisible } from './compareToSelfVisible'
 import './App.css'
 
 function App() {
@@ -909,7 +910,7 @@ function App() {
             <div className="trove-picker-panel">
               {(searchMode === 'duplicates' || searchMode === 'uniques') ? ((() => {
                 const compareIds = searchMode === 'duplicates' ? dupCompareTroveIds : uniqCompareTroveIds
-                const compareToSelfVisible = primaryTroveId && (compareIds.size === 0 || (compareIds.size === 1 && compareIds.has(primaryTroveId)))
+                const compareToSelfVisible = isCompareToSelfVisible(primaryTroveId, compareIds)
                 return (
                   <>
                   <h2 className="trove-picker-heading">Troves</h2>
