@@ -2212,6 +2212,12 @@ function App() {
                         .catch(() => {})
                     }}
                   >
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                      <polyline points="3 6 5 6 21 6" />
+                      <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                      <line x1="10" y1="11" x2="10" y2="17" />
+                      <line x1="14" y1="11" x2="14" y2="17" />
+                    </svg>
                     Clear Cache
                   </button>
                 </>
@@ -2271,6 +2277,17 @@ function App() {
                   }
                 }}
               >
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <path d="M17.661 18.993A9 9 0 1 1 16.361 4.13" />
+                  <path
+                    d="M14.108 0.528 L12.709 5.98 L18.21 4.181 Z"
+                    fill="currentColor"
+                    stroke="currentColor"
+                    strokeWidth="1.1"
+                    strokeLinejoin="round"
+                    strokeLinecap="round"
+                  />
+                </svg>
                 Reload Troves
               </button>
             </p>

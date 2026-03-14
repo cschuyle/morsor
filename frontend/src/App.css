@@ -208,6 +208,10 @@
   font-size: inherit;
   color: #6633cc;
   text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  vertical-align: bottom;
 }
 
 .app-footer-clear-cache:hover {
