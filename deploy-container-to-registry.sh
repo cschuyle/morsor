@@ -27,8 +27,9 @@ fi
 if [ -z "${MOOCHO_VERSION:-}" ]; then
   GIT_SHA_SHORT="$(git rev-parse --short=7 HEAD)"
   BUILD_DATE="$(date +%Y%m%d)"
-  # 24-hour HHMM timestamp
+  # 24-hour HHMM timestamp, zero-padded to 4 digits (e.g. 0016, 1430)
   BUILD_TIME_HHMM="$(date +%H%M)"
+  BUILD_TIME_HHMM="$(printf '%04d' $((10#${BUILD_TIME_HHMM})))"
   MOOCHO_VERSION="${BUILD_DATE}-${BUILD_TIME_HHMM}-${GIT_SHA_SHORT}"
 fi
 
