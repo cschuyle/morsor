@@ -1,5 +1,44 @@
-import { useState, useEffect } from 'react'
+import { Fragment, useState, useEffect } from 'react'
 import type { UniqueResultRow, SearchResultRow } from './types'
+
+const WORD_RE = /\b[\w']+\b/g
+
+function getWordsFromTitles(nearMisses: Array<{ result?: SearchResultRow; score?: number }>): Set<string> {
+  const set = new Set<string>()
+  for (const m of nearMisses ?? []) {
+    const title = (m?.result as SearchResultRow | undefined)?.title ?? ''
+    const words = title.toLowerCase().match(WORD_RE) ?? []
+    words.forEach((w) => set.add(w))
+  }
+  return set
+}
+
+function getWordsFromTitle(title: string): Set<string> {
+  const words = (title ?? '').toLowerCase().match(WORD_RE) ?? []
+  return new Set(words)
+}
+
+function titleWithMatchHighlight(title: string, highlightWords: Set<string>): React.ReactNode {
+  if (!title) return '—'
+  const segments = title.split(/(\b[\w']+\b)/g)
+  return segments.map((seg, i) => {
+    if (seg.length > 0 && /^[\w']+$/.test(seg) && highlightWords.has(seg.toLowerCase())) {
+      return <span key={i} className="uniques-word-in-near-miss">{seg}</span>
+    }
+    return seg
+  })
+}
+
+function titleWithExtraHighlight(matchTitle: string, primaryWords: Set<string>): React.ReactNode {
+  if (!matchTitle) return '—'
+  const segments = matchTitle.split(/(\b[\w']+\b)/g)
+  return segments.map((seg, i) => {
+    if (seg.length > 0 && /^[\w']+$/.test(seg) && !primaryWords.has(seg.toLowerCase())) {
+      return <span key={i} className="dup-match-word-not-in-primary">{seg}</span>
+    }
+    return seg
+  })
+}
 
 interface UniquesResultsViewProps {
   results?: UniqueResultRow[]
@@ -74,23 +113,40 @@ export function UniquesResultsView({ results = [], sortBy = null, sortDir = 'asc
           {results.map((row, idx) => {
             const item = (row?.item ?? row) as SearchResultRow | undefined
             const score = typeof row?.score === 'number' ? row.score : null
+            const nearMisses = row?.nearMisses ?? []
+            const nearMissWords = getWordsFromTitles(nearMisses)
+            const primaryWords = getWordsFromTitle(item?.title ?? '')
             return (
-              <tr key={idx} className="duplicate-row-primary">
-                <td className="col-title">{item?.title ?? '—'}</td>
-                <td className="col-trove">{item?.trove ?? item?.troveId ?? ''}</td>
-                <td className="col-score">{score != null ? score.toFixed(2) : '—'}</td>
-                <td className="col-uniques-help">
-                  <button
-                    type="button"
-                    className="uniques-help-btn"
-                    onClick={() => setDialogRow(idx)}
-                    title="Show top possible duplicates"
-                    aria-label="Show top possible duplicates"
-                  >
-                    ?
-                  </button>
-                </td>
-              </tr>
+              <Fragment key={idx}>
+                <tr className="duplicate-row-primary">
+                  <td className="col-title">{titleWithMatchHighlight(item?.title ?? '—', nearMissWords)}</td>
+                  <td className="col-trove">{item?.trove ?? item?.troveId ?? ''}</td>
+                  <td className="col-score">{score != null ? score.toFixed(2) : '—'}</td>
+                  <td className="col-uniques-help">
+                    <button
+                      type="button"
+                      className="uniques-help-btn"
+                      onClick={() => setDialogRow(idx)}
+                      title="Show top possible duplicates"
+                      aria-label="Show top possible duplicates"
+                    >
+                      ?
+                    </button>
+                  </td>
+                </tr>
+                {nearMisses.map((m, matchIdx) => {
+                  const r = (m?.result ?? m) as SearchResultRow | undefined
+                  const s = typeof m?.score === 'number' ? m.score : null
+                  return (
+                    <tr key={matchIdx} className="duplicate-row-match">
+                      <td className="col-title">{titleWithExtraHighlight(r?.title ?? '—', primaryWords)}</td>
+                      <td className="col-trove">{r?.trove ?? r?.troveId ?? ''}</td>
+                      <td className="col-score">{s != null ? s.toFixed(2) : '—'}</td>
+                      <td className="col-uniques-help" />
+                    </tr>
+                  )
+                })}
+              </Fragment>
             )
           })}
         </tbody>
