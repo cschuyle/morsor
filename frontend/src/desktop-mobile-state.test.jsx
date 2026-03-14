@@ -63,10 +63,10 @@ describe('Desktop and mobile share state via URL', () => {
       </MemoryRouter>
     )
     await waitFor(() => {
-      expect(screen.getByText(/Server OK/)).toBeInTheDocument()
+      expect(screen.getByRole('img', { name: 'Server OK' })).toBeInTheDocument()
     })
 
-    const desktopLink = screen.getByRole('link', { name: 'Desktop site' })
+    const desktopLink = screen.getByRole('link', { name: 'Desktop' })
     const href = desktopLink.getAttribute('href') ?? ''
     expect(href).toContain('mode=duplicates')
     expect(href).toContain('q=')
@@ -101,10 +101,10 @@ describe('Desktop and mobile share state via URL', () => {
       </MemoryRouter>
     )
     await waitFor(() => {
-      expect(screen.getByText(/Server OK/)).toBeInTheDocument()
+      expect(screen.getByRole('img', { name: 'Server OK' })).toBeInTheDocument()
     })
 
-    const desktopLink = screen.getByRole('link', { name: 'Desktop site' })
+    const desktopLink = screen.getByRole('link', { name: 'Desktop' })
     const href = desktopLink.getAttribute('href') ?? ''
     expect(href).toContain('q=test')
     expect(href).toContain('trove=favorites')
