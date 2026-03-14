@@ -1,6 +1,25 @@
 import { Fragment } from 'react'
 import type { DuplicateRow } from './types'
 
+const WORD_RE = /\b\w+\b/g
+
+function getPrimaryWords(primaryTitle: string): Set<string> {
+  const lower = (primaryTitle ?? '').toLowerCase()
+  const words = lower.match(WORD_RE) ?? []
+  return new Set(words)
+}
+
+function titleWithExtraHighlight(matchTitle: string, primaryWords: Set<string>): React.ReactNode {
+  if (!matchTitle) return '—'
+  const segments = matchTitle.split(/(\b[\w']+\b)/g)
+  return segments.map((seg, i) => {
+    if (seg.length > 0 && /^[\w']+$/.test(seg) && !primaryWords.has(seg.toLowerCase())) {
+      return <span key={i} className="dup-match-word-not-in-primary">{seg}</span>
+    }
+    return seg
+  })
+}
+
 interface DuplicateResultsViewProps {
   rows?: DuplicateRow[]
   sortBy?: string | null
@@ -66,13 +85,16 @@ export function DuplicateResultsView({ rows = [], sortBy = null, sortDir = 'asc'
                 <td className="col-trove">{row.primary?.trove ?? row.primary?.troveId ?? ''}</td>
                 <td className="col-score" aria-label="Primary item (max match score)">{primaryScore}</td>
               </tr>
-              {(row.matches ?? []).filter((m) => String(m.result?.id ?? '') !== String(row.primary?.id ?? '')).map((m, matchIdx) => (
+              {(row.matches ?? []).filter((m) => String(m.result?.id ?? '') !== String(row.primary?.id ?? '')).map((m, matchIdx) => {
+                const primaryWords = getPrimaryWords(row.primary?.title ?? '')
+                return (
                 <tr key={matchIdx} className="duplicate-row-match">
-                  <td className="col-title">{m.result?.title ?? '—'}</td>
+                  <td className="col-title">{titleWithExtraHighlight(m.result?.title ?? '—', primaryWords)}</td>
                   <td className="col-trove">{m.result?.trove ?? m.result?.troveId ?? ''}</td>
                   <td className="col-score">{typeof m.score === 'number' ? m.score.toFixed(2) : '—'}</td>
                 </tr>
-              ))}
+              )
+              })}
             </Fragment>
             )
           })}

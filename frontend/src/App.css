@@ -1742,6 +1742,10 @@
   border-bottom: 1px solid #eee;
 }
 
+.duplicate-row-match .dup-match-word-not-in-primary {
+  background-color: #fef9c3;
+}
+
 .duplicate-results-empty {
   margin: 1rem 0;
   color: #666;
