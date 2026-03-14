@@ -43,6 +43,17 @@ function makeUniquesResponse(total, page, size) {
   return { total, page, size, results }
 }
 
+/** Return a fetch Response whose body is a single NDJSON line (for stream API mocks). */
+function streamDoneResponse(payload) {
+  const body = new ReadableStream({
+    start(controller) {
+      controller.enqueue(new TextEncoder().encode(JSON.stringify({ type: 'done', result: payload }) + '\n'))
+      controller.close()
+    },
+  })
+  return new Response(body, { status: 200, headers: { 'Content-Type': 'application/x-ndjson' } })
+}
+
 function expectNumberedPagination(nav) {
   const numsContainer = nav.querySelector('.pagination-nums')
   expect(numsContainer).toBeInTheDocument()
@@ -103,7 +114,9 @@ describe('Desktop search pagination', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Search' }))
 
     await waitFor(() => {
-      expect(screen.getByText(/Page 1 of 10/)).toBeInTheDocument()
+      const nav = screen.getByRole('navigation', { name: /Search results pages/i })
+      expect(nav).toBeInTheDocument()
+      expect(nav.textContent).toMatch(/Page\s+.*of\s+10/)
     })
 
     const nav = screen.getByRole('navigation', { name: /Search results pages/i })
@@ -119,15 +132,12 @@ describe('Desktop duplicates pagination', () => {
       if (path.includes('/api/troves')) {
         return Promise.resolve({ ok: true, json: () => Promise.resolve(twoTroves) })
       }
-      if (path.includes('/api/search/duplicates')) {
+      if (path.includes('/api/search/duplicates/stream')) {
         const u = new URL(path, 'http://localhost')
         const page = parseInt(u.searchParams.get('page') || '0', 10)
         const size = parseInt(u.searchParams.get('size') || '50', 10)
         const total = 500
-        return Promise.resolve({
-          ok: true,
-          json: () => Promise.resolve(makeDuplicatesResponse(total, page, size)),
-        })
+        return Promise.resolve(streamDoneResponse(makeDuplicatesResponse(total, page, size)))
       }
       if (path.includes('/api/status')) {
         return Promise.resolve({ ok: true, json: () => Promise.resolve({ status: 'UP', cache: { entries: 0, estimatedBytes: 0 } }) })
@@ -163,15 +173,12 @@ describe('Desktop uniques pagination', () => {
       if (path.includes('/api/troves')) {
         return Promise.resolve({ ok: true, json: () => Promise.resolve(twoTroves) })
       }
-      if (path.includes('/api/search/uniques')) {
+      if (path.includes('/api/search/uniques/stream')) {
         const u = new URL(path, 'http://localhost')
         const page = parseInt(u.searchParams.get('page') || '0', 10)
         const size = parseInt(u.searchParams.get('size') || '50', 10)
         const total = 500
-        return Promise.resolve({
-          ok: true,
-          json: () => Promise.resolve(makeUniquesResponse(total, page, size)),
-        })
+        return Promise.resolve(streamDoneResponse(makeUniquesResponse(total, page, size)))
       }
       if (path.includes('/api/status')) {
         return Promise.resolve({ ok: true, json: () => Promise.resolve({ status: 'UP', cache: { entries: 0, estimatedBytes: 0 } }) })
