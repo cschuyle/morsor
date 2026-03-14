@@ -522,10 +522,6 @@ function App() {
       setDuplicatesResult({ total: 0, page: 0, size, rows: [] })
       return
     }
-    if (selectedTroveIds.size === 0) {
-      setDuplicatesResult({ total: 0, page: 0, size, rows: [] })
-      return
-    }
     const params = new URLSearchParams({
       primaryTrove: primaryTroveId.trim(),
       query: q,
@@ -533,7 +529,8 @@ function App() {
       size: String(size),
       maxMatches: '20',
     })
-    selectedTroveIds.forEach((id) => params.append('compareTrove', id))
+    const compareIdsToSend = selectedTroveIds.size > 0 ? selectedTroveIds : new Set([primaryTroveId.trim()])
+    compareIdsToSend.forEach((id) => params.append('compareTrove', id))
     const streamUrl = `/api/search/duplicates/stream?${params}`
     const restUrl = `/api/search/duplicates?${params}`
     const cached = queryCache.get(restUrl) as DuplicatesResultData | null | undefined
@@ -669,7 +666,6 @@ function App() {
     e?.preventDefault()
     if (searchMode === 'duplicates') {
       if (!primaryTroveId.trim()) return
-      if (selectedTroveIds.size === 0) return
       setSearchError(null)
       setSearchResult(null)
       setUniquesResult(null)
@@ -711,7 +707,7 @@ function App() {
   function handleDupPageSizeChange(e) {
     const newSize = Number(e.target.value)
     setDupPageSize(newSize)
-    if (duplicatesResult != null && primaryTroveId.trim() && selectedTroveIds.size > 0) fetchDuplicates(0, newSize)
+    if (duplicatesResult != null && primaryTroveId.trim()) fetchDuplicates(0, newSize)
   }
   function handleUniqPageSizeChange(e) {
     const newSize = Number(e.target.value)
@@ -1428,7 +1424,7 @@ function App() {
                         queryRef.current = '*'
                         setFreezeTroveListOrder(false)
                         if (searchMode === 'duplicates') {
-                          if (primaryTroveId.trim() && selectedTroveIds.size > 0) {
+                          if (primaryTroveId.trim()) {
                             setUniquesResult(null)
                             fetchDuplicates(0)
                           }
@@ -1726,11 +1722,12 @@ function App() {
               const primaryName = troves.find((t) => t.id === primaryTroveId)?.name ?? primaryTroveId
               const compareNamesList = [...selectedTroveIds].map((id) => troves.find((t) => t.id === id)?.name ?? id).join(', ')
               const compareDisplay = compareNamesList.length < 50 ? compareNamesList : `${selectedTroveIds.size} troves`
-              const compareSummary = selectedTroveIds.size === 1 && selectedTroveIds.has(primaryTroveId) ? <strong>Self-compare</strong> : <><strong>Compare:</strong> {compareDisplay}</>
+              const isSelfCompareDup = selectedTroveIds.size === 0 || (selectedTroveIds.size === 1 && selectedTroveIds.has(primaryTroveId))
+              const compareSummary = isSelfCompareDup ? <strong>Self-compare</strong> : <><strong>Compare:</strong> {compareDisplay}</>
               return (
                 <>
                   <p className="search-count search-count-detail">
-                    <><strong>Primary:</strong> {primaryName} · {compareSummary}.{lastCompareQueryTimeSec != null && <> <strong>Duration</strong>: {lastCompareQueryTimeSec}s.</>} </>{formatCount(total)} {selectedTroveIds.size === 1 && selectedTroveIds.has(primaryTroveId) ? '' : 'primary '}item{total !== 1 ? 's' : ''} with possible duplicates.
+                    <><strong>Primary:</strong> {primaryName} · {compareSummary}.{lastCompareQueryTimeSec != null && <> <strong>Duration</strong>: {lastCompareQueryTimeSec}s.</>} </>{formatCount(total)} {isSelfCompareDup ? '' : 'primary '}item{total !== 1 ? 's' : ''} with possible duplicates.
                     {totalPages > 1 && ` Showing ${formatCount(from)}–${formatCount(to)}.`}
                   </p>
                   <div className="search-results-options">
@@ -1851,11 +1848,12 @@ function App() {
               const primaryName = troves.find((t) => t.id === primaryTroveId)?.name ?? primaryTroveId
               const compareNamesList = [...selectedTroveIds].map((id) => troves.find((t) => t.id === id)?.name ?? id).join(', ')
               const compareDisplay = compareNamesList.length < 50 ? compareNamesList : `${selectedTroveIds.size} troves`
-              const compareSummary = selectedTroveIds.size === 1 && selectedTroveIds.has(primaryTroveId) ? <strong>Self-compare</strong> : <><strong>Compare:</strong> {compareDisplay}</>
+              const isSelfCompareUniq = selectedTroveIds.size === 1 && selectedTroveIds.has(primaryTroveId)
+              const compareSummary = isSelfCompareUniq ? <strong>Self-compare</strong> : <><strong>Compare:</strong> {compareDisplay}</>
               return (
                 <>
                   <p className="search-count search-count-detail">
-                    <><strong>Primary:</strong> {primaryName} · {compareSummary}.{lastCompareQueryTimeSec != null && <> <strong>Duration</strong>: {lastCompareQueryTimeSec}s.</>} </>{formatCount(total)} item{total !== 1 ? 's' : ''}{selectedTroveIds.size === 1 && selectedTroveIds.has(primaryTroveId) ? ' ' : ' in primary '}are either unique or have no obvious match.
+                    <><strong>Primary:</strong> {primaryName} · {compareSummary}.{lastCompareQueryTimeSec != null && <> <strong>Duration</strong>: {lastCompareQueryTimeSec}s.</>} </>{formatCount(total)} item{total !== 1 ? 's' : ''}{isSelfCompareUniq ? ' ' : ' in primary '}are either unique or have no obvious match.
                     {totalPages > 1 && ` Showing ${formatCount(from)}–${formatCount(to)}.`}
                   </p>
                   <div className="search-results-options">
@@ -2178,8 +2176,8 @@ function App() {
                     showScoreColumn={query.trim() !== '*'}
                     viewMode={searchResultsViewMode}
                     afterFilterSlot={gallerySortAfterFilterSlot}
-                    hideTroveInGallery={selectedTroveIds.size === 1}
-                    hideTroveInList={selectedTroveIds.size === 1}
+                    hideTroveInGallery={selectedTroveIds.size <= 1}
+                    hideTroveInList={selectedTroveIds.size <= 1}
                     showPdfSashInGallery
                     showGalleryDecorations={galleryDecorate}
                   />

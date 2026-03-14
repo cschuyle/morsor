@@ -514,7 +514,8 @@ function MobileApp() {
       size: String(DUP_UNIQUES_PAGE_SIZE),
       maxMatches: '20',
     })
-    compareTroveIds.forEach((id) => params.append('compareTrove', id))
+    const compareIdsToSend = compareTroveIds.size > 0 ? compareTroveIds : new Set([primaryTroveId.trim()])
+    compareIdsToSend.forEach((id) => params.append('compareTrove', id))
     const streamUrl = `/api/search/duplicates/stream?${params}`
     const restUrl = `/api/search/duplicates?${params}`
     const cached = queryCache.get(restUrl) as DuplicatesResultData | null | undefined
