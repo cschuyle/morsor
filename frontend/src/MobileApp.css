@@ -1390,6 +1390,16 @@
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
 }
 
+.mobile-primary-compare-tab--invalid {
+  background: #ffeb3b;
+  color: #213547;
+}
+
+.mobile-primary-compare-tab--invalid.mobile-primary-compare-tab--active {
+  background: #ffc107;
+  color: #213547;
+}
+
 .mobile-search-error {
   margin: 0 0 0.75rem;
   padding: 0.5rem 0.75rem;

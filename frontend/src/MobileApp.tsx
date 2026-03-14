@@ -506,10 +506,6 @@ function MobileApp() {
       setDuplicatesResult({ total: 0, page: 0, size: DUP_UNIQUES_PAGE_SIZE, rows: [] })
       return
     }
-    if (compareTroveIds.size === 0) {
-      setDuplicatesResult({ total: 0, page: 0, size: DUP_UNIQUES_PAGE_SIZE, rows: [] })
-      return
-    }
     const params = new URLSearchParams({
       primaryTrove: primaryTroveId.trim(),
       query: q,
@@ -827,7 +823,6 @@ function MobileApp() {
     setSearchError(null)
     if (searchMode === 'duplicates') {
       if (!primaryTroveId.trim()) return
-      if (compareTroveIds.size === 0) return
       setUniquesResult(null)
       fetchDuplicates(0)
       setDuplicatesPage(0)
@@ -1054,9 +1049,12 @@ function MobileApp() {
 
   const troveLabel = isDupOrUniques
     ? (primaryTroveId
-        ? <><strong>Primary:</strong> {troves.find((t) => t.id === primaryTroveId)?.name ?? primaryTroveId} · {compareTroveIds.size === 1 && compareTroveIds.has(primaryTroveId) ? <strong>Self-compare</strong> : <><strong>Compare:</strong> {formatCount(compareTroveIds.size)}</>}</>
+        ? <><strong>Primary:</strong> {troves.find((t) => t.id === primaryTroveId)?.name ?? primaryTroveId} · {(compareTroveIds.size === 0 || (compareTroveIds.size === 1 && compareTroveIds.has(primaryTroveId))) ? <strong>Self-compare</strong> : <><strong>Compare:</strong> {formatCount(compareTroveIds.size)}</>}</>
         : 'Set primary & compare troves')
     : (selectedTroveIds.size === 0 ? 'All troves' : `${formatCount(selectedTroveIds.size)} trove${selectedTroveIds.size !== 1 ? 's' : ''}`)
+  const invalidCompareHint = <>Select <strong>Primary</strong> & <strong>Comparison</strong> troves</>
+  const invalidCompareSelection = (searchMode === 'duplicates' && !dupPrimaryTroveId) ||
+    (searchMode === 'uniques' && (!uniqPrimaryTroveId || uniqCompareTroveIds.size === 0 || uniqCompareTroveIds.has(uniqPrimaryTroveId)))
   const mobileTroveDropdownLabel = (() => {
     if (searchMode === 'search') {
       const itemsPart = searchResult != null && count > 0 ? `${formatCount(count)} item${count !== 1 ? 's' : ''} · ` : ''
@@ -1070,8 +1068,8 @@ function MobileApp() {
       const name = troves.find((t) => t.id === primaryTroveId)?.name ?? primaryTroveId
       const durationPart = lastCompareQueryTimeSec != null ? <> <strong>Duration</strong>: {lastCompareQueryTimeSec}s.</> : null
       if (selfCompare && total > 0) return <>{name} · Self-compare.{durationPart} {formatCount(total)} item{total !== 1 ? 's' : ''} with possible duplicates.</>
-      if (total > 0) return <>{formatCount(total)} dups · {primaryTroveId ? <>{name} · Compare: {formatCount(compareTroveIds.size)}.{durationPart}</> : 'Choose troves to search'}</>
-      return primaryTroveId ? <>{name} · Compare: {formatCount(compareTroveIds.size)}.{durationPart}</> : 'Choose troves to search'
+      if (total > 0) return <>{formatCount(total)} dups · {primaryTroveId ? <>{name} · {compareTroveIds.size === 0 ? 'Self-compare' : <>Compare: {formatCount(compareTroveIds.size)}</>}.{durationPart}</> : invalidCompareHint}</>
+      return primaryTroveId ? <>{name} · {compareTroveIds.size === 0 ? 'Self-compare' : <>Compare: {formatCount(compareTroveIds.size)}</>}.{durationPart}</> : invalidCompareHint
     }
     if (searchMode === 'uniques' && uniquesResult != null) {
       const total = uniquesResult.total ?? 0
@@ -1079,17 +1077,17 @@ function MobileApp() {
       const durationPart = lastCompareQueryTimeSec != null ? <> <strong>Duration</strong>: {lastCompareQueryTimeSec}s.</> : null
       const uniqPart = total > 0 ? `${formatCount(total)} uniques · ` : ''
       const troveName = primaryTroveId ? troves.find((t) => t.id === primaryTroveId)?.name ?? primaryTroveId : ''
-      const trovePart = primaryTroveId ? <>{troveName} · Compare: {formatCount(compareTroveIds.size)}.{durationPart}</> : 'Choose troves to search'
+      const trovePart = primaryTroveId ? <>{troveName} · Compare: {formatCount(compareTroveIds.size)}.{durationPart}</> : invalidCompareHint
       return (uniqPart ? <>{uniqPart}{trovePart}</> : trovePart) as React.ReactNode
     }
     if (searchMode === 'duplicates') {
       const name = troves.find((t) => t.id === primaryTroveId)?.name ?? primaryTroveId
-      return primaryTroveId && compareTroveIds.size > 0 ? <>{name} · Compare: {formatCount(compareTroveIds.size)}</> : 'Choose troves to search'
+      return primaryTroveId ? <>{name} · {compareTroveIds.size === 0 ? 'Self-compare' : <>Compare: {formatCount(compareTroveIds.size)}</>}</> : invalidCompareHint
     }
     if (searchMode === 'uniques') {
       if (compareTroveIds.size === 1 && compareTroveIds.has(primaryTroveId)) return 'Primary trove cannot be in compare list.'
       const troveName = primaryTroveId ? troves.find((t) => t.id === primaryTroveId)?.name ?? primaryTroveId : ''
-      return primaryTroveId && compareTroveIds.size > 0 ? <>{troveName} · Compare: {formatCount(compareTroveIds.size)}</> : 'Choose troves to search'
+      return primaryTroveId && compareTroveIds.size > 0 ? <>{troveName} · Compare: {formatCount(compareTroveIds.size)}</> : invalidCompareHint
     }
     return 'All troves. Click to change'
   })()
@@ -1298,7 +1296,7 @@ onClick={() => {
                   setFreezeTroveListOrder(false)
                   setPage(0)
                   if (searchMode === 'duplicates') {
-                    if (primaryTroveId.trim() && compareTroveIds.size > 0) {
+                    if (primaryTroveId.trim()) {
                       setUniquesResult(null)
                       fetchDuplicates(0)
                     }
@@ -1316,7 +1314,7 @@ onClick={() => {
               </button>
             </span>
           </div>
-          <button type="submit" className="mobile-search-btn" disabled={searching || (isDupOrUniques && (!primaryTroveId || compareTroveIds.size === 0))} aria-label="Search">
+          <button type="submit" className="mobile-search-btn" disabled={searching || (searchMode === 'duplicates' ? !primaryTroveId : (searchMode === 'uniques' && (!primaryTroveId || compareTroveIds.size === 0)))} aria-label="Search">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
               <circle cx="11" cy="11" r="8" />
               <path d="m21 21-4.35-4.35" />
@@ -1518,9 +1516,6 @@ onClick={() => {
           </p>
         )}
 
-        {isDupOrUniques && (!primaryTroveId || compareTroveIds.size === 0) && !searching && (
-          <p className="mobile-search-hint">Select primary trove and at least one compare trove. Use * for all items.</p>
-        )}
         {isDupOrUniques && searching && (
           <div className="mobile-search-loading" aria-live="polite" aria-busy="true">
             <span className="mobile-search-spinner" aria-hidden="true" />
@@ -1652,28 +1647,34 @@ onClick={() => {
 
         {showTrovePicker && (
           <div className={`mobile-trove-picker${isDupOrUniques ? ' mobile-trove-picker--with-tabs' : ''}`}>
-            {isDupOrUniques && (
-              <div className="mobile-primary-compare-tabs" role="tablist">
-                <button
-                  type="button"
-                  role="tab"
-                  aria-selected={trovePickerSubTab === 'primary'}
-                  className={`mobile-primary-compare-tab ${trovePickerSubTab === 'primary' ? 'mobile-primary-compare-tab--active' : ''}`}
-                  onClick={() => setTrovePickerSubTab('primary')}
-                >
-                  Primary
-                </button>
-                <button
-                  type="button"
-                  role="tab"
-                  aria-selected={trovePickerSubTab === 'compare'}
-                  className={`mobile-primary-compare-tab ${trovePickerSubTab === 'compare' ? 'mobile-primary-compare-tab--active' : ''}`}
-                  onClick={() => setTrovePickerSubTab('compare')}
-                >
-                  Compare
-                </button>
-              </div>
-            )}
+            {isDupOrUniques && (() => {
+              const primaryTabInvalid = searchMode === 'duplicates' ? !dupPrimaryTroveId : !uniqPrimaryTroveId
+              const compareTabInvalid = searchMode === 'duplicates'
+                ? false
+                : (uniqCompareTroveIds.size === 0 || uniqCompareTroveIds.has(uniqPrimaryTroveId))
+              return (
+                <div className="mobile-primary-compare-tabs" role="tablist">
+                  <button
+                    type="button"
+                    role="tab"
+                    aria-selected={trovePickerSubTab === 'primary'}
+                    className={`mobile-primary-compare-tab ${trovePickerSubTab === 'primary' ? 'mobile-primary-compare-tab--active' : ''}${primaryTabInvalid ? ' mobile-primary-compare-tab--invalid' : ''}`}
+                    onClick={() => setTrovePickerSubTab('primary')}
+                  >
+                    Primary
+                  </button>
+                  <button
+                    type="button"
+                    role="tab"
+                    aria-selected={trovePickerSubTab === 'compare'}
+                    className={`mobile-primary-compare-tab ${trovePickerSubTab === 'compare' ? 'mobile-primary-compare-tab--active' : ''}${compareTabInvalid ? ' mobile-primary-compare-tab--invalid' : ''}`}
+                    onClick={() => setTrovePickerSubTab('compare')}
+                  >
+                    Compare
+                  </button>
+                </div>
+              )
+            })()}
             <div className="mobile-trove-filter-row">
               <div className="mobile-trove-filter-wrap">
                 <input

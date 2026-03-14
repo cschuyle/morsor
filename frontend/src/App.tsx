@@ -910,24 +910,34 @@ function App() {
               {(searchMode === 'duplicates' || searchMode === 'uniques') ? (
                 <>
                   <div className="trove-picker-tabs" role="tablist" aria-label="Trove selection">
-                    <button
-                      type="button"
-                      role="tab"
-                      aria-selected={duplicatesTroveTab === 'primary'}
-                      className={`trove-picker-tab ${duplicatesTroveTab === 'primary' ? 'trove-picker-tab--active' : ''}`}
-                      onClick={() => setDuplicatesTroveTab('primary')}
-                    >
-                      Primary
-                    </button>
-                    <button
-                      type="button"
-                      role="tab"
-                      aria-selected={duplicatesTroveTab === 'compare'}
-                      className={`trove-picker-tab ${duplicatesTroveTab === 'compare' ? 'trove-picker-tab--active' : ''}`}
-                      onClick={() => setDuplicatesTroveTab('compare')}
-                    >
-                      Compare
-                    </button>
+                    {(() => {
+                      const primaryTabInvalid = searchMode === 'duplicates' ? !dupPrimaryTroveId : !uniqPrimaryTroveId
+                      const compareTabInvalid = searchMode === 'duplicates'
+                        ? false
+                        : (uniqCompareTroveIds.size === 0 || uniqCompareTroveIds.has(uniqPrimaryTroveId))
+                      return (
+                        <>
+                          <button
+                            type="button"
+                            role="tab"
+                            aria-selected={duplicatesTroveTab === 'primary'}
+                            className={`trove-picker-tab ${duplicatesTroveTab === 'primary' ? 'trove-picker-tab--active' : ''}${primaryTabInvalid ? ' trove-picker-tab--invalid' : ''}`}
+                            onClick={() => setDuplicatesTroveTab('primary')}
+                          >
+                            Primary
+                          </button>
+                          <button
+                            type="button"
+                            role="tab"
+                            aria-selected={duplicatesTroveTab === 'compare'}
+                            className={`trove-picker-tab ${duplicatesTroveTab === 'compare' ? 'trove-picker-tab--active' : ''}${compareTabInvalid ? ' trove-picker-tab--invalid' : ''}`}
+                            onClick={() => setDuplicatesTroveTab('compare')}
+                          >
+                            Compare
+                          </button>
+                        </>
+                      )
+                    })()}
                   </div>
                   {duplicatesTroveTab === 'primary' && (() => {
                     const primarySelectedTrove = primaryTrovesFiltered.find((t) => t.id === primaryTroveId)
@@ -1655,7 +1665,7 @@ aria-label="Clear compare troves"
             ) : null}
             {(searchMode === 'duplicates' || searchMode === 'uniques') && duplicatesResult == null && uniquesResult == null && !searching && (
               <p className="search-count search-count-detail">
-                Select <strong>primary trove</strong> and at least one <strong>compare trove</strong>. Use query <strong>*</strong> for all items, or type a filter.
+                Select <strong>Primary</strong> & <strong>Comparison</strong> troves
               </p>
             )}
             {(searchMode === 'duplicates' || searchMode === 'uniques') && searching && (

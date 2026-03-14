@@ -611,6 +611,16 @@
   border-bottom: 1px solid #ff8800;
 }
 
+.trove-picker-tab--invalid {
+  background: #ffeb3b;
+  color: #213547;
+}
+
+.trove-picker-tab--invalid.trove-picker-tab--active {
+  background: #ffc107;
+  color: #213547;
+}
+
 .trove-picker-actions {
   margin-bottom: 0.75rem;
 }
