@@ -1,5 +1,6 @@
 import { Fragment, useState, useEffect } from 'react'
 import type { UniqueResultRow, SearchResultRow } from './types'
+import { rawSourceDisplay } from './SearchResultsGrid'
 
 const WORD_RE = /\b[\w']+\b/g
 
@@ -45,6 +46,7 @@ interface UniquesResultsViewProps {
   sortBy?: string | null
   sortDir?: 'asc' | 'desc'
   onSortChange?: ((columnId: string, direction: 'asc' | 'desc') => void) | null
+  onOpenRawSource?: (payload: { title: string; rawSourceItem: string }) => void
 }
 
 /**
@@ -52,7 +54,7 @@ interface UniquesResultsViewProps {
  * Each result has item (SearchResult), score (nearest-miss), and nearMisses (top possible duplicates).
  * sortBy / sortDir / onSortChange: optional column sort (title, trove, score).
  */
-export function UniquesResultsView({ results = [], sortBy = null, sortDir = 'asc', onSortChange }: UniquesResultsViewProps) {
+export function UniquesResultsView({ results = [], sortBy = null, sortDir = 'asc', onSortChange, onOpenRawSource }: UniquesResultsViewProps) {
   const [dialogRow, setDialogRow] = useState<number | null>(null)
 
   useEffect(() => {
@@ -118,7 +120,13 @@ export function UniquesResultsView({ results = [], sortBy = null, sortDir = 'asc
             const primaryWords = getWordsFromTitle(item?.title ?? '')
             return (
               <Fragment key={idx}>
-                <tr className="duplicate-row-primary">
+                <tr
+                  className="duplicate-row-primary"
+                  onClick={onOpenRawSource ? () => {
+                    onOpenRawSource({ title: item?.title ?? '', rawSourceItem: rawSourceDisplay(item?.rawSourceItem) })
+                  } : undefined}
+                  title={onOpenRawSource ? 'Click to view raw source' : undefined}
+                >
                   <td className="col-title">{titleWithMatchHighlight(item?.title ?? '—', nearMissWords)}</td>
                   <td className="col-trove">{item?.trove ?? item?.troveId ?? ''}</td>
                   <td className="col-score">{score != null ? score.toFixed(2) : '—'}</td>
@@ -126,7 +134,7 @@ export function UniquesResultsView({ results = [], sortBy = null, sortDir = 'asc
                     <button
                       type="button"
                       className="uniques-help-btn"
-                      onClick={() => setDialogRow(idx)}
+                      onClick={(e) => { e.stopPropagation(); setDialogRow(idx) }}
                       title="Show top possible duplicates"
                       aria-label="Show top possible duplicates"
                     >
@@ -138,7 +146,14 @@ export function UniquesResultsView({ results = [], sortBy = null, sortDir = 'asc
                   const r = (m?.result ?? m) as SearchResultRow | undefined
                   const s = typeof m?.score === 'number' ? m.score : null
                   return (
-                    <tr key={matchIdx} className="duplicate-row-match">
+                    <tr
+                      key={matchIdx}
+                      className="duplicate-row-match"
+                      onClick={onOpenRawSource ? () => {
+                        onOpenRawSource({ title: r?.title ?? '', rawSourceItem: rawSourceDisplay(r?.rawSourceItem) })
+                      } : undefined}
+                      title={onOpenRawSource ? 'Click to view raw source' : undefined}
+                    >
                       <td className="col-title">{titleWithExtraHighlight(r?.title ?? '—', primaryWords)}</td>
                       <td className="col-trove">{r?.trove ?? r?.troveId ?? ''}</td>
                       <td className="col-score">{s != null ? s.toFixed(2) : '—'}</td>

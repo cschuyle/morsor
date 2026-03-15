@@ -74,6 +74,7 @@ function App() {
   const [compareProgress, setCompareProgress] = useState({ current: 0, total: 0 })
   const [compareElapsedSec, setCompareElapsedSec] = useState(0)
   const [lastCompareQueryTimeSec, setLastCompareQueryTimeSec] = useState<number | null>(null)
+  const [compareRawSourceLightbox, setCompareRawSourceLightbox] = useState<{ title: string; rawSourceItem: string } | null>(null)
   const [reloadTrovesInProgress, setReloadTrovesInProgress] = useState(false)
   const [reloadTrovesProgress, setReloadTrovesProgress] = useState({ current: 0, total: 0 })
   const queryRef = useRef(query)
@@ -417,6 +418,13 @@ function App() {
     prevBoostTroveIdRef.current = boostTroveId
     if (queryRef.current.trim()) fetchSearch(0)
   }, [boostTroveId, searchMode])
+
+  useEffect(() => {
+    if (!compareRawSourceLightbox) return
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setCompareRawSourceLightbox(null) }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [compareRawSourceLightbox])
 
   function toggleTrove(id) {
     if (searchMode === 'search') setFreezeTroveListOrder(true)
@@ -1833,6 +1841,7 @@ function App() {
                       setDuplicatesSortBy(col)
                       setDuplicatesSortDir(dir)
                     }}
+                    onOpenRawSource={(payload) => setCompareRawSourceLightbox(payload)}
                   />
                 </>
               )
@@ -1956,6 +1965,7 @@ function App() {
                     sortBy={uniquesSortBy}
                     sortDir={uniquesSortDir}
                     onSortChange={(col, dir) => fetchUniques(0, col, dir)}
+                    onOpenRawSource={(payload) => setCompareRawSourceLightbox(payload)}
                   />
                 </>
               )
@@ -2187,6 +2197,30 @@ function App() {
           </section>
         </main>
       </div>
+      {compareRawSourceLightbox && (
+        <div
+          className="search-raw-source-lightbox"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Raw source"
+          onClick={() => setCompareRawSourceLightbox(null)}
+        >
+          <button type="button" className="search-thumb-lightbox-close" onClick={() => setCompareRawSourceLightbox(null)} aria-label="Close">×</button>
+          <div className="search-raw-source-lightbox-content" onClick={(e) => e.stopPropagation()}>
+            {compareRawSourceLightbox.title && (
+              <div className="search-thumb-lightbox-title">
+                {compareRawSourceLightbox.title}
+              </div>
+            )}
+            <pre className="search-raw-source-lightbox-pre">{compareRawSourceLightbox.rawSourceItem}</pre>
+          </div>
+          <div className="search-raw-source-lightbox-footer" onClick={(e) => e.stopPropagation()}>
+            <div className="search-thumb-lightbox-raw-wrap">
+              <span className="search-thumb-lightbox-raw-btn search-thumb-lightbox-raw-btn--label" aria-hidden="true">RAW</span>
+            </div>
+          </div>
+        </div>
+      )}
       <hr className="backend-status-divider" />
       <footer className="app-footer">
         <div className="app-footer-row">

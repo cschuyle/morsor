@@ -1,4 +1,5 @@
 import { useState, useEffect, useLayoutEffect, useRef, useMemo } from 'react'
+import { createPortal } from 'react-dom'
 import { Link, useSearchParams, useLocation } from 'react-router-dom'
 import type { SearchResultData, SearchResultRow, Trove, DuplicatesResultData, UniquesResultData } from './types'
 import type { FileTypeQuickModeValue } from './fileTypeQuickMode'
@@ -76,6 +77,7 @@ function MobileApp() {
   const [compareProgress, setCompareProgress] = useState({ current: 0, total: 0 })
   const [compareElapsedSec, setCompareElapsedSec] = useState(0)
   const [lastCompareQueryTimeSec, setLastCompareQueryTimeSec] = useState<number | null>(null)
+  const [compareRawSourceLightbox, setCompareRawSourceLightbox] = useState<{ title: string; rawSourceItem: string } | null>(null)
   const [reloadTrovesInProgress, setReloadTrovesInProgress] = useState(false)
   const [reloadTrovesProgress, setReloadTrovesProgress] = useState({ current: 0, total: 0 })
   const [fileTypeFilters, setFileTypeFilters] = useState<Set<string>>(() => {
@@ -351,6 +353,13 @@ function MobileApp() {
     window.addEventListener('keydown', handleEscape)
     return () => window.removeEventListener('keydown', handleEscape)
   }, [gallerySortDropdownOpen])
+
+  useEffect(() => {
+    if (!compareRawSourceLightbox) return
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setCompareRawSourceLightbox(null) }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [compareRawSourceLightbox])
 
   function refreshStatusMessage() {
     fetch('/api/status', { credentials: 'include', headers: { ...getApiAuthHeaders() } })
@@ -1945,6 +1954,7 @@ onClick={() => {
                 setDuplicatesSortBy(col)
                 setDuplicatesSortDir(dir)
               }}
+              onOpenRawSource={(payload) => setCompareRawSourceLightbox(payload)}
             />
           </div>
         )}
@@ -1956,12 +1966,37 @@ onClick={() => {
               sortBy={uniquesSortBy}
               sortDir={uniquesSortDir}
               onSortChange={(col, dir) => fetchUniques(0, col, dir)}
+              onOpenRawSource={(payload) => setCompareRawSourceLightbox(payload)}
             />
           </div>
         )}
         </div>
       </main>
-
+      {compareRawSourceLightbox && typeof document !== 'undefined' && createPortal(
+        <div
+          className="search-raw-source-lightbox"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Raw source"
+          onClick={() => setCompareRawSourceLightbox(null)}
+        >
+          <button type="button" className="search-thumb-lightbox-close" onClick={() => setCompareRawSourceLightbox(null)} aria-label="Close">×</button>
+          <div className="search-raw-source-lightbox-content" onClick={(e) => e.stopPropagation()}>
+            {compareRawSourceLightbox.title && (
+              <div className="search-thumb-lightbox-title">
+                {compareRawSourceLightbox.title}
+              </div>
+            )}
+            <pre className="search-raw-source-lightbox-pre">{compareRawSourceLightbox.rawSourceItem}</pre>
+          </div>
+          <div className="search-raw-source-lightbox-footer" onClick={(e) => e.stopPropagation()}>
+            <div className="search-thumb-lightbox-raw-wrap">
+              <span className="search-thumb-lightbox-raw-btn search-thumb-lightbox-raw-btn--label" aria-hidden="true">RAW</span>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
       <footer className="mobile-footer">
         <div className="mobile-footer-row mobile-footer-row--singleline">
           <Link to={location.search ? `/?${location.search.slice(1)}` : '/'} className="mobile-footer-link" onClick={() => sessionStorage.setItem('morsorPreferDesktop', 'true')}>Desktop</Link>

@@ -1,5 +1,6 @@
 import { Fragment } from 'react'
 import type { DuplicateRow } from './types'
+import { rawSourceDisplay } from './SearchResultsGrid'
 
 const WORD_RE = /\b\w+\b/g
 
@@ -25,13 +26,14 @@ interface DuplicateResultsViewProps {
   sortBy?: string | null
   sortDir?: 'asc' | 'desc'
   onSortChange?: ((columnId: string, direction: 'asc' | 'desc') => void) | null
+  onOpenRawSource?: (payload: { title: string; rawSourceItem: string }) => void
 }
 
 /**
  * Renders duplicate-finder results: each row has one primary item and N match rows (different style).
  * sortBy / sortDir / onSortChange: optional column sort (title, trove, score). Sorting uses primary row only.
  */
-export function DuplicateResultsView({ rows = [], sortBy = null, sortDir = 'asc', onSortChange }: DuplicateResultsViewProps) {
+export function DuplicateResultsView({ rows = [], sortBy = null, sortDir = 'asc', onSortChange, onOpenRawSource }: DuplicateResultsViewProps) {
   const handleSort = (columnId: string) => {
     if (!onSortChange) return
     const nextDir = sortBy === columnId && sortDir === 'asc' ? 'desc' as const : 'asc' as const
@@ -80,17 +82,32 @@ export function DuplicateResultsView({ rows = [], sortBy = null, sortDir = 'asc'
             const primaryScore = maxScore === -Infinity ? '—' : maxScore.toFixed(2)
             return (
             <Fragment key={rowIdx}>
-              <tr className="duplicate-row-primary">
+              <tr
+                className="duplicate-row-primary"
+                onClick={onOpenRawSource ? () => {
+                  const item = row.primary
+                  onOpenRawSource({ title: item?.title ?? '', rawSourceItem: rawSourceDisplay(item?.rawSourceItem) })
+                } : undefined}
+                title={onOpenRawSource ? 'Click to view raw source' : undefined}
+              >
                 <td className="col-title">{row.primary?.title ?? '—'}</td>
                 <td className="col-trove">{row.primary?.trove ?? row.primary?.troveId ?? ''}</td>
                 <td className="col-score" aria-label="Primary item (max match score)">{primaryScore}</td>
               </tr>
               {(row.matches ?? []).filter((m) => String(m.result?.id ?? '') !== String(row.primary?.id ?? '')).map((m, matchIdx) => {
                 const primaryWords = getPrimaryWords(row.primary?.title ?? '')
+                const matchItem = m.result
                 return (
-                <tr key={matchIdx} className="duplicate-row-match">
-                  <td className="col-title">{titleWithExtraHighlight(m.result?.title ?? '—', primaryWords)}</td>
-                  <td className="col-trove">{m.result?.trove ?? m.result?.troveId ?? ''}</td>
+                <tr
+                  key={matchIdx}
+                  className="duplicate-row-match"
+                  onClick={onOpenRawSource ? () => {
+                    onOpenRawSource({ title: matchItem?.title ?? '', rawSourceItem: rawSourceDisplay(matchItem?.rawSourceItem) })
+                  } : undefined}
+                  title={onOpenRawSource ? 'Click to view raw source' : undefined}
+                >
+                  <td className="col-title">{titleWithExtraHighlight(matchItem?.title ?? '—', primaryWords)}</td>
+                  <td className="col-trove">{matchItem?.trove ?? matchItem?.troveId ?? ''}</td>
                   <td className="col-score">{typeof m.score === 'number' ? m.score.toFixed(2) : '—'}</td>
                 </tr>
               )

@@ -210,7 +210,7 @@ const scoreColumn = {
 
 const RAW_SOURCE_NOT_AVAILABLE = 'Raw Source Not Available'
 
-function rawSourceDisplay(rawSourceItem: unknown): string {
+export function rawSourceDisplay(rawSourceItem: unknown): string {
   return (rawSourceItem != null && rawSourceItem !== '') ? String(rawSourceItem) : RAW_SOURCE_NOT_AVAILABLE
 }
 
