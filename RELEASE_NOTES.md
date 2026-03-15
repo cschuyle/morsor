@@ -4,6 +4,8 @@
 
 *(Tag created when deploy runs.)*
 
+## release-v20260314-1856-11dbdce
+
 ### Compare (duplicates / uniques)
 - **Desktop compare page size:** Fix bug where the page size wasn't being respected.
 - **Trove picker:** Improved UI for self-compare and not allowing same trove selection in Primary vs Compare tabs.
@@ -21,7 +23,7 @@
 - **Footer:** Added trash and reload icons.
 
 ### Reload troves
-- Progress popup: Improved visibility and fixed buig where it wouldn't load the initial attempt
+- Progress popup: Improved visibility and fixed bug where it wouldn't load the initial attempt
 
 ### Deploy and tooling
 - **deploy-container-to-registry.sh:** Zero-pad HHMM to 4 digits in version string.
