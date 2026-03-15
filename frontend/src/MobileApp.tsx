@@ -271,6 +271,14 @@ function MobileApp() {
     return next
   }
 
+  // When user switches to Search tab but URL still has compare mode, update URL (persist effect skips that case).
+  useEffect(() => {
+    if (searchMode !== 'search') return
+    const urlMode = searchParams.get('mode')
+    if (urlMode !== 'duplicates' && urlMode !== 'uniques') return
+    setSearchParams(buildSearchParams(), { replace: true })
+  }, [searchMode, searchParams, query, selectedTroveIds, fileTypeFilters, fileTypeQuickMode, thumbnailOnly, boostTroveId, searchResultsViewMode, searchResult?.page, searchResult?.size, page, pageSize])
+
   // Persist current tab, query, trove selection, view, and search pagination to URL.
   // Skip writing when URL has params we haven't applied yet (e.g. initial load or desktop→mobile with query string).
   useEffect(() => {
@@ -1261,6 +1269,7 @@ function MobileApp() {
             aria-selected={searchMode === 'search'}
             className={`mobile-mode-tab ${searchMode === 'search' ? 'mobile-mode-tab--active' : ''}`}
             onClick={() => {
+              setSearchParams(buildSearchParamsForMode('search', '', new Set()), { replace: true })
               setSearchMode('search')
               setSearchResult(null)
               setDuplicatesResult(null)
