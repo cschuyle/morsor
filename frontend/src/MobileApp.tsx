@@ -62,10 +62,13 @@ function MobileApp() {
   const [duplicatesSortBy, setDuplicatesSortBy] = useState<string | null>(null)
   const [duplicatesSortDir, setDuplicatesSortDir] = useState<'asc' | 'desc'>('asc')
   const [duplicatesPage, setDuplicatesPage] = useState(0)
+  const [dupPageSize, setDupPageSize] = useState(DUP_UNIQUES_PAGE_SIZE)
   const [uniquesResult, setUniquesResult] = useState<UniquesResultData | null>(null)
   const [uniquesPage, setUniquesPage] = useState(0)
+  const [uniqPageSize, setUniqPageSize] = useState(DUP_UNIQUES_PAGE_SIZE)
   const [uniquesSortBy, setUniquesSortBy] = useState<string | null>(null)
   const [uniquesSortDir, setUniquesSortDir] = useState<'asc' | 'desc'>('asc')
+  const [comparePageSizeDropdownOpen, setComparePageSizeDropdownOpen] = useState(false)
   const [mobileSearchPageInput, setMobileSearchPageInput] = useState('')
   const [showTrovePicker, setShowTrovePicker] = useState(false)
   const [trovePickerFilter, setTrovePickerFilter] = useState('')
@@ -115,6 +118,7 @@ function MobileApp() {
   const compareIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const fileTypeDropdownRef = useRef<HTMLDivElement | null>(null)
   const pageSizeDropdownRef = useRef<HTMLDivElement | null>(null)
+  const comparePageSizeDropdownRef = useRef<HTMLDivElement | null>(null)
   const gallerySortDropdownRef = useRef<HTMLDivElement | null>(null)
   const copyFlareTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const mobileMainRef = useRef<HTMLElement | null>(null)
@@ -195,9 +199,13 @@ function MobileApp() {
       if (mode === 'duplicates') {
         setDupPrimaryTroveId(primary ? (urlTroveId(primary, troves) ?? primary) : '')
         setDupCompareTroveIds(compare)
+        const dupSizeParam = Number(searchParams.get('size'))
+        if (Number.isFinite(dupSizeParam) && dupSizeParam > 0) setDupPageSize(dupSizeParam)
       } else {
         setUniqPrimaryTroveId(primary ? (urlTroveId(primary, troves) ?? primary) : '')
         setUniqCompareTroveIds(compare)
+        const uniqSizeParam = Number(searchParams.get('size'))
+        if (Number.isFinite(uniqSizeParam) && uniqSizeParam > 0) setUniqPageSize(uniqSizeParam)
       }
     }
   }, [searchParams, troves])
@@ -233,10 +241,12 @@ function MobileApp() {
       const primaryId = dupPrimaryTroveId ? (urlTroveId(dupPrimaryTroveId, troves) ?? dupPrimaryTroveId) : null
       if (primaryId) next.set('primary', primaryId)
       Array.from(dupCompareTroveIds).map((id) => urlTroveId(id, troves) ?? id).filter(Boolean).forEach((id) => next.append('compare', id))
+      next.set('size', String(dupPageSize))
     } else {
       const primaryId = uniqPrimaryTroveId ? (urlTroveId(uniqPrimaryTroveId, troves) ?? uniqPrimaryTroveId) : null
       if (primaryId) next.set('primary', primaryId)
       Array.from(uniqCompareTroveIds).map((id) => urlTroveId(id, troves) ?? id).filter(Boolean).forEach((id) => next.append('compare', id))
+      next.set('size', String(uniqPageSize))
     }
     return next
   }
@@ -286,7 +296,7 @@ function MobileApp() {
     if (next.toString() !== searchParams.toString()) {
       setSearchParams(next, { replace: true })
     }
-  }, [query, searchMode, selectedTroveIds, dupPrimaryTroveId, dupCompareTroveIds, uniqPrimaryTroveId, uniqCompareTroveIds, fileTypeFilters, fileTypeQuickMode, thumbnailOnly, boostTroveId, searchResultsViewMode, searchResult?.page, searchResult?.size, page, pageSize, searchParams])
+  }, [query, searchMode, selectedTroveIds, dupPrimaryTroveId, dupCompareTroveIds, uniqPrimaryTroveId, uniqCompareTroveIds, fileTypeFilters, fileTypeQuickMode, thumbnailOnly, boostTroveId, searchResultsViewMode, searchResult?.page, searchResult?.size, page, pageSize, dupPageSize, uniqPageSize, searchParams])
 
   // Keep mobile search page input in sync with the current page (1-based)
   useEffect(() => {
@@ -333,6 +343,26 @@ function MobileApp() {
     window.addEventListener('keydown', handleEscape)
     return () => window.removeEventListener('keydown', handleEscape)
   }, [pageSizeDropdownOpen])
+
+  useEffect(() => {
+    if (!comparePageSizeDropdownOpen) return
+    function handleClickOutside(e: MouseEvent) {
+      if (comparePageSizeDropdownRef.current && !comparePageSizeDropdownRef.current.contains(e.target as Node)) {
+        setComparePageSizeDropdownOpen(false)
+      }
+    }
+    document.addEventListener('click', handleClickOutside)
+    return () => document.removeEventListener('click', handleClickOutside)
+  }, [comparePageSizeDropdownOpen])
+
+  useEffect(() => {
+    if (!comparePageSizeDropdownOpen) return
+    function handleEscape(e: KeyboardEvent) {
+      if (e.key === 'Escape') setComparePageSizeDropdownOpen(false)
+    }
+    window.addEventListener('keydown', handleEscape)
+    return () => window.removeEventListener('keydown', handleEscape)
+  }, [comparePageSizeDropdownOpen])
 
   useEffect(() => {
     if (!gallerySortDropdownOpen) return
@@ -510,17 +540,18 @@ function MobileApp() {
     }
   }
 
-  function fetchDuplicates(pageNum: number): void {
+  function fetchDuplicates(pageNum: number, sizeOverride: number | null = null): void {
     const q = queryRef.current.trim() || '*'
+    const size = sizeOverride ?? dupPageSize
     if (!primaryTroveId.trim()) {
-      setDuplicatesResult({ total: 0, page: 0, size: DUP_UNIQUES_PAGE_SIZE, rows: [] })
+      setDuplicatesResult({ total: 0, page: 0, size, rows: [] })
       return
     }
     const params = new URLSearchParams({
       primaryTrove: primaryTroveId.trim(),
       query: q,
       page: String(pageNum),
-      size: String(DUP_UNIQUES_PAGE_SIZE),
+      size: String(size),
       maxMatches: '20',
     })
     const compareIdsToSend = compareTroveIds.size > 0 ? compareTroveIds : new Set([primaryTroveId.trim()])
@@ -567,14 +598,15 @@ function MobileApp() {
     })
   }
 
-  function fetchUniques(pageNum: number, sortByOverride: string | null = null, sortDirOverride: 'asc' | 'desc' | null = null): void {
+  function fetchUniques(pageNum: number, sortByOverride: string | null = null, sortDirOverride: 'asc' | 'desc' | null = null, sizeOverride: number | null = null): void {
     const q = queryRef.current.trim() || '*'
+    const size = sizeOverride ?? uniqPageSize
     if (!primaryTroveId.trim()) {
-      setUniquesResult({ total: 0, page: 0, size: DUP_UNIQUES_PAGE_SIZE, results: [] })
+      setUniquesResult({ total: 0, page: 0, size, results: [] })
       return
     }
     if (compareTroveIds.size === 0) {
-      setUniquesResult({ total: 0, page: 0, size: DUP_UNIQUES_PAGE_SIZE, results: [] })
+      setUniquesResult({ total: 0, page: 0, size, results: [] })
       return
     }
     const sortBy = sortByOverride ?? uniquesSortBy
@@ -587,7 +619,7 @@ function MobileApp() {
       primaryTrove: primaryTroveId.trim(),
       query: q,
       page: String(pageNum),
-      size: String(DUP_UNIQUES_PAGE_SIZE),
+      size: String(size),
     })
     if (sortBy) {
       params.set('sortBy', sortBy)
@@ -1648,31 +1680,121 @@ onClick={() => {
               )}
             </span>
           )}
-          {searchMode === 'duplicates' && duplicatesResult != null && (() => {
-            const total = duplicatesResult.total ?? 0
-            const size = duplicatesResult.size ?? DUP_UNIQUES_PAGE_SIZE
-            const totalDupPages = size > 0 ? Math.ceil(total / size) : 0
-            return totalDupPages > 1 && (
-              <nav className="mobile-pagination mobile-troves-row-right" aria-label="Duplicate pages">
-                <button type="button" className="mobile-page-btn" disabled={duplicatesPage <= 0 || searching} onClick={() => fetchDuplicates(duplicatesPage - 1)} aria-label="Previous">‹</button>
-                <span className="mobile-page-info">{formatCount(duplicatesPage + 1)} / {formatCount(totalDupPages)}</span>
-                <button type="button" className="mobile-page-btn" disabled={duplicatesPage >= totalDupPages - 1 || searching} onClick={() => fetchDuplicates(duplicatesPage + 1)} aria-label="Next">›</button>
-              </nav>
-            )
-          })()}
-          {searchMode === 'uniques' && uniquesResult != null && (() => {
-            const total = uniquesResult.total ?? 0
-            const size = uniquesResult.size ?? DUP_UNIQUES_PAGE_SIZE
-            const totalUniqPages = size > 0 ? Math.ceil(total / size) : 0
-            return totalUniqPages > 1 && (
-              <nav className="mobile-pagination mobile-troves-row-right" aria-label="Uniques pages">
-                <button type="button" className="mobile-page-btn" disabled={uniquesPage <= 0 || searching} onClick={() => fetchUniques(uniquesPage - 1)} aria-label="Previous">‹</button>
-                <span className="mobile-page-info">{formatCount(uniquesPage + 1)} / {formatCount(totalUniqPages)}</span>
-                <button type="button" className="mobile-page-btn" disabled={uniquesPage >= totalUniqPages - 1 || searching} onClick={() => fetchUniques(uniquesPage + 1)} aria-label="Next">›</button>
-              </nav>
-            )
-          })()}
         </div>
+        {(searchMode === 'duplicates' && duplicatesResult != null) || (searchMode === 'uniques' && uniquesResult != null) ? (
+          <div className="mobile-compare-options-row">
+            {searchMode === 'duplicates' && duplicatesResult != null && (() => {
+              const total = duplicatesResult.total ?? 0
+              const size = duplicatesResult.size ?? dupPageSize
+              const totalDupPages = size > 0 ? Math.ceil(total / size) : 0
+              return (
+                <>
+                  {totalDupPages > 1 && (
+                    <nav className="mobile-pagination mobile-troves-row-right" aria-label="Duplicate pages">
+                      <button type="button" className="mobile-page-btn" disabled={duplicatesPage <= 0 || searching} onClick={() => fetchDuplicates(duplicatesPage - 1)} aria-label="Previous">‹</button>
+                      <span className="mobile-page-info">{formatCount(duplicatesPage + 1)} / {formatCount(totalDupPages)}</span>
+                      <button type="button" className="mobile-page-btn" disabled={duplicatesPage >= totalDupPages - 1 || searching} onClick={() => fetchDuplicates(duplicatesPage + 1)} aria-label="Next">›</button>
+                    </nav>
+                  )}
+                  <div className="mobile-page-size-dropdown-wrap mobile-page-size-label mobile-page-size-label--end" ref={comparePageSizeDropdownRef}>
+                    Size
+                    <div className="mobile-page-size-trigger-wrap">
+                      <button
+                        type="button"
+                        className="mobile-page-size-trigger"
+                        onClick={() => setComparePageSizeDropdownOpen((o) => !o)}
+                        disabled={searching}
+                        aria-expanded={comparePageSizeDropdownOpen}
+                        aria-haspopup="listbox"
+                        aria-label="Page size"
+                      >
+                        {formatCount(dupPageSize)}
+                      </button>
+                    </div>
+                    {comparePageSizeDropdownOpen && (
+                      <div className="mobile-page-size-panel" role="listbox" aria-label="Page size">
+                        {MOBILE_PAGE_SIZE_OPTIONS.map((n) => (
+                          <button
+                            key={n}
+                            type="button"
+                            role="option"
+                            aria-selected={dupPageSize === n}
+                            className={`mobile-page-size-option${dupPageSize === n ? ' mobile-page-size-option--selected' : ''}`}
+                            onClick={() => {
+                              setDupPageSize(n)
+                              if (primaryTroveId.trim()) fetchDuplicates(0, n)
+                              const nextParams = buildSearchParams()
+                              nextParams.set('size', String(n))
+                              setSearchParams(nextParams, { replace: true })
+                              setComparePageSizeDropdownOpen(false)
+                            }}
+                          >
+                            {dupPageSize === n ? '✓ ' : ''}{formatCount(n)}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </>
+              )
+            })()}
+            {searchMode === 'uniques' && uniquesResult != null && (() => {
+              const total = uniquesResult.total ?? 0
+              const size = uniquesResult.size ?? uniqPageSize
+              const totalUniqPages = size > 0 ? Math.ceil(total / size) : 0
+              return (
+                <>
+                  {totalUniqPages > 1 && (
+                    <nav className="mobile-pagination mobile-troves-row-right" aria-label="Uniques pages">
+                      <button type="button" className="mobile-page-btn" disabled={uniquesPage <= 0 || searching} onClick={() => fetchUniques(uniquesPage - 1)} aria-label="Previous">‹</button>
+                      <span className="mobile-page-info">{formatCount(uniquesPage + 1)} / {formatCount(totalUniqPages)}</span>
+                      <button type="button" className="mobile-page-btn" disabled={uniquesPage >= totalUniqPages - 1 || searching} onClick={() => fetchUniques(uniquesPage + 1)} aria-label="Next">›</button>
+                    </nav>
+                  )}
+                  <div className="mobile-page-size-dropdown-wrap mobile-page-size-label mobile-page-size-label--end" ref={comparePageSizeDropdownRef}>
+                    Size
+                    <div className="mobile-page-size-trigger-wrap">
+                      <button
+                        type="button"
+                        className="mobile-page-size-trigger"
+                        onClick={() => setComparePageSizeDropdownOpen((o) => !o)}
+                        disabled={searching}
+                        aria-expanded={comparePageSizeDropdownOpen}
+                        aria-haspopup="listbox"
+                        aria-label="Page size"
+                      >
+                        {formatCount(uniqPageSize)}
+                      </button>
+                    </div>
+                    {comparePageSizeDropdownOpen && (
+                      <div className="mobile-page-size-panel" role="listbox" aria-label="Page size">
+                        {MOBILE_PAGE_SIZE_OPTIONS.map((n) => (
+                          <button
+                            key={n}
+                            type="button"
+                            role="option"
+                            aria-selected={uniqPageSize === n}
+                            className={`mobile-page-size-option${uniqPageSize === n ? ' mobile-page-size-option--selected' : ''}`}
+                            onClick={() => {
+                              setUniqPageSize(n)
+                              if (primaryTroveId.trim() && compareTroveIds.size > 0) fetchUniques(0, null, null, n)
+                              const nextParams = buildSearchParams()
+                              nextParams.set('size', String(n))
+                              setSearchParams(nextParams, { replace: true })
+                              setComparePageSizeDropdownOpen(false)
+                            }}
+                          >
+                            {uniqPageSize === n ? '✓ ' : ''}{formatCount(n)}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </>
+              )
+            })()}
+          </div>
+        ) : null}
 
         {showTrovePicker && (
           <div className={`mobile-trove-picker${isDupOrUniques ? ' mobile-trove-picker--with-tabs' : ''}`}>

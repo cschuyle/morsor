@@ -673,6 +673,18 @@
   filter: invert(42%) sepia(98%) saturate(1500%) hue-rotate(195deg);
 }
 
+.mobile-compare-options-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.35rem;
+  padding: 0.25rem 0 0.35rem;
+}
+
+.mobile-compare-options-row .mobile-page-size-dropdown-wrap {
+  margin-left: auto;
+}
+
 .mobile-troves-row {
   display: flex;
   align-items: center;

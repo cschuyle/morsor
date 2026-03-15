@@ -275,10 +275,14 @@ function App() {
       const primary = searchParams.get('primary')
       setDupPrimaryTroveId(primary != null ? (urlTroveId(primary, troves) ?? primary) : '')
       setDupCompareTroveIds(new Set(searchParams.getAll('compare').map((v) => urlTroveId(v, troves) ?? v).filter(Boolean)))
+      const dupSizeParam = Number(searchParams.get('size'))
+      if (Number.isFinite(dupSizeParam) && dupSizeParam > 0) setDupPageSize(dupSizeParam)
     } else {
       const primary = searchParams.get('primary')
       setUniqPrimaryTroveId(primary != null ? (urlTroveId(primary, troves) ?? primary) : '')
       setUniqCompareTroveIds(new Set(searchParams.getAll('compare').map((v) => urlTroveId(v, troves) ?? v).filter(Boolean)))
+      const uniqSizeParam = Number(searchParams.get('size'))
+      if (Number.isFinite(uniqSizeParam) && uniqSizeParam > 0) setUniqPageSize(uniqSizeParam)
     }
   }, [searchParams, troves])
 
@@ -294,7 +298,8 @@ function App() {
     boostTrove: string | null = null,
     view: string | null = null,
     thumbnailOnlyOverride?: boolean,
-    quickModeOverride?: FileTypeQuickModeValue
+    quickModeOverride?: FileTypeQuickModeValue,
+    sizeForMode: number = mode === 'duplicates' ? dupPageSize : mode === 'uniques' ? uniqPageSize : pageSize
   ): URLSearchParams {
     const next = new URLSearchParams()
     if (mode !== 'search') next.set('mode', mode)
@@ -313,16 +318,17 @@ function App() {
       next.set('view', view === 'gallery' ? 'gallery' : 'list')
       const existingPage = searchParams.get('page')
       if (existingPage != null) next.set('page', existingPage)
-      const existingSize = searchParams.get('size')
-      if (existingSize != null) next.set('size', existingSize)
+      next.set('size', String(sizeForMode))
     } else if (mode === 'duplicates') {
       const primaryId = dupPrimary ? (urlTroveId(dupPrimary, troves) ?? dupPrimary) : null
       if (primaryId) next.set('primary', primaryId)
       Array.from(dupCompare).map((id) => urlTroveId(id, troves) ?? id).filter(Boolean).forEach((id) => next.append('compare', id))
+      next.set('size', String(sizeForMode))
     } else {
       const primaryId = uniqPrimary ? (urlTroveId(uniqPrimary, troves) ?? uniqPrimary) : null
       if (primaryId) next.set('primary', primaryId)
       Array.from(uniqCompare).map((id) => urlTroveId(id, troves) ?? id).filter(Boolean).forEach((id) => next.append('compare', id))
+      next.set('size', String(sizeForMode))
     }
     return next
   }
@@ -360,7 +366,7 @@ function App() {
     if (next.toString() !== searchParams.toString()) {
       setSearchParams(next, { replace: true })
     }
-  }, [query, searchMode, searchSelectedTroveIds, primaryTroveId, dupCompareTroveIds, uniqCompareTroveIds, fileTypeFilters, fileTypeQuickMode, thumbnailOnly, boostTroveId, searchResultsViewMode, searchResult?.page, searchResult?.size, pageSize])
+  }, [query, searchMode, searchSelectedTroveIds, primaryTroveId, dupCompareTroveIds, uniqCompareTroveIds, fileTypeFilters, fileTypeQuickMode, thumbnailOnly, boostTroveId, searchResultsViewMode, searchResult?.page, searchResult?.size, pageSize, dupPageSize, uniqPageSize])
 
   // Keep the search page input in sync with the current page (1-based)
   useEffect(() => {
@@ -716,11 +722,17 @@ function App() {
     const newSize = Number(e.target.value)
     setDupPageSize(newSize)
     if (duplicatesResult != null && primaryTroveId.trim()) fetchDuplicates(0, newSize)
+    const nextParams = new URLSearchParams(searchParams)
+    nextParams.set('size', String(newSize))
+    setSearchParams(nextParams, { replace: true })
   }
   function handleUniqPageSizeChange(e) {
     const newSize = Number(e.target.value)
     setUniqPageSize(newSize)
     if (uniquesResult != null && primaryTroveId.trim() && selectedTroveIds.size > 0) fetchUniques(0, null, null, newSize)
+    const nextParams = new URLSearchParams(searchParams)
+    nextParams.set('size', String(newSize))
+    setSearchParams(nextParams, { replace: true })
   }
 
   function goToPage(nextPage) {
