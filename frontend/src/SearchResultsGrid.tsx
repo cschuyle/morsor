@@ -865,7 +865,7 @@ export function SearchResultsGrid({ data, sortBy = null, sortDir = 'asc', onSort
             {table.getFlatHeaders().map((header) => (
               <col
                 key={header.id}
-                style={{ width: header.column.id === 'title' ? '100%' : `var(--header-${header.id}-size)` }}
+                style={{ width: `var(--header-${header.id}-size)` }}
               />
             ))}
           </colgroup>
@@ -876,7 +876,7 @@ export function SearchResultsGrid({ data, sortBy = null, sortDir = 'asc', onSort
                   <th
                     key={header.id}
                     className={`col-${header.column.id} ${header.column.getCanSort() ? 'sortable' : ''}`}
-                    style={{ width: header.column.id === 'title' ? '100%' : `var(--header-${header.id}-size)` }}
+                    style={{ width: `var(--header-${header.id}-size)` }}
                     onClick={header.column.getToggleSortingHandler()}
                   >
                     <span className="grid-th-content">
