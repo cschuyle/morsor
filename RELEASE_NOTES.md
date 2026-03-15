@@ -4,6 +4,13 @@
 
 *(Tag created when deploy runs.)*
 
+### Search results
+- **Column resizing:** Results list columns (Title, Trove, Score) can be resized by dragging the header edge; double-click resizer resets.
+- **Trove column:** Show the trove column when no troves are selected (desktop; mobile already did). Hide only when exactly one trove is selected.
+
+### Mobile app
+- **Search tab:** Fixed bug: The URL was not being updated when switching from a Compare tab
+
 ## release-v20260314-1856-11dbdce
 
 ### Compare (duplicates / uniques)
