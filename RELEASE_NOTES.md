@@ -4,6 +4,29 @@
 
 *(Tag created when deploy runs.)*
 
+### Compare (duplicates / uniques)
+- **Desktop compare page size:** Fix bug where the page size wasn't being respected.
+- **Trove picker:** Improved UI for self-compare and not allowing same trove selection in Primary vs Compare tabs.
+- **Compare (Duplicates, Unique) results:** Single-click row opens raw source lightbox.
+- **Progress UI:** 
+    - Duplicates/uniques progress shows light purple stats, timer.
+    - **Timers** for compare tabs.
+- **Highlighting for Compares:** Unmatched words in duplicates list; shared words and uniques in uniques view.
+- **Cache:** Duplicates and uniques searches cached together for instant complement results.
+
+### Mobile app
+- **Page navigator:** Double chevrons (« ») for first/last page
+
+### Desktop
+- **Footer:** Added trash and reload icons.
+
+### Reload troves
+- Progress popup: Improved visibility and fixed buig where it wouldn't load the initial attempt
+
+### Deploy and tooling
+- **deploy-container-to-registry.sh:** Zero-pad HHMM to 4 digits in version string.
+- **Release process:** RELEASE_NOTES.md updated with new tag after deploy; AGENTS.md step 6.
+
 ## release-v20260314-0016-61328fc
 
 ### Media picker
