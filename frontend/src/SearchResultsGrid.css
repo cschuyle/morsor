@@ -188,7 +188,7 @@
 .grid-table .col-thumb {
   padding-left: 0.25rem;
   padding-right: 0.25rem;
-  overflow: hidden;
+  overflow: visible; /* allow thumbnail hover to extend beyond cell */
   min-width: 0;
   vertical-align: middle;
 }
@@ -197,6 +197,12 @@
   max-width: 100%;
   margin: 0 auto;
   display: block;
+}
+
+/* Ensure hovered thumbnail appears above neighboring cells */
+.grid-table .col-thumb:hover .search-thumb-btn {
+  position: relative;
+  z-index: 2;
 }
 
 .grid-table .col-thumb .search-thumb,
@@ -339,6 +345,13 @@
   max-height: 4.8rem;
   object-fit: cover;
   border-radius: 4px;
+  transition: transform 0.12s ease-out;
+}
+
+/* List mode: slightly enlarge thumbnail on hover */
+.grid-table .col-thumb:hover .search-thumb {
+  transform-origin: left center;
+  transform: scale(1.6);
 }
 
 .search-thumb-link-icon {
