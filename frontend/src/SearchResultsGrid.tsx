@@ -243,6 +243,7 @@ export function SearchResultsGrid({ data, sortBy = null, sortDir = 'asc', onSort
     () => Array.isArray(data) && data.some((row) => row && row.itemType === 'littlePrinceItem' && (row.thumbnailUrl || (row.itemUrl && String(row.itemUrl).trim()))),
     [data]
   )
+  const hasResults = Array.isArray(data) && data.length > 0
   const listTextColumns = useMemo(
     () => (hideTroveInList ? textColumns.filter((c) => c.id !== 'trove') : textColumns),
     [hideTroveInList]
@@ -512,29 +513,31 @@ export function SearchResultsGrid({ data, sortBy = null, sortDir = 'asc', onSort
           ? createPortal(lightboxContent, document.body)
           : lightboxContent
       })()}
-      <div className="grid-toolbar">
-        <div className="grid-filter-wrap">
-          <input
-            type="search"
-            placeholder="Filter this page"
-            value={globalFilter}
-            onChange={(e) => setGlobalFilter(e.target.value)}
-            onKeyDown={(e) => { if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); setGlobalFilter('') } }}
-            className="grid-filter-input"
-          />
-          {globalFilter && (
-            <button
-              type="button"
-              className="grid-filter-clear"
-              onClick={() => setGlobalFilter('')}
-              aria-label="Clear filter"
-            >
-              ×
-            </button>
-          )}
+      {hasResults && (
+        <div className="grid-toolbar">
+          <div className="grid-filter-wrap">
+            <input
+              type="search"
+              placeholder="Filter this page"
+              value={globalFilter}
+              onChange={(e) => setGlobalFilter(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); setGlobalFilter('') } }}
+              className="grid-filter-input"
+            />
+            {globalFilter && (
+              <button
+                type="button"
+                className="grid-filter-clear"
+                onClick={() => setGlobalFilter('')}
+                aria-label="Clear filter"
+              >
+                ×
+              </button>
+            )}
+          </div>
+          {afterFilterSlot}
         </div>
-        {afterFilterSlot}
-      </div>
+      )}
       {showGallery ? (
         <div className="search-results-gallery">
           {filteredRowsForGallery.length === 0 ? (
