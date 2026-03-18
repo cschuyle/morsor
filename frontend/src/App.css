@@ -2061,6 +2061,16 @@
   color: #000;
   min-width: 3.5em;
   flex-shrink: 0;
+  font-variant-caps: small-caps;
+}
+
+.search-compare-progress-eta-label {
+  font-size: 0.8em;
+  margin-right: 0.35em;
+}
+
+.search-compare-progress-timer span + span {
+  margin-left: 0.12em;
 }
 
 .search-mode-toggle {

@@ -1732,39 +1732,74 @@ function App() {
                 Select <strong>Primary</strong> & <strong>Comparison</strong> troves
               </p>
             )}
-            {(searchMode === 'duplicates' || searchMode === 'uniques') && searching && (
-              <div className="duplicates-search-loading" aria-live="polite">
-                <span>{searchMode === 'duplicates' ? 'Finding duplicates…' : 'Finding uniques…'}</span>
-                <div
-                  className="search-compare-progress-wrap"
-                  role="progressbar"
-                  aria-valuenow={compareProgress.total > 0 ? compareProgress.current : undefined}
-                  aria-valuemin={0}
-                  aria-valuemax={compareProgress.total > 0 ? compareProgress.total : undefined}
-                  aria-label="Analysis progress"
-                >
-                  <div className="search-compare-progress-track">
-                    <div
-                      className={`search-compare-progress-bar ${compareProgress.total === 0 ? 'search-compare-progress-indeterminate' : ''}`}
-                      style={compareProgress.total > 0 ? { width: `${(compareProgress.current / compareProgress.total) * 100}%` } : undefined}
-                    />
-                    {compareProgress.total > 0 && (() => {
-                      const pct = Math.round((compareProgress.current / compareProgress.total) * 100)
-                      return (
-                        <span className={`search-compare-progress-percent ${pct < 50 ? 'search-compare-progress-percent-over-track' : ''}`}>{pct}%</span>
-                      )
-                    })()}
+            {(searchMode === 'duplicates' || searchMode === 'uniques') && searching && (() => {
+              const hasTotal = compareProgress.total > 0
+              const hasProgress = hasTotal && compareProgress.current > 0 && compareElapsedSec > 0
+              let etaSec: number | null = null
+              if (hasProgress) {
+                const rate = compareProgress.current / compareElapsedSec
+                if (rate > 0) {
+                  const remaining = (compareProgress.total - compareProgress.current) / rate
+                  etaSec = Math.max(0, Math.round(remaining))
+                }
+              }
+              const etaLabel = etaSec != null ? etaSec : null
+              return (
+                <div className="duplicates-search-loading" aria-live="polite">
+                  <span>{searchMode === 'duplicates' ? 'Finding duplicates…' : 'Finding uniques…'}</span>
+                  <div
+                    className="search-compare-progress-wrap"
+                    role="progressbar"
+                    aria-valuenow={hasTotal ? compareProgress.current : undefined}
+                    aria-valuemin={0}
+                    aria-valuemax={hasTotal ? compareProgress.total : undefined}
+                    aria-label="Analysis progress"
+                  >
+                    <div className="search-compare-progress-track">
+                      <div
+                        className={`search-compare-progress-bar ${!hasTotal ? 'search-compare-progress-indeterminate' : ''}`}
+                        style={hasTotal ? { width: `${(compareProgress.current / compareProgress.total) * 100}%` } : undefined}
+                      />
+                      {hasTotal && (() => {
+                        const pct = Math.round((compareProgress.current / compareProgress.total) * 100)
+                        return (
+                          <span className={`search-compare-progress-percent ${pct < 50 ? 'search-compare-progress-percent-over-track' : ''}`}>{pct}%</span>
+                        )
+                      })()}
+                    </div>
+                    <span className="search-compare-progress-stats">
+                      <span className="search-compare-progress-timer" aria-label="Estimated time remaining">
+                        {etaLabel == null ? (
+                          'ETA —'
+                        ) : (() => {
+                          let remaining = etaLabel
+                          const h = Math.floor(remaining / 3600)
+                          remaining %= 3600
+                          const m = Math.floor(remaining / 60)
+                          const s = remaining % 60
+                          const parts: React.ReactNode[] = []
+                          if (h > 0) parts.push(<><strong>{h}</strong>h</>)
+                          if (m > 0 || h > 0) parts.push(<><strong>{m}</strong>m</>)
+                          parts.push(<><strong>{s}</strong>s</>)
+                          return (
+                            <>
+                              <span className="search-compare-progress-eta-label">ETA</span>
+                              {parts.map((p, idx) => (
+                                <span key={idx}>{p}</span>
+                              ))}
+                            </>
+                          )
+                        })()}
+                      </span>
+                      {hasTotal && <span className="search-compare-progress-stats-sep" aria-hidden="true">·</span>}
+                      {hasTotal && (
+                        <span className="search-compare-progress-count">{compareProgress.current}/{compareProgress.total}</span>
+                      )}
+                    </span>
                   </div>
-                  <span className="search-compare-progress-stats">
-                    <span className="search-compare-progress-timer" aria-label="Elapsed time">{compareElapsedSec}s</span>
-                    {compareProgress.total > 0 && <span className="search-compare-progress-stats-sep" aria-hidden="true">·</span>}
-                    {compareProgress.total > 0 && (
-                      <span className="search-compare-progress-count">{compareProgress.current}/{compareProgress.total}</span>
-                    )}
-                  </span>
                 </div>
-              </div>
-            )}
+              )
+            })()}
             {searchMode === 'duplicates' && duplicatesResult != null && !searching && (() => {
               const total = duplicatesResult.total ?? 0
               const pageNum = duplicatesResult.page ?? 0

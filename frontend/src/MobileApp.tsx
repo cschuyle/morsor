@@ -1586,43 +1586,58 @@ onClick={() => {
           </p>
         )}
 
-        {isDupOrUniques && searching && (
-          <div className="mobile-search-loading" aria-live="polite" aria-busy="true">
-            <span className="mobile-search-spinner" aria-hidden="true" />
-            <div
-              className="search-compare-progress-wrap"
-              role="progressbar"
-              aria-valuenow={compareProgress.total > 0 ? compareProgress.current : undefined}
-              aria-valuemin={0}
-              aria-valuemax={compareProgress.total > 0 ? compareProgress.total : undefined}
-              aria-label="Analysis progress"
-            >
-              <div className="search-compare-progress-track">
-                <div
-                  className={`search-compare-progress-bar ${compareProgress.total === 0 ? 'search-compare-progress-indeterminate' : ''}`}
-                  style={compareProgress.total > 0 ? { width: `${(compareProgress.current / compareProgress.total) * 100}%` } : undefined}
-                />
-                {compareProgress.total > 0 && (() => {
-                  const pct = Math.round((compareProgress.current / compareProgress.total) * 100)
-                  return (
-                    <span className={`search-compare-progress-percent ${pct < 50 ? 'search-compare-progress-percent-over-track' : ''}`}>{pct}%</span>
-                  )
-                })()}
+        {isDupOrUniques && searching && (() => {
+          const hasTotal = compareProgress.total > 0
+          const hasProgress = hasTotal && compareProgress.current > 0 && compareElapsedSec > 0
+          let etaSec: number | null = null
+          if (hasProgress) {
+            const rate = compareProgress.current / compareElapsedSec
+            if (rate > 0) {
+              const remaining = (compareProgress.total - compareProgress.current) / rate
+              etaSec = Math.max(0, Math.round(remaining))
+            }
+          }
+          const etaLabel = etaSec != null ? `${etaSec}s` : '—'
+          return (
+            <div className="mobile-search-loading" aria-live="polite" aria-busy="true">
+              <span className="mobile-search-spinner" aria-hidden="true" />
+              <div
+                className="search-compare-progress-wrap"
+                role="progressbar"
+                aria-valuenow={hasTotal ? compareProgress.current : undefined}
+                aria-valuemin={0}
+                aria-valuemax={hasTotal ? compareProgress.total : undefined}
+                aria-label="Analysis progress"
+              >
+                <div className="search-compare-progress-track">
+                  <div
+                    className={`search-compare-progress-bar ${!hasTotal ? 'search-compare-progress-indeterminate' : ''}`}
+                    style={hasTotal ? { width: `${(compareProgress.current / compareProgress.total) * 100}%` } : undefined}
+                  />
+                  {hasTotal && (() => {
+                    const pct = Math.round((compareProgress.current / compareProgress.total) * 100)
+                    return (
+                      <span className={`search-compare-progress-percent ${pct < 50 ? 'search-compare-progress-percent-over-track' : ''}`}>{pct}%</span>
+                    )
+                  })()}
+                </div>
+                <span className="search-compare-progress-stats">
+                  <span className="search-compare-progress-timer" aria-label="Estimated time remaining">
+                    ETA {etaLabel}
+                  </span>
+                  {hasTotal && <span className="search-compare-progress-stats-sep" aria-hidden="true">·</span>}
+                  {hasTotal && (
+                    <span className="search-compare-progress-count">{compareProgress.current}/{compareProgress.total}</span>
+                  )}
+                </span>
+                <button type="button" className="mobile-search-cancel" onClick={cancelSearch} aria-label="Cancel search">
+                  Cancel
+                </button>
+                <span className="search-compare-progress-spacer" aria-hidden="true" />
               </div>
-              <span className="search-compare-progress-stats">
-                <span className="search-compare-progress-timer" aria-label="Elapsed time">{compareElapsedSec}s</span>
-                {compareProgress.total > 0 && <span className="search-compare-progress-stats-sep" aria-hidden="true">·</span>}
-                {compareProgress.total > 0 && (
-                  <span className="search-compare-progress-count">{compareProgress.current}/{compareProgress.total}</span>
-                )}
-              </span>
-            <button type="button" className="mobile-search-cancel" onClick={cancelSearch} aria-label="Cancel search">
-              Cancel
-            </button>
-              <span className="search-compare-progress-spacer" aria-hidden="true" />
             </div>
-          </div>
-        )}
+          )
+        })()}
 
         <div className="mobile-troves-row">
           <button

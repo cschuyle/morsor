@@ -1585,6 +1585,7 @@
 }
 .mobile-search-loading .search-compare-progress-timer {
   min-width: 2.8em;
+  font-variant-caps: small-caps;
 }
 
 .search-compare-progress-spacer {
