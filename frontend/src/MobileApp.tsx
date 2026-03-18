@@ -116,6 +116,7 @@ function MobileApp() {
   const reloadInProgressRef = useRef(false)
   const compareTimerStartRef = useRef<number | null>(null)
   const compareIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const compareEtaHistoryRef = useRef<number[]>([])
   const fileTypeDropdownRef = useRef<HTMLDivElement | null>(null)
   const pageSizeDropdownRef = useRef<HTMLDivElement | null>(null)
   const comparePageSizeDropdownRef = useRef<HTMLDivElement | null>(null)
@@ -558,12 +559,23 @@ function MobileApp() {
     }
   }
 
-  function fetchDuplicates(pageNum: number, sizeOverride: number | null = null): void {
+  function fetchDuplicates(
+    pageNum: number,
+    sizeOverride: number | null = null,
+    sortByOverride: string | null = null,
+    sortDirOverride: 'asc' | 'desc' | null = null
+  ): void {
     const q = queryRef.current.trim() || '*'
     const size = sizeOverride ?? dupPageSize
     if (!primaryTroveId.trim()) {
       setDuplicatesResult({ total: 0, page: 0, size, rows: [] })
       return
+    }
+    const sortBy = sortByOverride !== undefined && sortByOverride !== null ? sortByOverride : duplicatesSortBy
+    const sortDir = sortDirOverride !== undefined && sortDirOverride !== null ? sortDirOverride : duplicatesSortDir
+    if (sortByOverride != null || sortDirOverride != null) {
+      setDuplicatesSortBy(sortBy || null)
+      setDuplicatesSortDir(sortDir)
     }
     const params = new URLSearchParams({
       primaryTrove: primaryTroveId.trim(),
@@ -572,6 +584,10 @@ function MobileApp() {
       size: String(size),
       maxMatches: '20',
     })
+    if (sortBy) {
+      params.set('sortBy', sortBy)
+      params.set('sortDir', sortDir)
+    }
     const compareIdsToSend = compareTroveIds.size > 0 ? compareTroveIds : new Set([primaryTroveId.trim()])
     compareIdsToSend.forEach((id) => params.append('compareTrove', id))
     const streamUrl = `/api/search/duplicates/stream?${params}`
@@ -999,31 +1015,6 @@ function MobileApp() {
     const q = queryRef.current.trim()
     if (q) fetchSearch(page, effectiveSortBy, nextDir)
   }
-
-  const sortedDuplicateRows = useMemo(() => {
-    const raw = Array.isArray(duplicatesResult?.rows) ? duplicatesResult.rows : []
-    if (!duplicatesSortBy) return raw
-    const maxScore = (row) => {
-      if (!row?.matches?.length) return 0
-      return Math.max(...row.matches.map((m) => (typeof m?.score === 'number' ? m.score : 0)))
-    }
-    const dir = duplicatesSortDir === 'desc' ? -1 : 1
-    return [...raw].sort((a, b) => {
-      let cmp = 0
-      if (duplicatesSortBy === 'title') {
-        const ta = (a.primary?.title ?? '').toLowerCase()
-        const tb = (b.primary?.title ?? '').toLowerCase()
-        cmp = ta.localeCompare(tb, undefined, { sensitivity: 'base' })
-      } else if (duplicatesSortBy === 'trove') {
-        const ta = (a.primary?.trove ?? a.primary?.troveId ?? '').toLowerCase()
-        const tb = (b.primary?.trove ?? b.primary?.troveId ?? '').toLowerCase()
-        cmp = ta.localeCompare(tb, undefined, { sensitivity: 'base' })
-      } else if (duplicatesSortBy === 'score') {
-        cmp = maxScore(a) - maxScore(b)
-      }
-      return dir * cmp
-    })
-  }, [duplicatesResult?.rows, duplicatesSortBy, duplicatesSortDir])
 
   const results = searchResult?.results ?? []
   const count = searchResult?.count ?? 0
@@ -1607,7 +1598,18 @@ onClick={() => {
               etaSec = Math.max(0, Math.round(remaining))
             }
           }
-          const etaLabel = etaSec != null ? `${etaSec}s` : '—'
+          // Smooth ETA using a moving average of the most recent 5 measurements
+          let smoothedEtaSec: number | null = null
+          if (etaSec != null) {
+            const history = compareEtaHistoryRef.current
+            history.push(etaSec)
+            if (history.length > 5) history.splice(0, history.length - 5)
+            const sum = history.reduce((acc, v) => acc + v, 0)
+            smoothedEtaSec = Math.round(sum / history.length)
+          } else {
+            smoothedEtaSec = null
+          }
+          const etaLabel = smoothedEtaSec != null ? `${smoothedEtaSec}s` : '—'
           return (
             <div className="mobile-search-loading" aria-live="polite" aria-busy="true">
               <span className="mobile-search-spinner" aria-hidden="true" />
@@ -2136,13 +2138,10 @@ onClick={() => {
         {searchMode === 'duplicates' && duplicatesResult != null && !searching && (
           <div className="mobile-dup-uniques-results">
             <DuplicateResultsView
-              rows={sortedDuplicateRows}
+              rows={Array.isArray(duplicatesResult.rows) ? duplicatesResult.rows : []}
               sortBy={duplicatesSortBy}
               sortDir={duplicatesSortDir}
-              onSortChange={(col, dir) => {
-                setDuplicatesSortBy(col)
-                setDuplicatesSortDir(dir)
-              }}
+              onSortChange={(col, dir) => fetchDuplicates(0, null, col, dir)}
               onOpenRawSource={(payload) => setCompareRawSourceLightbox(payload)}
             />
           </div>

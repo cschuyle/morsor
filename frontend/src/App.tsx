@@ -90,6 +90,11 @@ function App() {
   const reloadInProgressRef = useRef(false)
   const compareTimerStartRef = useRef<number | null>(null)
   const compareIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const compareEtaHistoryRef = useRef<number[]>([])
+  const [showCompareBackToTop, setShowCompareBackToTop] = useState(false)
+  const compareSectionRef = useRef<HTMLDivElement | null>(null)
+  const compareScrollContainerRef = useRef<HTMLElement | null>(null)
+  const [compareBackToTopCenterX, setCompareBackToTopCenterX] = useState<number | null>(null)
   const fileTypeDropdownRef = useRef<HTMLDivElement | null>(null)
   const dupPageSizeRef = useRef(dupPageSize)
   const uniqPageSizeRef = useRef(uniqPageSize)
@@ -100,6 +105,41 @@ function App() {
   const isStarQuery = (query ?? '').trim() === '*'
   const effectiveSortBy = isStarQuery ? (starSortBy ?? 'title') : (otherSortBy ?? 'score')
   const effectiveSortDir = isStarQuery ? (starSortDir ?? 'asc') : (otherSortDir ?? 'desc')
+
+  // Back-to-top for compare results (duplicates/uniques) – mirrors SearchResultsGrid behavior
+  useEffect(() => {
+    const el = compareSectionRef.current
+    if (!el) return
+    const scrollContainer = (el.closest('.main') ?? null) as HTMLElement | null
+    compareScrollContainerRef.current = scrollContainer
+    const threshold = 200
+    const getScrollTop = () => (scrollContainer ? scrollContainer.scrollTop : window.scrollY)
+    const onScroll = () => setShowCompareBackToTop(getScrollTop() > threshold)
+    onScroll()
+    if (scrollContainer) {
+      scrollContainer.addEventListener('scroll', onScroll, { passive: true })
+      return () => scrollContainer.removeEventListener('scroll', onScroll)
+    }
+    window.addEventListener('scroll', onScroll, { passive: true })
+    return () => window.removeEventListener('scroll', onScroll)
+  }, [])
+
+  useEffect(() => {
+    const el = compareSectionRef.current
+    if (!el) return
+    const updateCenter = () => {
+      const rect = el.getBoundingClientRect()
+      setCompareBackToTopCenterX(rect.left + rect.width / 2)
+    }
+    updateCenter()
+    const ro = new ResizeObserver(updateCenter)
+    ro.observe(el)
+    window.addEventListener('resize', updateCenter)
+    return () => {
+      ro.disconnect()
+      window.removeEventListener('resize', updateCenter)
+    }
+  }, [])
 
   function refreshStatusMessage() {
     fetch('/api/status', { credentials: 'include', headers: { ...getApiAuthHeaders() } })
@@ -533,12 +573,23 @@ function App() {
     }
   }
 
-  function fetchDuplicates(pageNum: number, sizeOverride: number | null = null) {
+  function fetchDuplicates(
+    pageNum: number,
+    sizeOverride: number | null = null,
+    sortByOverride: string | null = null,
+    sortDirOverride: 'asc' | 'desc' | null = null
+  ) {
     const q = queryRef.current.trim() || '*'
     const size = sizeOverride ?? dupPageSizeRef.current
     if (!primaryTroveId.trim()) {
       setDuplicatesResult({ total: 0, page: 0, size, rows: [] })
       return
+    }
+    const sortBy = sortByOverride !== undefined && sortByOverride !== null ? sortByOverride : duplicatesSortBy
+    const sortDir = sortDirOverride !== undefined && sortDirOverride !== null ? sortDirOverride : duplicatesSortDir
+    if (sortByOverride != null || sortDirOverride != null) {
+      setDuplicatesSortBy(sortBy || null)
+      setDuplicatesSortDir(sortDir)
     }
     const params = new URLSearchParams({
       primaryTrove: primaryTroveId.trim(),
@@ -547,6 +598,10 @@ function App() {
       size: String(size),
       maxMatches: '20',
     })
+    if (sortBy) {
+      params.set('sortBy', sortBy)
+      params.set('sortDir', sortDir)
+    }
     const compareIdsToSend = selectedTroveIds.size > 0 ? selectedTroveIds : new Set([primaryTroveId.trim()])
     compareIdsToSend.forEach((id) => params.append('compareTrove', id))
     const streamUrl = `/api/search/duplicates/stream?${params}`
@@ -893,31 +948,6 @@ function App() {
     const notSelected = doSplit ? filtered.filter((t) => !idsForSplit.has(t.id)).sort(sortByName) : [...filtered].sort(sortByName)
     return { selected, notSelected, displaySelectedTroveIds: idsForSplit }
   }, [troves, searchResult, troveFilter, showFilter, selectedTroveIds, searchMode, freezeTroveListOrder, boostTroveId])
-
-  const sortedDuplicateRows = useMemo(() => {
-    const raw = Array.isArray(duplicatesResult?.rows) ? duplicatesResult.rows : []
-    if (!duplicatesSortBy) return raw
-    const maxScore = (row) => {
-      if (!row?.matches?.length) return 0
-      return Math.max(...row.matches.map((m) => (typeof m?.score === 'number' ? m.score : 0)))
-    }
-    const dir = duplicatesSortDir === 'desc' ? -1 : 1
-    return [...raw].sort((a, b) => {
-      let cmp = 0
-      if (duplicatesSortBy === 'title') {
-        const ta = (a.primary?.title ?? '').toLowerCase()
-        const tb = (b.primary?.title ?? '').toLowerCase()
-        cmp = ta.localeCompare(tb, undefined, { sensitivity: 'base' })
-      } else if (duplicatesSortBy === 'trove') {
-        const ta = (a.primary?.trove ?? a.primary?.troveId ?? '').toLowerCase()
-        const tb = (b.primary?.trove ?? b.primary?.troveId ?? '').toLowerCase()
-        cmp = ta.localeCompare(tb, undefined, { sensitivity: 'base' })
-      } else if (duplicatesSortBy === 'score') {
-        cmp = maxScore(a) - maxScore(b)
-      }
-      return dir * cmp
-    })
-  }, [duplicatesResult?.rows, duplicatesSortBy, duplicatesSortDir])
 
   return (
     <div className="desktop-app">
@@ -1727,6 +1757,7 @@ function App() {
                 {(searchMode === 'search' && searchResult?.warning) || (searchMode === 'duplicates' && duplicatesResult?.warning) || (searchMode === 'uniques' && uniquesResult?.warning)}
               </p>
             ) : null}
+            <div ref={compareSectionRef}>
             {(searchMode === 'duplicates' || searchMode === 'uniques') && duplicatesResult == null && uniquesResult == null && !searching && (
               <p className="search-count search-count-detail">
                 Select <strong>Primary</strong> & <strong>Comparison</strong> troves
@@ -1743,7 +1774,18 @@ function App() {
                   etaSec = Math.max(0, Math.round(remaining))
                 }
               }
-              const etaLabel = etaSec != null ? etaSec : null
+              // Smooth ETA using a moving average of the most recent 5 measurements
+              let smoothedEtaSec: number | null = null
+              if (etaSec != null) {
+                const history = compareEtaHistoryRef.current
+                history.push(etaSec)
+                if (history.length > 5) history.splice(0, history.length - 5)
+                const sum = history.reduce((acc, v) => acc + v, 0)
+                smoothedEtaSec = Math.round(sum / history.length)
+              } else {
+                smoothedEtaSec = null
+              }
+              const etaLabel = smoothedEtaSec != null ? smoothedEtaSec : null
               return (
                 <div className="duplicates-search-loading" aria-live="polite">
                   <span>{searchMode === 'duplicates' ? 'Finding duplicates…' : 'Finding uniques…'}</span>
@@ -1804,7 +1846,7 @@ function App() {
               const total = duplicatesResult.total ?? 0
               const pageNum = duplicatesResult.page ?? 0
               const size = duplicatesResult.size ?? 50
-              const rows = sortedDuplicateRows
+              const rows = Array.isArray(duplicatesResult.rows) ? duplicatesResult.rows : []
               const totalPages = size > 0 ? Math.ceil(total / size) : 0
               const from = total === 0 ? 0 : pageNum * size + 1
               const to = Math.min((pageNum + 1) * size, total)
@@ -1918,10 +1960,7 @@ function App() {
                     rows={rows}
                     sortBy={duplicatesSortBy}
                     sortDir={duplicatesSortDir}
-                    onSortChange={(col, dir) => {
-                      setDuplicatesSortBy(col)
-                      setDuplicatesSortDir(dir)
-                    }}
+                    onSortChange={(col, dir) => fetchDuplicates(0, null, col, dir)}
                     onOpenRawSource={(payload) => setCompareRawSourceLightbox(payload)}
                   />
                 </>
@@ -2051,6 +2090,23 @@ function App() {
                 </>
               )
             })()}
+            {showCompareBackToTop && (
+              <button
+                type="button"
+                className="back-to-top-btn"
+                style={compareBackToTopCenterX != null ? { left: compareBackToTopCenterX } : undefined}
+                onClick={() => {
+                  const sc = compareScrollContainerRef.current
+                  if (sc && 'scrollTo' in sc) sc.scrollTo({ top: 0, behavior: 'smooth' })
+                  else window.scrollTo({ top: 0, behavior: 'smooth' })
+                }}
+                aria-label="Back to top"
+                title="Back to top"
+              >
+                <span aria-hidden="true">▲</span>
+              </button>
+            )}
+            </div>
             {searchMode === 'search' && searchResult != null && (() => {
               const results = Array.isArray(searchResult.results) ? searchResult.results : []
               const hasQuery = query.trim() !== ''

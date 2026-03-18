@@ -179,7 +179,9 @@ public class SearchController {
             @RequestParam(required = false, defaultValue = "*") String query,
             @RequestParam(required = false, defaultValue = "0") int page,
             @RequestParam(required = false, defaultValue = "50") int size,
-            @RequestParam(required = false, defaultValue = "20") int maxMatches) {
+            @RequestParam(required = false, defaultValue = "20") int maxMatches,
+            @RequestParam(required = false) String sortBy,
+            @RequestParam(required = false, defaultValue = "asc") String sortDir) {
         final int pageNum = Math.max(0, page);
         final int pageSize = Math.min(500, Math.max(1, size));
         final int maxMatchesVal = Math.min(50, Math.max(1, maxMatches));
@@ -192,6 +194,16 @@ public class SearchController {
         SearchCache.DupUniqCacheResult cacheResult = searchCache.getOrComputeDupUniq(cacheKey,
                 () -> searchDataService.searchDuplicatesAndUniques(primaryTrimmed, compareSet, queryVal, null));
         List<DuplicateMatchRow> all = trimDuplicateMatches(cacheResult.pair().duplicates(), maxMatchesVal);
+        boolean descending = "desc".equalsIgnoreCase(sortDir != null ? sortDir : "asc");
+        if (sortBy != null && !sortBy.isBlank()) {
+            Comparator<DuplicateMatchRow> cmp = duplicatesComparatorFor(sortBy);
+            if (cmp != null) {
+                if (descending) {
+                    cmp = cmp.reversed();
+                }
+                all = all.stream().sorted(cmp).toList();
+            }
+        }
         long total = all.size();
         int from = (int) Math.min((long) pageNum * pageSize, total);
         int to = (int) Math.min(from + pageSize, total);
@@ -207,7 +219,9 @@ public class SearchController {
             @RequestParam(required = false, defaultValue = "*") String query,
             @RequestParam(required = false, defaultValue = "0") int page,
             @RequestParam(required = false, defaultValue = "50") int size,
-            @RequestParam(required = false, defaultValue = "20") int maxMatches) {
+            @RequestParam(required = false, defaultValue = "20") int maxMatches,
+            @RequestParam(required = false) String sortBy,
+            @RequestParam(required = false, defaultValue = "asc") String sortDir) {
         final int pageNum = Math.max(0, page);
         final int pageSize = Math.min(500, Math.max(1, size));
         final int maxMatchesVal = Math.min(50, Math.max(1, maxMatches));
@@ -217,6 +231,8 @@ public class SearchController {
         final String primaryTrimmed = primaryTrove.trim();
         final String queryVal = query != null ? query : "*";
         String cacheKey = dupUniqCacheKey(primaryTrimmed, compareSet, queryVal);
+        final boolean descending = "desc".equalsIgnoreCase(sortDir != null ? sortDir : "asc");
+        final String sortByVal = sortBy;
         ObjectMapper om = this.objectMapper;
         SecurityContext securityContext = SecurityContextHolder.getContext();
         StreamingResponseBody stream = out -> {
@@ -233,6 +249,15 @@ public class SearchController {
                             }
                         }));
                 List<DuplicateMatchRow> all = trimDuplicateMatches(cacheResult.pair().duplicates(), maxMatchesVal);
+                if (sortByVal != null && !sortByVal.isBlank()) {
+                    Comparator<DuplicateMatchRow> cmp = duplicatesComparatorFor(sortByVal);
+                    if (cmp != null) {
+                        if (descending) {
+                            cmp = cmp.reversed();
+                        }
+                        all = all.stream().sorted(cmp).toList();
+                    }
+                }
                 long total = all.size();
                 int from = (int) Math.min((long) pageNum * pageSize, total);
                 int to = (int) Math.min(from + pageSize, total);
@@ -373,6 +398,24 @@ public class SearchController {
                 .map(row -> new DuplicateMatchRow(row.primary(),
                         row.matches().size() <= maxMatches ? row.matches() : row.matches().stream().limit(maxMatches).toList()))
                 .toList();
+    }
+
+    private static double maxDuplicateRowScore(DuplicateMatchRow row) {
+        if (row.matches() == null || row.matches().isEmpty()) {
+            return 0.0;
+        }
+        return row.matches().stream().mapToDouble(ScoredSearchResult::score).max().orElse(0.0);
+    }
+
+    private static Comparator<DuplicateMatchRow> duplicatesComparatorFor(String sortBy) {
+        return switch (sortBy.toLowerCase()) {
+            case "title" -> Comparator.comparing(
+                    r -> r.primary().title() != null ? r.primary().title().toLowerCase() : "");
+            case "trove" -> Comparator.comparing(
+                    r -> r.primary().trove() != null ? r.primary().trove().toLowerCase() : "");
+            case "score" -> Comparator.comparingDouble(SearchController::maxDuplicateRowScore);
+            default -> null;
+        };
     }
 
     private static Comparator<UniqueResult> uniquesComparatorFor(String sortBy) {

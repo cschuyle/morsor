@@ -10,7 +10,7 @@
   container-name: search-results;
 }
 
-.search-results-grid .back-to-top-btn {
+.back-to-top-btn {
   position: fixed;
   bottom: 5rem;
   left: 50%;
@@ -31,12 +31,12 @@
   color: rgba(0, 0, 0, 0.5);
   transition: background-color 0.15s, box-shadow 0.15s, color 0.15s;
 }
-.search-results-grid .back-to-top-btn:hover {
+.back-to-top-btn:hover {
   background-color: rgba(255, 212, 168, 0.85) !important;
   color: rgba(0, 0, 0, 0.75);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
 }
-.search-results-grid .back-to-top-btn:focus-visible {
+.back-to-top-btn:focus-visible {
   outline: 2px solid #6633cc;
   outline-offset: 2px;
 }
