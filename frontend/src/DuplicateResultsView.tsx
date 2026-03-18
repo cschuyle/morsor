@@ -50,6 +50,9 @@ export function DuplicateResultsView({ rows = [], sortBy = null, sortDir = 'asc'
       <table className="duplicate-results-table">
         <thead>
           <tr>
+            <th className="col-thumb" scope="col">
+              {/* Thumbnail */}
+            </th>
             <th
               className={`col-title ${onSortChange ? 'sortable' : ''}`}
               onClick={onSortChange ? () => handleSort('title') : undefined}
@@ -80,6 +83,7 @@ export function DuplicateResultsView({ rows = [], sortBy = null, sortDir = 'asc'
               return s > best ? s : best
             }, -Infinity)
             const primaryScore = maxScore === -Infinity ? '—' : maxScore.toFixed(2)
+            const primaryThumb = typeof row.primary?.thumbnailUrl === 'string' ? row.primary.thumbnailUrl : null
             return (
             <Fragment key={rowIdx}>
               <tr
@@ -90,6 +94,11 @@ export function DuplicateResultsView({ rows = [], sortBy = null, sortDir = 'asc'
                 } : undefined}
                 title={onOpenRawSource ? 'Click to view raw source' : undefined}
               >
+                <td className="col-thumb">
+                  {primaryThumb ? (
+                    <img src={primaryThumb} alt="" className="dup-thumb" loading="lazy" />
+                  ) : null}
+                </td>
                 <td className="col-title">{row.primary?.title ?? '—'}</td>
                 <td className="col-trove">{row.primary?.trove ?? row.primary?.troveId ?? ''}</td>
                 <td className="col-score" aria-label="Primary item (max match score)">{primaryScore}</td>
@@ -97,6 +106,7 @@ export function DuplicateResultsView({ rows = [], sortBy = null, sortDir = 'asc'
               {(row.matches ?? []).filter((m) => String(m.result?.id ?? '') !== String(row.primary?.id ?? '')).map((m, matchIdx) => {
                 const primaryWords = getPrimaryWords(row.primary?.title ?? '')
                 const matchItem = m.result
+                const matchThumb = typeof matchItem?.thumbnailUrl === 'string' ? matchItem.thumbnailUrl : null
                 return (
                 <tr
                   key={matchIdx}
@@ -106,6 +116,11 @@ export function DuplicateResultsView({ rows = [], sortBy = null, sortDir = 'asc'
                   } : undefined}
                   title={onOpenRawSource ? 'Click to view raw source' : undefined}
                 >
+                  <td className="col-thumb">
+                    {matchThumb ? (
+                      <img src={matchThumb} alt="" className="dup-thumb" loading="lazy" />
+                    ) : null}
+                  </td>
                   <td className="col-title">{titleWithExtraHighlight(matchItem?.title ?? '—', primaryWords)}</td>
                   <td className="col-trove">{matchItem?.trove ?? matchItem?.troveId ?? ''}</td>
                   <td className="col-score">{typeof m.score === 'number' ? m.score.toFixed(2) : '—'}</td>

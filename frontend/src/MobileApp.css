@@ -2163,6 +2163,19 @@
   white-space: nowrap;
 }
 
+.mobile-dup-uniques-results .duplicate-results-table .col-thumb {
+  width: 1%;
+  white-space: nowrap;
+}
+
+.mobile-dup-uniques-results .dup-thumb {
+  display: block;
+  width: 2.5rem;
+  height: 2.5rem;
+  object-fit: cover;
+  border-radius: 4px;
+}
+
 .mobile-dup-uniques-results .col-uniques-help {
   padding: 0.4rem 0.25rem;
   text-align: right;

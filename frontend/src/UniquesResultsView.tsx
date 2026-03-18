@@ -87,6 +87,9 @@ export function UniquesResultsView({ results = [], sortBy = null, sortDir = 'asc
       <table className="duplicate-results-table">
         <thead>
           <tr>
+            <th className="col-thumb" scope="col">
+              {/* Thumbnail */}
+            </th>
             <th
               className={`col-title ${onSortChange ? 'sortable' : ''}`}
               onClick={onSortChange ? () => handleSort('title') : undefined}
@@ -118,6 +121,7 @@ export function UniquesResultsView({ results = [], sortBy = null, sortDir = 'asc
             const nearMisses = row?.nearMisses ?? []
             const nearMissWords = getWordsFromTitles(nearMisses)
             const primaryWords = getWordsFromTitle(item?.title ?? '')
+            const primaryThumb = item?.thumbnailUrl
             return (
               <Fragment key={idx}>
                 <tr
@@ -127,6 +131,11 @@ export function UniquesResultsView({ results = [], sortBy = null, sortDir = 'asc
                   } : undefined}
                   title={onOpenRawSource ? 'Click to view raw source' : undefined}
                 >
+                  <td className="col-thumb">
+                    {primaryThumb ? (
+                      <img src={primaryThumb} alt="" className="dup-thumb" loading="lazy" />
+                    ) : null}
+                  </td>
                   <td className="col-title">{titleWithMatchHighlight(item?.title ?? '—', nearMissWords)}</td>
                   <td className="col-trove">{item?.trove ?? item?.troveId ?? ''}</td>
                   <td className="col-score">{score != null ? score.toFixed(2) : '—'}</td>

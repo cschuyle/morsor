@@ -1803,6 +1803,19 @@
   white-space: nowrap;
 }
 
+.duplicate-results-table .col-thumb {
+  width: 1%;
+  white-space: nowrap;
+}
+
+.dup-thumb {
+  display: block;
+  width: 3.2rem;
+  height: 3.2rem;
+  object-fit: cover;
+  border-radius: 4px;
+}
+
 .col-uniques-help {
   width: 1%;
   padding: 0.4rem 0.15rem 0.4rem 0.25rem;
