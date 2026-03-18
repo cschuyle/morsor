@@ -45,9 +45,10 @@
   display: none;
 }
 
-/* Ensure fixed-position lightbox is anchored to viewport on mobile.
+/* Ensure fixed-position overlays (lightbox, uniques dialog) are anchored to viewport on mobile.
    A filtered ancestor can create a containing block and shift the overlay with scroll. */
-.mobile-app:has(.search-thumb-lightbox) .mobile-main:not(.mobile-about-main) {
+.mobile-app:has(.search-thumb-lightbox) .mobile-main:not(.mobile-about-main),
+.mobile-app:has(.uniques-dialog-backdrop) .mobile-main:not(.mobile-about-main) {
   filter: none;
 }
 
@@ -2258,6 +2259,7 @@
   font-size: 0.9rem;
   color: #555;
   border-bottom: 1px solid #eee;
+  text-align: center;
 }
 
 .mobile-dup-uniques-results .uniques-dialog-list {
@@ -2273,6 +2275,7 @@
   display: flex;
   flex-direction: column;
   gap: 0.2rem;
+  text-align: left;
 }
 
 .mobile-dup-uniques-results .uniques-dialog-item-title {

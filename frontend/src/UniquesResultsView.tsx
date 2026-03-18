@@ -82,8 +82,12 @@ export function UniquesResultsView({ results = [], sortBy = null, sortDir = 'asc
   const primaryItem = dialogRow != null ? (results[dialogRow]?.item ?? results[dialogRow]) as SearchResultRow | undefined : undefined
   const primaryTitle = primaryItem?.title ?? ''
 
+  const rootClassName = dialogRow != null
+    ? 'duplicate-results uniques-results uniques-results--dialog-open'
+    : 'duplicate-results uniques-results'
+
   return (
-    <div className="duplicate-results uniques-results">
+    <div className={rootClassName}>
       <table className="duplicate-results-table">
         <thead>
           <tr>

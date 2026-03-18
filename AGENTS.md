@@ -50,6 +50,9 @@ Document regressions here (what broke, where, and how it was fixed) so agents ca
 
 - **File type quick buttons hover when enabled:** The Any, Meh, and thumbnail buttons in the file type dropdown should not show a hover effect when they are the currently selected/enabled option. **Cause:** On mobile, `.mobile-filetype-quick-btn--active:hover` darkened the orange to `#e67a00`, giving a hover effect on the active button. (Desktop already kept the same color for active hover.) **Fix:** For the active quick button (class `--active`), keep the same background and border on hover as at rest. In MobileApp.css set `.mobile-filetype-quick-btn--active:hover` to `#ff8800` so it does not change on hover. Desktop already uses the same color for `.search-filetype-quick-btn--active:hover`; ensure hover is only applied to non-active buttons via `:hover:not(.search-filetype-quick-btn--active)` for the purple hover.
 
+- **Uniques dialog / mobile scroll:** On mobile, when scrolled down and opening the "Possible duplicates (top 5)" uniques dialog, the popup can appear shifted or partly off the top of the screen. **Cause:** Like the lightbox, the dialog lives inside `.mobile-main`, which has a `filter` applied; that filtered ancestor creates a containing block, so `position: fixed` on `.uniques-dialog-backdrop` becomes relative to the scrollable container instead of the viewport. **Fix:** In `MobileApp.css`, when `.uniques-dialog-backdrop` is present, clear the `filter` on `.mobile-main` so the backdrop is truly viewport-fixed:
+  - `.mobile-app:has(.uniques-dialog-backdrop) .mobile-main:not(.mobile-about-main) { filter: none; }`
+
 ---
 
 - If I say "A question", "Question:" or just "Q:" or even "Q", then I implicitly mean that I don't want you to modify any files. I am just asking a question."
