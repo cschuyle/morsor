@@ -2076,7 +2076,8 @@ function App() {
                           }}
                           aria-pressed={searchResultsViewMode === 'list'}
                         >
-                          List
+                          <img src="/list.png" alt="" aria-hidden="true" className="view-mode-btn-icon" />
+                          <span className="view-mode-btn-label">List</span>
                         </button>
                         <button
                           type="button"
@@ -2093,7 +2094,8 @@ function App() {
                           }}
                           aria-pressed={searchResultsViewMode === 'gallery'}
                         >
-                          Gallery
+                          <img src="/gallery.png" alt="" aria-hidden="true" className="view-mode-btn-icon" />
+                          <span className="view-mode-btn-label">Gallery</span>
                         </button>
                       </span>
                       <span className={`gallery-decorate-wrap ${searchResultsViewMode !== 'gallery' ? 'gallery-decorate-wrap--hidden' : ''}`}>

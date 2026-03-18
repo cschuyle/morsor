@@ -1553,7 +1553,7 @@
 
 .view-mode-btn {
   height: 2rem;
-  padding: 0 0.6rem;
+  padding: 0 0.55rem;
   font-size: 0.85rem;
   font-family: inherit;
   border: 1px solid #ddd;
@@ -1564,6 +1564,7 @@
   box-sizing: border-box;
   display: inline-flex;
   align-items: center;
+  gap: 0.25rem;
 }
 
 .view-mode-btn:hover {
@@ -1581,6 +1582,17 @@
   background: #6633cc;
   border-color: #6633cc;
   color: #fff;
+}
+
+.view-mode-btn-icon {
+  display: block;
+  width: 1.25rem;
+  height: 1.25rem;
+  object-fit: contain;
+}
+
+.view-mode-btn-label {
+  display: inline-block;
 }
 
 .page-size-label {
