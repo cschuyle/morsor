@@ -1633,7 +1633,7 @@ onClick={() => {
                 </div>
                 <span className="search-compare-progress-stats">
                   <span className="search-compare-progress-timer" aria-label="Estimated time remaining">
-                    ETA {etaLabel}
+                    {etaLabel}
                   </span>
                   {hasTotal && <span className="search-compare-progress-stats-sep" aria-hidden="true">·</span>}
                   {hasTotal && (
