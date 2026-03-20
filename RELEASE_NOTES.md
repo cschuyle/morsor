@@ -4,6 +4,8 @@
 
 *(Tag created when deploy runs.)*
 
+## release-v20260319-1826-b706dd5
+
 ### Search results
 - **Filter box:** Only show “Filter this page” when there are results.
 - **List mode:** Thumbnail now enlarges on hover (up to 60%).
