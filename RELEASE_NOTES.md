@@ -5,11 +5,19 @@
 *(Tag created when deploy runs.)*
 
 ### Search results
+- **Filter box:** Only show “Filter this page” when there are results.
+- **List mode:** Thumbnail now enlarges on hover (up to 60%).
 - **Column resizing:** Results list columns (Title, Trove, Score) can be resized by dragging the header edge; double-click resizer resets.
-- **Trove column:** Show the trove column when no troves are selected (desktop; mobile already did). Hide only when exactly one trove is selected.
 
-### Mobile app
-- **Search tab:** Fixed bug: The URL was not being updated when switching from a Compare tab
+### Compare (duplicates / uniques)
+- **Sort over full result:** Duplicates and uniques sort over the entire result set (like the search tab), not just the current page.
+- **Thumbnails:** Thumbnails are now shown in duplicate and uniques result tables.
+- **Progress:** ETA countdown instead of elapsed time.
+- **Back-to-top:** Same back-to-top arrow as search when compare view is scrolled down.
+
+### Desktop
+- **View mode toggle:** List and gallery icons inside the view toggle buttons.
+- **Trove column:** Show the trove column when no troves are selected (desktop; mobile already did). Hide only when exactly one trove is selected.
 
 ## release-v20260314-1856-11dbdce
 
