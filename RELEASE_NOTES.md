@@ -4,6 +4,9 @@
 
 *(Tag created when deploy runs.)*
 
+### Search results
+- **Filter box color:** “Filter this page” input now uses a pale blue background to distinguish it from the regular search box.
+
 ## release-v20260319-1826-b706dd5
 
 ### Search results
