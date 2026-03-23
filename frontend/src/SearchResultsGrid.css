@@ -61,9 +61,9 @@
   height: 2.25rem;
   box-sizing: border-box;
   padding: 0 2.25rem 0 2.75rem;
-  border: 1px solid #ddd;
+  border: 1px solid #8f9fe0;
   border-radius: 6px;
-  background: #ffffff;
+  background-color: #c8d9ff;
   color: #213547;
   font-size: 0.95rem;
   background-image: url('/filter.png');
