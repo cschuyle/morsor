@@ -29,25 +29,82 @@ export default function Login() {
     }
   }, [])
 
-  function handleSubmit(e: FormEvent<HTMLFormElement>) {
+  /**
+   * Merge React state with live DOM values (1Password, browser AutoFill, etc. often skip onChange).
+   * Prefer whichever side is non-empty; if both set, keep React state (typed edits win).
+   */
+  function mergeCredentialsFromForm(
+    form: HTMLFormElement,
+    stateUser: string,
+    statePass: string
+  ): { user: string; pass: string } {
+    const unInput = form.querySelector<HTMLInputElement>('[name=username]')
+    const pwInput = form.querySelector<HTMLInputElement>('[name=password]')
+    const domUser = (unInput?.value ?? '').trim()
+    const domPass = pwInput?.value ?? ''
+    const stateU = (stateUser ?? '').trim()
+    const stateP = statePass ?? ''
+    return {
+      user: stateU || domUser,
+      pass: stateP || domPass,
+    }
+  }
+
+  /** Run before submit (pointer down) so desktop managers have one more chance to sync React state. */
+  function syncControlledFieldsFromDom() {
+    const form = formRef.current
+    if (!form) {
+      return
+    }
+    const { user, pass } = mergeCredentialsFromForm(form, username, password)
+    if (user) {
+      setUsername(user)
+    }
+    if (pass) {
+      setPassword(pass)
+    }
+  }
+
+  /** iOS / 1Password often commit `.value` a tick after the click; wait then re-read DOM. */
+  function waitForAutofillPaint(): Promise<void> {
+    return new Promise((resolve) => {
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => resolve())
+      })
+    })
+  }
+
+  async function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault()
     setSubmitting(true)
     setError('')
-    let user = (username ?? '').trim()
-    let pass = password ?? ''
-    // Safari/Firefox often don't fire onChange for password-manager autofill; read from DOM as fallback
-    if ((!user || !pass) && formRef.current) {
-      const unInput = formRef.current.querySelector<HTMLInputElement>('[name=username]')
-      const pwInput = formRef.current.querySelector<HTMLInputElement>('[name=password]')
-      if (unInput && pwInput) {
-        if (!user) user = (unInput.value ?? '').trim()
-        if (!pass) pass = pwInput.value ?? ''
-      }
+    const formEl = formRef.current ?? e.currentTarget
+    let { user, pass } = mergeCredentialsFromForm(formEl, username, password)
+
+    if (!user || !pass) {
+      await waitForAutofillPaint()
+      ;({ user, pass } = mergeCredentialsFromForm(formEl, username, password))
     }
     if (!user || !pass) {
+      await new Promise<void>((r) => setTimeout(r, 100))
+      ;({ user, pass } = mergeCredentialsFromForm(formEl, username, password))
+    }
+    if (!user || !pass) {
+      await new Promise<void>((r) => setTimeout(r, 250))
+      ;({ user, pass } = mergeCredentialsFromForm(formEl, username, password))
+    }
+
+    if (!user || !pass) {
+      setError(
+        'Username and password are required. If you used AutoFill, wait a moment and click Sign in again.'
+      )
       setSubmitting(false)
       return
     }
+
+    setUsername(user)
+    setPassword(pass)
+
     const attemptLogin = (): Promise<Response> => {
       const csrf = getCsrfToken()
       const body = new URLSearchParams({ username: user, password: pass })
@@ -100,6 +157,7 @@ export default function Login() {
               autoComplete="username"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
+              onInput={(e) => setUsername(e.currentTarget.value)}
               className="login-input"
               required
             />
@@ -112,12 +170,22 @@ export default function Login() {
               autoComplete="current-password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
+              onInput={(e) => setPassword(e.currentTarget.value)}
               className="login-input"
               required
             />
           </label>
           {error && <p className="login-error" role="alert">{error}</p>}
-          <button type="submit" className="login-submit" disabled={submitting}>
+          <button
+            type="submit"
+            className="login-submit"
+            disabled={submitting}
+            onPointerDown={(ev) => {
+              if (ev.button === 0) {
+                syncControlledFieldsFromDom()
+              }
+            }}
+          >
             {submitting ? 'Signing in…' : 'Sign in'}
           </button>
         </form>
