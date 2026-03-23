@@ -4,9 +4,11 @@
 
 *(Tag created when deploy runs.)*
 
+## release-v20260323-1521-f57df91
+
 ### Authentication & sign-in
 - Improved behavior when authentication results in an error.
-- Improved behavior when accepting autofill (e.g. 1Password and iPhone)
+- Improved behavior when accepting autofill (e.g. 1Password and iPhone).
 
 ## release-v20260323-1316-4f07b9a
 
