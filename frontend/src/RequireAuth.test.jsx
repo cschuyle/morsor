@@ -24,7 +24,7 @@ describe('RequireAuth', () => {
     vi.unstubAllGlobals()
   })
 
-  it('checks /api/troves before rendering children', async () => {
+  it('checks /api/auth/session before rendering children', async () => {
     render(
       <RequireAuth>
         <span>Child content</span>
@@ -35,10 +35,10 @@ describe('RequireAuth', () => {
       expect(fetchMock).toHaveBeenCalled()
     })
 
-    const trovesCall = fetchMock.mock.calls.find(
-      (call) => typeof call[0] === 'string' && call[0].includes('/api/troves')
+    const sessionCall = fetchMock.mock.calls.find(
+      (call) => typeof call[0] === 'string' && call[0].includes('/api/auth/session')
     )
-    expect(trovesCall).toBeDefined()
+    expect(sessionCall).toBeDefined()
   })
 
   it('renders children after successful auth', async () => {
@@ -51,5 +51,32 @@ describe('RequireAuth', () => {
     await waitFor(() => {
       expect(screen.getByText('Child content')).toBeInTheDocument()
     })
+  })
+
+  it('redirects to login with service_unavailable when auth session returns 503 (e.g. DB down)', async () => {
+    const locationMock = { href: 'http://localhost/', pathname: '/', search: '', hash: '' }
+    Object.defineProperty(window, 'location', {
+      configurable: true,
+      writable: true,
+      value: locationMock,
+    })
+
+    fetchMock.mockImplementation(() =>
+      Promise.resolve({
+        status: 503,
+        ok: false,
+      })
+    )
+
+    render(
+      <RequireAuth>
+        <span>Child content</span>
+      </RequireAuth>
+    )
+
+    await waitFor(() => {
+      expect(locationMock.href).toBe('/login?error=service_unavailable')
+    })
+    expect(screen.queryByText('Child content')).not.toBeInTheDocument()
   })
 })

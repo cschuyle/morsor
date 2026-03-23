@@ -1,6 +1,60 @@
 import { useState, useEffect, useRef, FormEvent } from 'react'
+import { getApiAuthHeaders } from './apiAuth'
 import { getCsrfToken } from './getCsrfToken'
 import './Login.css'
+
+/** Spring failed-login redirects are 302 to /login?error (do not treat as success). */
+function loginRedirectIsFailure(location: string | null): boolean {
+  if (!location) {
+    return false
+  }
+  try {
+    const path = new URL(location, window.location.origin).pathname
+    return path === '/login' || path.endsWith('/login')
+  } catch {
+    return location.includes('/login')
+  }
+}
+
+function fetchAuthSession(): Promise<Response> {
+  return fetch('/api/auth/session', { credentials: 'include', headers: { ...getApiAuthHeaders() } })
+}
+
+type LoginOutcome = { kind: 'goto'; href: string } | { kind: 'error'; message: string }
+
+async function loginOutcomeFromResponse(res: Response, redirectTo: string): Promise<LoginOutcome> {
+  if (res.status === 302) {
+    const loc = res.headers.get('Location')
+    if (loginRedirectIsFailure(loc)) {
+      return { kind: 'error', message: 'Invalid username or password.' }
+    }
+    return { kind: 'goto', href: redirectTo }
+  }
+  if (res.status === 200) {
+    const check = await fetchAuthSession()
+    if (check.ok) {
+      return { kind: 'goto', href: redirectTo }
+    }
+    if (check.status === 503) {
+      return { kind: 'goto', href: '/login?error=service_unavailable' }
+    }
+    return { kind: 'error', message: 'Invalid username or password.' }
+  }
+  if (res.type === 'opaqueredirect' || res.status === 0) {
+    const check = await fetchAuthSession()
+    if (check.ok) {
+      return { kind: 'goto', href: redirectTo }
+    }
+    if (check.status === 503) {
+      return { kind: 'goto', href: '/login?error=service_unavailable' }
+    }
+    return { kind: 'error', message: 'Invalid username or password.' }
+  }
+  if (res.status === 401 || res.status === 403) {
+    return { kind: 'error', message: 'Invalid username or password.' }
+  }
+  return { kind: 'error', message: 'Invalid username or password.' }
+}
 
 export default function Login() {
   const [error, setError] = useState('')
@@ -121,23 +175,21 @@ export default function Login() {
 
     attemptLogin()
       .then(async (res) => {
-        if (res.type === 'opaqueredirect' || res.status === 302 || res.status === 200) {
-          window.location.href = redirectTo
-          return
-        }
-        if (res.status === 401 || res.status === 403) {
+        let r = res
+        if (r.status === 401 || r.status === 403) {
           try {
             await fetch('/api/status', { credentials: 'include' })
           } catch {
             // ignore
           }
-          const retry = await attemptLogin()
-          if (retry.type === 'opaqueredirect' || retry.status === 302 || retry.status === 200) {
-            window.location.href = redirectTo
-            return
-          }
+          r = await attemptLogin()
         }
-        setError('Invalid username or password.')
+        const out = await loginOutcomeFromResponse(r, redirectTo)
+        if (out.kind === 'goto') {
+          window.location.href = out.href
+        } else {
+          setError(out.message)
+        }
       })
       .catch(() => setError('Login failed.'))
       .finally(() => setSubmitting(false))

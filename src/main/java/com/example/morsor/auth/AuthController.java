@@ -1,8 +1,11 @@
 package com.example.morsor.auth;
 
+import org.springframework.dao.DataAccessException;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -11,6 +14,7 @@ import org.springframework.web.bind.annotation.RestController;
 import java.security.SecureRandom;
 import java.util.Base64;
 import java.util.Map;
+import java.util.Optional;
 
 @RestController
 @RequestMapping("/api")
@@ -29,6 +33,31 @@ public class AuthController {
         this.userRepository = userRepository;
         this.apiTokenRepository = apiTokenRepository;
         this.tokenHashService = tokenHashService;
+    }
+
+    /**
+     * Confirms the current security principal can be resolved against the auth database.
+     * Used by the SPA so we do not treat a user as logged in when Postgres (or JDBC) is down.
+     */
+    @GetMapping("/auth/session")
+    public ResponseEntity<Map<String, Boolean>> authSession() {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null || !auth.isAuthenticated() || auth.getPrincipal() == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+        String username = auth.getName();
+        if (username == null || username.isBlank()) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+        try {
+            Optional<User> user = userRepository.findByUsername(username);
+            if (user.isEmpty()) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+            }
+            return ResponseEntity.ok(Map.of("ok", true));
+        } catch (DataAccessException e) {
+            return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).build();
+        }
     }
 
     @PostMapping("/tokens")
