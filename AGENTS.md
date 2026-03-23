@@ -29,6 +29,7 @@ Add your preferences below. For example:
 - **Other:** When changing code in an area listed below, read the "Known regressions and fixes" section so the same issues are not reintroduced.
     - Search requests from the UI
     - UI rendering in general
+    - Sign-in / login (`Login.tsx`, CSRF, Spring Security form login): also read **Login page (often needs a second try)** below.
 
 - **Release process ("Do a release"):** When the user asks to do a release, follow this sequence:
     1. Ensure the working tree is clean (everything committed). If not, stop and ask them to commit or stash.
@@ -52,6 +53,14 @@ Document regressions here (what broke, where, and how it was fixed) so agents ca
 
 - **Uniques dialog / mobile scroll:** On mobile, when scrolled down and opening the "Possible duplicates (top 5)" uniques dialog, the popup can appear shifted or partly off the top of the screen. **Cause:** Like the lightbox, the dialog lives inside `.mobile-main`, which has a `filter` applied; that filtered ancestor creates a containing block, so `position: fixed` on `.uniques-dialog-backdrop` becomes relative to the scrollable container instead of the viewport. **Fix:** In `MobileApp.css`, when `.uniques-dialog-backdrop` is present, clear the `filter` on `.mobile-main` so the backdrop is truly viewport-fixed:
   - `.mobile-app:has(.uniques-dialog-backdrop) .mobile-main:not(.mobile-about-main) { filter: none; }`
+
+-# **Login page (often needs a second try)** In **certain** browsers and setups, users may need to click **Sign in** **twice** (or submit once, see an empty/error state, then succeed). Treat this as a **known limitation** of the SPA + Spring Security flow until fully eliminated—not always a fresh bug.
+
+- **Password-filling plugins and autofill** (1Password, Safari/iOS Keychain, browser password managers, etc.): Fields can look filled while React state or the DOM `.value` is not updated in time for the first `POST /login`, or the manager commits values a tick after the click. The app mitigates with `onInput`, deferred DOM reads, and related logic; some edge cases remain.
+- **CSRF token:** The `XSRF-TOKEN` cookie is tied to a server session. Navigating to `/login` via the client router does **not** load HTML from Spring, so there is no cookie until a backend `GET` runs. Priming uses **`GET /api/auth/csrf-prime`** when the user actually submits credentials (not on idle page load). If the first POST still runs without a token, Spring returns **403** and a retry after priming can succeed.
+- **`GET /api/auth/session`:** Must be **`permitAll`** (see `SecurityConfig`) so anonymous browsers reach the controller. It returns **200** JSON `{"authenticated":false}` when logged out (not **401** from the filter chain), so the network panel is not noisy; **503** still means auth DB unreachable.
+
+When editing **`Login.tsx`**, **`getCsrfToken.ts`**, or **login / CSRF** configuration, aim to reduce double-submit; still expect occasional reports from specific extensions or browsers.
 
 ---
 

@@ -17,6 +17,7 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.web.client.RestTemplate;
 
 import java.util.List;
+import java.util.Map;
 import java.util.TreeSet;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -127,5 +128,27 @@ class SearchControllerTest {
         assertThat(groupKeys)
                 .as("Each duplicate group must appear only once (no symmetric duplicate rows)")
                 .doesNotHaveDuplicates();
+    }
+
+    @Test
+    void authSessionReturns200WithAuthenticatedFalseForAnonymousRequest() {
+        ResponseEntity<Map<String, Object>> response = restTemplate.exchange(
+                "http://localhost:" + port + "/api/auth/session",
+                HttpMethod.GET,
+                null,
+                new ParameterizedTypeReference<Map<String, Object>>() {});
+        assertThat(response.getStatusCode().value()).isEqualTo(200);
+        assertThat(response.getBody()).isNotNull();
+        assertThat(response.getBody()).containsEntry("authenticated", false);
+    }
+
+    @Test
+    void csrfPrimeReturns204WithoutAuthentication() {
+        ResponseEntity<Void> response = restTemplate.exchange(
+                "http://localhost:" + port + "/api/auth/csrf-prime",
+                HttpMethod.GET,
+                null,
+                Void.class);
+        assertThat(response.getStatusCode().value()).isEqualTo(204);
     }
 }

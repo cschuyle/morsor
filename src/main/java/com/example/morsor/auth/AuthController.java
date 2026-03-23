@@ -3,6 +3,7 @@ package com.example.morsor.auth;
 import org.springframework.dao.DataAccessException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.authentication.AnonymousAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -36,25 +37,38 @@ public class AuthController {
     }
 
     /**
-     * Confirms the current security principal can be resolved against the auth database.
-     * Used by the SPA so we do not treat a user as logged in when Postgres (or JDBC) is down.
+     * Anonymous GET so the SPA can create a session and receive the {@code XSRF-TOKEN} cookie before
+     * {@code POST /login}. This endpoint is always permitted and returns 204.
+     */
+    @GetMapping("/auth/csrf-prime")
+    public ResponseEntity<Void> csrfPrime() {
+        return ResponseEntity.noContent().build();
+    }
+
+    /**
+     * Reports whether the current principal is logged in for the SPA (backed by JDBC).
+     * Returns 200 {@code {"authenticated":false}} when there is no real login so DevTools does not show
+     * 401 for normal “visit app while logged out” flows. 403 = stale session (principal not in DB).
      */
     @GetMapping("/auth/session")
-    public ResponseEntity<Map<String, Boolean>> authSession() {
+    public ResponseEntity<Map<String, Object>> authSession() {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        if (auth == null || !auth.isAuthenticated() || auth.getPrincipal() == null) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        if (auth == null
+                || !auth.isAuthenticated()
+                || auth.getPrincipal() == null
+                || auth instanceof AnonymousAuthenticationToken) {
+            return ResponseEntity.ok(Map.of("authenticated", false));
         }
         String username = auth.getName();
-        if (username == null || username.isBlank()) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        if (username == null || username.isBlank() || "anonymousUser".equalsIgnoreCase(username)) {
+            return ResponseEntity.ok(Map.of("authenticated", false));
         }
         try {
             Optional<User> user = userRepository.findByUsername(username);
             if (user.isEmpty()) {
                 return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
             }
-            return ResponseEntity.ok(Map.of("ok", true));
+            return ResponseEntity.ok(Map.of("authenticated", true));
         } catch (DataAccessException e) {
             return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).build();
         }

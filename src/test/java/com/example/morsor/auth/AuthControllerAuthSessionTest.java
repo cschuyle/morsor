@@ -30,15 +30,16 @@ class AuthControllerAuthSessionTest {
     }
 
     @Test
-    void authSessionReturns401WhenNotAuthenticated() {
+    void authSessionReturns200WithAuthenticatedFalseWhenNotLoggedIn() {
         AuthController controller = new AuthController(
                 mock(UserRepository.class),
                 mock(ApiTokenRepository.class),
                 mock(TokenHashService.class));
 
-        ResponseEntity<Map<String, Boolean>> res = controller.authSession();
+        ResponseEntity<Map<String, Object>> res = controller.authSession();
 
-        assertThat(res.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+        assertThat(res.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(res.getBody()).containsEntry("authenticated", false);
     }
 
     @Test
@@ -59,10 +60,10 @@ class AuthControllerAuthSessionTest {
                         "n/a",
                         List.of(new SimpleGrantedAuthority("ROLE_USER"))));
 
-        ResponseEntity<Map<String, Boolean>> res = controller.authSession();
+        ResponseEntity<Map<String, Object>> res = controller.authSession();
 
         assertThat(res.getStatusCode()).isEqualTo(HttpStatus.OK);
-        assertThat(res.getBody()).containsEntry("ok", true);
+        assertThat(res.getBody()).containsEntry("authenticated", true);
     }
 
     @Test
@@ -103,7 +104,7 @@ class AuthControllerAuthSessionTest {
                         "n/a",
                         List.of(new SimpleGrantedAuthority("ROLE_USER"))));
 
-        ResponseEntity<Map<String, Boolean>> res = controller.authSession();
+        ResponseEntity<Map<String, Object>> res = controller.authSession();
 
         assertThat(res.getStatusCode()).isEqualTo(HttpStatus.SERVICE_UNAVAILABLE);
     }

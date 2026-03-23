@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, FormEvent } from 'react'
 import { getApiAuthHeaders } from './apiAuth'
-import { getCsrfToken } from './getCsrfToken'
+import { getCsrfToken, primeCsrfCookie } from './getCsrfToken'
 import './Login.css'
 
 /** Spring failed-login redirects are 302 to /login?error (do not treat as success). */
@@ -20,6 +20,21 @@ function fetchAuthSession(): Promise<Response> {
   return fetch('/api/auth/session', { credentials: 'include', headers: { ...getApiAuthHeaders() } })
 }
 
+async function sessionResponseIndicatesLoggedIn(res: Response): Promise<boolean> {
+  if (res.status === 503) {
+    return false
+  }
+  if (!res.ok) {
+    return false
+  }
+  try {
+    const body = (await res.json()) as { authenticated?: boolean }
+    return body.authenticated === true
+  } catch {
+    return false
+  }
+}
+
 type LoginOutcome = { kind: 'goto'; href: string } | { kind: 'error'; message: string }
 
 async function loginOutcomeFromResponse(res: Response, redirectTo: string): Promise<LoginOutcome> {
@@ -32,21 +47,21 @@ async function loginOutcomeFromResponse(res: Response, redirectTo: string): Prom
   }
   if (res.status === 200) {
     const check = await fetchAuthSession()
-    if (check.ok) {
-      return { kind: 'goto', href: redirectTo }
-    }
     if (check.status === 503) {
       return { kind: 'goto', href: '/login?error=service_unavailable' }
+    }
+    if (await sessionResponseIndicatesLoggedIn(check)) {
+      return { kind: 'goto', href: redirectTo }
     }
     return { kind: 'error', message: 'Invalid username or password.' }
   }
   if (res.type === 'opaqueredirect' || res.status === 0) {
     const check = await fetchAuthSession()
-    if (check.ok) {
-      return { kind: 'goto', href: redirectTo }
-    }
     if (check.status === 503) {
       return { kind: 'goto', href: '/login?error=service_unavailable' }
+    }
+    if (await sessionResponseIndicatesLoggedIn(check)) {
+      return { kind: 'goto', href: redirectTo }
     }
     return { kind: 'error', message: 'Invalid username or password.' }
   }
@@ -159,7 +174,14 @@ export default function Login() {
     setUsername(user)
     setPassword(pass)
 
-    const attemptLogin = (): Promise<Response> => {
+    const attemptLogin = async (): Promise<Response> => {
+      if (!getCsrfToken()) {
+        try {
+          await primeCsrfCookie()
+        } catch {
+          // ignore
+        }
+      }
       const csrf = getCsrfToken()
       const body = new URLSearchParams({ username: user, password: pass })
       const headers: Record<string, string> = { 'Content-Type': 'application/x-www-form-urlencoded' }
@@ -178,7 +200,8 @@ export default function Login() {
         let r = res
         if (r.status === 401 || r.status === 403) {
           try {
-            await fetch('/api/status', { credentials: 'include' })
+            await primeCsrfCookie()
+            await fetch('/api/status', { credentials: 'include', headers: { ...getApiAuthHeaders() } })
           } catch {
             // ignore
           }

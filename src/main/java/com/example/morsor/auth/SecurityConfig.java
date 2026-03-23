@@ -7,6 +7,7 @@ import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.access.intercept.AuthorizationFilter;
@@ -91,6 +92,8 @@ public class SecurityConfig {
             //     .anyRequest().authenticated()
             // )
             .authorizeHttpRequests(auth -> auth
+                .requestMatchers(HttpMethod.GET, "/api/auth/csrf-prime").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/auth/session").permitAll()
                 .requestMatchers("/login", "/favicon.ico").permitAll()
                 .requestMatchers("/assets/**").permitAll() // Because, Vite.
                 .requestMatchers("/@vite/**").permitAll() // Because, Vite.

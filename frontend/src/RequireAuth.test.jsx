@@ -10,7 +10,7 @@ describe('RequireAuth', () => {
       return Promise.resolve({
         status: 200,
         ok: true,
-        json: () => Promise.resolve([]),
+        json: () => Promise.resolve({ authenticated: true }),
       })
     })
     vi.stubGlobal('fetch', fetchMock)
@@ -51,6 +51,31 @@ describe('RequireAuth', () => {
     await waitFor(() => {
       expect(screen.getByText('Child content')).toBeInTheDocument()
     })
+  })
+
+  it('redirects to login when session returns 200 with authenticated false', async () => {
+    const locationMock = { href: 'http://localhost/', pathname: '/', search: '', hash: '' }
+    Object.defineProperty(window, 'location', {
+      configurable: true,
+      writable: true,
+      value: locationMock,
+    })
+    fetchMock.mockImplementation(() =>
+      Promise.resolve({
+        status: 200,
+        ok: true,
+        json: () => Promise.resolve({ authenticated: false }),
+      })
+    )
+    render(
+      <RequireAuth>
+        <span>Hidden</span>
+      </RequireAuth>
+    )
+    await waitFor(() => {
+      expect(locationMock.href).toMatch(/^\/login\?next=/)
+    })
+    expect(screen.queryByText('Hidden')).not.toBeInTheDocument()
   })
 
   it('redirects to login with service_unavailable when auth session returns 503 (e.g. DB down)', async () => {
