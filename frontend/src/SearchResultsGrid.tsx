@@ -41,6 +41,107 @@ function formatItemTypeForLightbox(value: unknown): string {
   return spaced.charAt(0).toUpperCase() + spaced.slice(1)
 }
 
+function formatLittlePrinceExtraValue(value: unknown): string {
+  if (value === null || value === undefined) {
+    return ''
+  }
+  if (typeof value === 'string') {
+    return value
+  }
+  if (typeof value === 'number' || typeof value === 'boolean') {
+    return String(value)
+  }
+  if (typeof value === 'bigint') {
+    return String(value)
+  }
+  try {
+    return JSON.stringify(value)
+  } catch {
+    return String(value)
+  }
+}
+
+/** Human-readable label for a JSON key: hyphens → spaces, camelCase split, title case. */
+function formatLittlePrinceFieldLabel(key: string): string {
+  const s = key.trim()
+  if (!s) {
+    return ''
+  }
+  const noHyphens = s.replace(/-/g, ' ')
+  const spaced = noHyphens.replace(/([a-z])([A-Z])/g, '$1 $2')
+  return spaced
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+    .join(' ')
+}
+
+function formatLittlePrinceExtraLines(extra: Record<string, unknown> | null | undefined): Array<{ label: string; content: string }> {
+  if (extra == null || typeof extra !== 'object') {
+    return []
+  }
+  const out: Array<{ label: string; content: string }> = []
+  for (const [key, value] of Object.entries(extra)) {
+    const content = formatLittlePrinceExtraValue(value)
+    if (content === '') {
+      continue
+    }
+    out.push({ label: formatLittlePrinceFieldLabel(key), content })
+  }
+  return out
+}
+
+/** Plain "Label: value" lines (e.g. aria-label); use formatLittlePrinceExtraLines + rich tooltip for bold labels. */
+function formatLittlePrinceExtraTooltip(extra: Record<string, unknown> | null | undefined): string | null {
+  const lines = formatLittlePrinceExtraLines(extra)
+  return lines.length > 0 ? lines.map((l) => `${l.label}: ${l.content}`).join('\n') : null
+}
+
+function combineTooltipParts(...parts: Array<string | null | undefined>): string {
+  return parts.filter((p): p is string => Boolean(p && p.trim())).join('\n\n')
+}
+
+/** Strip trailing punctuation often glued to URLs in prose. */
+function trimUrlDisplayAndHref(raw: string): string {
+  return raw.replace(/[.,;:!?)\]}>'"]+$/g, '')
+}
+
+/**
+ * Split plain text into fragments; substring that look like http(s) or www. URLs become links.
+ */
+function linkifyTextWithUrls(text: string): ReactNode {
+  const re = /(https?:\/\/[^\s<>"']+|www\.[^\s<>"']+)/gi
+  const out: ReactNode[] = []
+  let last = 0
+  let m: RegExpExecArray | null
+  let key = 0
+  while ((m = re.exec(text)) !== null) {
+    if (m.index > last) {
+      out.push(text.slice(last, m.index))
+    }
+    const trimmed = trimUrlDisplayAndHref(m[0])
+    if (trimmed.length > 0) {
+      const href = trimmed.startsWith('http') ? trimmed : `https://${trimmed}`
+      out.push(
+        <a
+          key={`lp-url-${key++}`}
+          href={href}
+          target="_blank"
+          rel="noopener noreferrer"
+          onClick={(e) => e.stopPropagation()}
+        >
+          {trimmed}
+        </a>
+      )
+    }
+    last = m.index + m[0].length
+  }
+  if (last < text.length) {
+    out.push(text.slice(last))
+  }
+  return out.length === 0 ? text : <>{out}</>
+}
+
 function isPlaceholderThumb(url: unknown): boolean {
   if (!url || !String(url).trim()) return false
   const u = String(url).trim()
@@ -293,11 +394,18 @@ function ThumbColumnHeader({ column }: { column: { getIsSorted: () => false | 'a
   )
 }
 
+type LpExtraHoverHandlers = {
+  onEnter: (lines: Array<{ label: string; content: string }>, e: MouseEvent<HTMLElement>) => void
+  onMove: (e: MouseEvent<HTMLElement>) => void
+  onLeave: () => void
+}
+
 function thumbnailColumnDef(
   onThumbnailClick: (payload: LightboxPayload) => void,
   isMobile = false,
   setRawSourceLightbox: ((state: { title: string; rawSourceItem: string } | null) => void) | null = null,
-  hasThumbnails = true
+  hasThumbnails = true,
+  lpExtraHover: LpExtraHoverHandlers | null = null
 ) {
   return {
     id: 'thumb',
@@ -328,6 +436,10 @@ function thumbnailColumnDef(
       const hasThumbnailImage = isLittlePrince && url && !showLinkIconInsteadOfThumb
       const showNonLpThumb = !isLittlePrince && url && String(url).trim() && !thumbIsPlaceholder
       const fileTypeTooltip = getFileTypeTooltip(pdfs, imageUrls, ebooks, videos, audios, otherFiles, itemUrl, !!largeUrl)
+      const lpLines = isLittlePrince
+        ? formatLittlePrinceExtraLines(row?.littlePrinceItemExtra as Record<string, unknown> | undefined)
+        : []
+      const lpExtraPlain = formatLittlePrinceExtraTooltip(row?.littlePrinceItemExtra as Record<string, unknown> | undefined)
       const payload = rowToLightboxPayload(row)
       const linkIcon = (
         <span className="search-thumb-link-icon" aria-hidden="true">
@@ -335,13 +447,23 @@ function thumbnailColumnDef(
         </span>
       )
       const defaultTitle = hasThumbnailImage || showNonLpThumb || showLinkIconOnly ? 'View full size' : 'View details'
+      const thumbTitle =
+        lpLines.length > 0
+          ? fileTypeTooltip ?? defaultTitle
+          : combineTooltipParts(lpExtraPlain, fileTypeTooltip) || defaultTitle
+      const thumbAriaLabel = showLinkIconOnly
+        ? 'Open link'
+        : combineTooltipParts(lpExtraPlain, fileTypeTooltip) || defaultTitle
       return (
         <button
           type="button"
           className="search-thumb-btn"
-          title={fileTypeTooltip ?? defaultTitle}
+          title={thumbTitle}
           onClick={() => payload && onThumbnailClick(payload)}
-          aria-label={showLinkIconOnly ? 'Open link' : (fileTypeTooltip ?? defaultTitle)}
+          onMouseEnter={lpLines.length > 0 && lpExtraHover ? (e) => lpExtraHover.onEnter(lpLines, e) : undefined}
+          onMouseMove={lpLines.length > 0 && lpExtraHover ? (e) => lpExtraHover.onMove(e) : undefined}
+          onMouseLeave={lpLines.length > 0 && lpExtraHover ? lpExtraHover.onLeave : undefined}
+          aria-label={thumbAriaLabel}
         >
           {largeUrl && url && !thumbIsPlaceholder && isLittlePrince && (
             <span className="search-thumb-pop-icon" aria-hidden="true">↗</span>
@@ -409,6 +531,61 @@ export function SearchResultsGrid({ data, sortBy = null, sortDir = 'asc', onSort
   const listUrlTooltipLeaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const listUrlTooltipShowTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const listUrlPointerRef = useRef({ x: 0, y: 0 })
+  const [lpExtraRichTooltipState, setLpExtraRichTooltipState] = useState<{
+    left: number
+    top: number
+    lines: Array<{ label: string; content: string }>
+  } | null>(null)
+  const lpExtraTooltipLeaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const lpExtraTooltipShowTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const lpExtraPointerRef = useRef({ x: 0, y: 0 })
+
+  const handleLpExtraMouseEnter = useCallback(
+    (lines: Array<{ label: string; content: string }>, e: MouseEvent<HTMLElement>) => {
+      if (lines.length === 0) {
+        return
+      }
+      setListUrlTooltipState(null)
+      lpExtraPointerRef.current = { x: e.clientX, y: e.clientY }
+      if (lpExtraTooltipLeaveTimerRef.current) {
+        clearTimeout(lpExtraTooltipLeaveTimerRef.current)
+        lpExtraTooltipLeaveTimerRef.current = null
+      }
+      if (lpExtraTooltipShowTimerRef.current) {
+        clearTimeout(lpExtraTooltipShowTimerRef.current)
+        lpExtraTooltipShowTimerRef.current = null
+      }
+      lpExtraTooltipShowTimerRef.current = setTimeout(() => {
+        const { x, y } = lpExtraPointerRef.current
+        const { left, top } = listUrlTooltipPositionFromPointer(x, y)
+        setLpExtraRichTooltipState({ left, top, lines })
+      }, 500)
+    },
+    []
+  )
+
+  const handleLpExtraMouseMove = useCallback((e: MouseEvent<HTMLElement>) => {
+    lpExtraPointerRef.current = { x: e.clientX, y: e.clientY }
+  }, [])
+
+  const handleLpExtraMouseLeave = useCallback(() => {
+    if (lpExtraTooltipShowTimerRef.current) {
+      clearTimeout(lpExtraTooltipShowTimerRef.current)
+      lpExtraTooltipShowTimerRef.current = null
+    }
+    lpExtraTooltipLeaveTimerRef.current = setTimeout(() => {
+      setLpExtraRichTooltipState(null)
+    }, 150)
+  }, [])
+
+  const lpExtraHoverHandlers = useMemo<LpExtraHoverHandlers>(
+    () => ({
+      onEnter: handleLpExtraMouseEnter,
+      onMove: handleLpExtraMouseMove,
+      onLeave: handleLpExtraMouseLeave,
+    }),
+    [handleLpExtraMouseEnter, handleLpExtraMouseMove, handleLpExtraMouseLeave]
+  )
 
   const closeLightbox = useCallback(() => setLightbox(null), [])
   const closeRawSourceLightbox = useCallback(() => setRawSourceLightbox(null), [])
@@ -423,12 +600,15 @@ export function SearchResultsGrid({ data, sortBy = null, sortDir = 'asc', onSort
   useEffect(() => {
     if (lightbox || rawSourceLightbox) {
       setListUrlTooltipState(null)
+      setLpExtraRichTooltipState(null)
     }
   }, [lightbox, rawSourceLightbox])
 
   useEffect(() => () => {
     if (listUrlTooltipShowTimerRef.current) clearTimeout(listUrlTooltipShowTimerRef.current)
     if (listUrlTooltipLeaveTimerRef.current) clearTimeout(listUrlTooltipLeaveTimerRef.current)
+    if (lpExtraTooltipShowTimerRef.current) clearTimeout(lpExtraTooltipShowTimerRef.current)
+    if (lpExtraTooltipLeaveTimerRef.current) clearTimeout(lpExtraTooltipLeaveTimerRef.current)
   }, [])
 
   useEffect(() => () => {
@@ -447,8 +627,8 @@ export function SearchResultsGrid({ data, sortBy = null, sortDir = 'asc', onSort
   const baseColumns = useMemo(
     () => [thumbnailColumnDef((payload) => {
       setLightbox(payload)
-    }, isMobile, setRawSourceLightbox, hasThumbnails), ...listTextColumns],
-    [hasThumbnails, isMobile, listTextColumns]
+    }, isMobile, setRawSourceLightbox, hasThumbnails, lpExtraHoverHandlers), ...listTextColumns],
+    [hasThumbnails, isMobile, listTextColumns, lpExtraHoverHandlers]
   )
   const columns = useMemo(
     () => (showScoreColumn ? [...baseColumns, scoreColumn] : baseColumns),
@@ -596,6 +776,30 @@ export function SearchResultsGrid({ data, sortBy = null, sortDir = 'asc', onSort
           >
             {listUrlTooltipState.url}
           </a>
+        </div>
+      )}
+      {lpExtraRichTooltipState && (
+        <div
+          className="search-results-lp-extra-tooltip"
+          style={{
+            left: lpExtraRichTooltipState.left,
+            top: lpExtraRichTooltipState.top,
+          }}
+          onMouseEnter={() => {
+            if (lpExtraTooltipLeaveTimerRef.current) {
+              clearTimeout(lpExtraTooltipLeaveTimerRef.current)
+              lpExtraTooltipLeaveTimerRef.current = null
+            }
+          }}
+          onMouseLeave={() => setLpExtraRichTooltipState(null)}
+        >
+          {lpExtraRichTooltipState.lines.map((line, i) => (
+            <div key={i} className="search-results-lp-extra-tooltip-line">
+              <strong>{line.label}</strong>
+              {': '}
+              <span className="search-results-lp-extra-tooltip-content">{linkifyTextWithUrls(line.content)}</span>
+            </div>
+          ))}
         </div>
       )}
       {rawSourceLightbox && (() => {
@@ -835,8 +1039,27 @@ export function SearchResultsGrid({ data, sortBy = null, sortDir = 'asc', onSort
                 setRawSourceLightbox({ title, rawSourceItem: rawSourceDisplay(rawSourceItem) })
               }
               const showUrlTooltip = payload?.itemUrl && !payload?.imageUrl
+              const lpLines =
+                row?.itemType === 'littlePrinceItem'
+                  ? formatLittlePrinceExtraLines(row.littlePrinceItemExtra as Record<string, unknown> | undefined)
+                  : []
+              const lpExtraPlain = formatLittlePrinceExtraTooltip(row.littlePrinceItemExtra as Record<string, unknown> | undefined)
+              const galleryCardTitle =
+                showUrlTooltip
+                  ? undefined
+                  : lpLines.length > 0
+                    ? undefined
+                    : payload
+                      ? 'View full size'
+                      : undefined
+              const galleryAriaLabel = payload
+                ? showUrlTooltip
+                  ? `Open ${payload.itemUrl}`
+                  : lpExtraPlain || 'View full size'
+                : undefined
               const handleUrlTooltipEnter = (e) => {
                 if (!showUrlTooltip) return
+                setLpExtraRichTooltipState(null)
                 if (urlTooltipLeaveTimerRef.current) {
                   clearTimeout(urlTooltipLeaveTimerRef.current)
                   urlTooltipLeaveTimerRef.current = null
@@ -865,8 +1088,15 @@ export function SearchResultsGrid({ data, sortBy = null, sortDir = 'asc', onSort
                 <div
                   key={row.id ?? idx}
                   className="search-results-gallery-card-wrap"
-                  onMouseEnter={showUrlTooltip ? handleUrlTooltipEnter : undefined}
-                  onMouseLeave={showUrlTooltip ? handleUrlTooltipLeave : undefined}
+                  onMouseEnter={
+                    showUrlTooltip
+                      ? handleUrlTooltipEnter
+                      : lpLines.length > 0
+                        ? (e) => handleLpExtraMouseEnter(lpLines, e)
+                        : undefined
+                  }
+                  onMouseMove={showUrlTooltip ? undefined : lpLines.length > 0 ? handleLpExtraMouseMove : undefined}
+                  onMouseLeave={showUrlTooltip ? handleUrlTooltipLeave : lpLines.length > 0 ? handleLpExtraMouseLeave : undefined}
                 >
                   <div
                     role="button"
@@ -904,8 +1134,8 @@ export function SearchResultsGrid({ data, sortBy = null, sortDir = 'asc', onSort
                       e.stopPropagation()
                       openRawSource(e)
                     }}
-                    title={payload && !showUrlTooltip ? 'View full size' : undefined}
-                    aria-label={payload ? (showUrlTooltip ? `Open ${payload.itemUrl}` : 'View full size') : undefined}
+                    title={galleryCardTitle}
+                    aria-label={galleryAriaLabel}
                   >
                   <span className="search-results-gallery-card-image">
                     {hasImage ? (
@@ -1052,6 +1282,10 @@ export function SearchResultsGrid({ data, sortBy = null, sortDir = 'asc', onSort
                 const rowData = row.original
                 const listItemUrl =
                   rowData?.itemUrl && String(rowData.itemUrl).trim() ? String(rowData.itemUrl).trim() : null
+                const listRowLpLines =
+                  rowData?.itemType === 'littlePrinceItem' && !listItemUrl
+                    ? formatLittlePrinceExtraLines(rowData.littlePrinceItemExtra as Record<string, unknown> | undefined)
+                    : []
                 const handleRowClick = () => {
                   const now = Date.now()
                   const rowId = row.id
@@ -1074,6 +1308,7 @@ export function SearchResultsGrid({ data, sortBy = null, sortDir = 'asc', onSort
                   : undefined
                 const handleListUrlTooltipEnter = listItemUrl
                   ? (e: MouseEvent<HTMLTableRowElement>) => {
+                    setLpExtraRichTooltipState(null)
                     listUrlPointerRef.current = { x: e.clientX, y: e.clientY }
                     if (listUrlTooltipLeaveTimerRef.current) {
                       clearTimeout(listUrlTooltipLeaveTimerRef.current)
@@ -1110,9 +1345,27 @@ export function SearchResultsGrid({ data, sortBy = null, sortDir = 'asc', onSort
                     key={row.id}
                     className="grid-row-double-clickable"
                     onClick={handleRowClick}
-                    onMouseEnter={handleListUrlTooltipEnter}
-                    onMouseMove={handleListUrlTooltipMove}
-                    onMouseLeave={handleListUrlTooltipLeave}
+                    onMouseEnter={
+                      listItemUrl
+                        ? handleListUrlTooltipEnter
+                        : listRowLpLines.length > 0
+                          ? (e) => handleLpExtraMouseEnter(listRowLpLines, e)
+                          : undefined
+                    }
+                    onMouseMove={
+                      listItemUrl
+                        ? handleListUrlTooltipMove
+                        : listRowLpLines.length > 0
+                          ? handleLpExtraMouseMove
+                          : undefined
+                    }
+                    onMouseLeave={
+                      listItemUrl
+                        ? handleListUrlTooltipLeave
+                        : listRowLpLines.length > 0
+                          ? handleLpExtraMouseLeave
+                          : undefined
+                    }
                   >
                     {row.getVisibleCells().map((cell) => (
                       <td key={cell.id} className={`col-${cell.column.id}`}>

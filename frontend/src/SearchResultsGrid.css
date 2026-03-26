@@ -641,6 +641,43 @@
   color: #5522aa;
 }
 
+.search-results-lp-extra-tooltip {
+  position: fixed;
+  margin: 0;
+  z-index: 1000;
+  padding: 0.4rem 0.55rem;
+  max-width: min(90vw, 36rem);
+  max-height: min(70vh, 24rem);
+  overflow: auto;
+  pointer-events: auto;
+  font-size: 0.8rem;
+  line-height: 1.45;
+  background: #f4f4f4;
+  color: #222;
+  border: 1px solid #c8c8c8;
+  border-radius: 4px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+}
+
+.search-results-lp-extra-tooltip-line + .search-results-lp-extra-tooltip-line {
+  margin-top: 0.2rem;
+}
+
+.search-results-lp-extra-tooltip strong {
+  font-weight: 600;
+  color: #111;
+}
+
+.search-results-lp-extra-tooltip-content a {
+  color: #6633cc;
+  text-decoration: underline;
+  word-break: break-all;
+}
+
+.search-results-lp-extra-tooltip-content a:hover {
+  color: #5522aa;
+}
+
 .search-results-gallery-url-tooltip {
   position: absolute;
   padding: 0.5rem 0.6rem;
