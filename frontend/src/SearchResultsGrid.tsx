@@ -160,9 +160,11 @@ function linkifyTextWithUrls(text: string): ReactNode {
           href={href}
           target="_blank"
           rel="noopener noreferrer"
+          className="search-results-lp-extra-tooltip-catalog-link"
           onClick={(e) => e.stopPropagation()}
         >
-          {trimmed}
+          <span className="search-results-lp-extra-tooltip-catalog-link-text">{trimmed}</span>
+          <PopOutIcon className="search-results-lp-extra-tooltip-catalog-link-icon" />
         </a>
       )
     }
