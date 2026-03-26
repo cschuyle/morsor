@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useCallback, useRef, type ReactNode } from 'react'
+import { useState, useMemo, useEffect, useCallback, useRef, type ReactNode, type MouseEvent } from 'react'
 import { createPortal } from 'react-dom'
 import {
   useReactTable,
@@ -21,7 +21,6 @@ export interface SearchResultsGridProps {
   hideTroveInList?: boolean
   showPdfSashInGallery?: boolean
   showGalleryDecorations?: boolean
-  allowThumbnailFallbackLightbox?: boolean
   isMobile?: boolean
 }
 
@@ -46,6 +45,111 @@ function isPlaceholderThumb(url: unknown): boolean {
   if (!url || !String(url).trim()) return false
   const u = String(url).trim()
   return u === AMAZON_PLACEHOLDER_THUMB || u.includes('/no_image')
+}
+
+/** Viewport / grid-relative anchor for gallery and list URL tooltips (hover). */
+function getUrlTooltipAnchor(
+  cardEl: HTMLElement,
+  gridEl: HTMLElement | null,
+  isMobile: boolean
+): { startX: number; startY: number; endX: number; endY: number; above: boolean } {
+  const cardRect = cardEl.getBoundingClientRect()
+  const startX = cardRect.left + cardRect.width / 2
+  const startY = cardRect.top + cardRect.height / 2
+  const tooltipApproxHalfHeight = 24
+  let clampedEndX = startX
+  let endY: number
+  let above: boolean
+
+  const vv = typeof window !== 'undefined' && window.visualViewport ? window.visualViewport : null
+  const viewportHeight = vv ? vv.height : (window.innerHeight || document.documentElement.clientHeight || 0)
+  const viewportTopOffset = vv ? vv.offsetTop : 0
+
+  if (gridEl) {
+    const gridRect = gridEl.getBoundingClientRect()
+    const relX = startX - gridRect.left
+    const containerWidth = gridRect.width
+    if (containerWidth > 0) {
+      const maxTooltipFraction = 2 / 3
+      const halfMaxWidth = (maxTooltipFraction * containerWidth) / 2
+      const edgeMargin = 8
+      const minCenter = gridRect.left + halfMaxWidth + edgeMargin
+      const maxCenter = gridRect.right - halfMaxWidth - edgeMargin
+      clampedEndX = Math.min(Math.max(startX, minCenter), maxCenter)
+    }
+
+    if (isMobile) {
+      const marginAbove = 60
+      const gapBelow = 4
+      const viewportTopMargin = 8
+      const viewportBottomMargin = 8
+
+      let endYCandidate: number
+      let useAbove = false
+
+      if (viewportHeight > 0) {
+        const preferredAboveCenterY = cardRect.top - tooltipApproxHalfHeight - marginAbove
+        const tooltipTopIfAbove = preferredAboveCenterY - tooltipApproxHalfHeight
+
+        if (tooltipTopIfAbove >= viewportTopMargin) {
+          endYCandidate = preferredAboveCenterY
+          useAbove = true
+        } else {
+          const preferredBelowCenterY = cardRect.bottom + tooltipApproxHalfHeight + gapBelow
+          endYCandidate = preferredBelowCenterY
+        }
+
+        const minCenterY = viewportTopOffset + tooltipApproxHalfHeight + viewportTopMargin
+        const maxCenterY = viewportTopOffset + viewportHeight - tooltipApproxHalfHeight - viewportBottomMargin
+        endY = Math.min(Math.max(endYCandidate, minCenterY), maxCenterY)
+        above = useAbove
+      } else {
+        const preferredBelowCenterY = cardRect.bottom + tooltipApproxHalfHeight + gapBelow
+        endY = preferredBelowCenterY
+        above = false
+      }
+    } else {
+      const spaceAbove = cardRect.top - gridRect.top
+      const showAbove = spaceAbove > 120
+      const margin = 6
+      if (showAbove) {
+        endY = cardRect.top - tooltipApproxHalfHeight - margin
+      } else {
+        endY = cardRect.bottom + tooltipApproxHalfHeight + margin
+      }
+      above = showAbove
+    }
+  } else {
+    const viewportTopMargin = 8
+    const viewportBottomMargin = 8
+    const marginAbove = 60
+    const gapBelow = 4
+
+    const preferredAboveCenterY = cardRect.top - tooltipApproxHalfHeight - marginAbove
+    const tooltipTopIfAbove = preferredAboveCenterY - tooltipApproxHalfHeight
+
+    let endYCandidate: number
+    let useAbove = false
+
+    if (tooltipTopIfAbove >= viewportTopMargin) {
+      endYCandidate = preferredAboveCenterY
+      useAbove = true
+    } else {
+      const preferredBelowCenterY = cardRect.bottom + tooltipApproxHalfHeight + gapBelow
+      endYCandidate = preferredBelowCenterY
+    }
+
+    if (viewportHeight > 0) {
+      const minCenterY = tooltipApproxHalfHeight + viewportTopMargin
+      const maxCenterY = viewportHeight - tooltipApproxHalfHeight - viewportBottomMargin
+      endY = Math.min(Math.max(endYCandidate, minCenterY), maxCenterY)
+    } else {
+      endY = endYCandidate
+    }
+    above = useAbove
+  }
+
+  return { startX, startY, endX: clampedEndX, endY, above }
 }
 
 function PopOutIcon({ className }: { className?: string }) {
@@ -79,14 +183,10 @@ const textColumns = [
 ]
 
 /**
- * Build lightbox payload. List view passes allowThumbnailFallback / includeLittlePrinceRawFallback so link-only or
- * raw-only little-prince rows still open the lightbox (title + item type + media links) instead of a new tab.
+ * Build lightbox payload for any result row. Center image uses API largeImageUrl only (not thumbnail or file attachments).
+ * Always returns a payload when the row is present so the lightbox can open even with no media.
  */
-function rowToLightboxPayload(
-  row: SearchResultRow | undefined | null,
-  allowThumbnailFallback: boolean,
-  includeLittlePrinceRawFallback: boolean
-): LightboxPayload | null {
+function rowToLightboxPayload(row: SearchResultRow | undefined | null): LightboxPayload | null {
   if (!row) return null
   const files = Array.isArray(row.files) ? row.files : []
   const pdfs = files.filter((u) => typeof u === 'string' && /\.pdf(\?|$)/i.test(u))
@@ -98,38 +198,12 @@ function rowToLightboxPayload(
   const otherFiles = files.filter((u) => typeof u === 'string' && !known.has(u))
   const largeUrl =
     row.largeImageUrl && String(row.largeImageUrl).trim() ? String(row.largeImageUrl).trim() : null
-  let imageUrl: string | null = largeUrl
-  const thumbUrlRaw = row.thumbnailUrl
-  const fallbackThumbUrl =
-    thumbUrlRaw && !isPlaceholderThumb(thumbUrlRaw) ? String(thumbUrlRaw).trim() : null
-  if (!imageUrl && allowThumbnailFallback && fallbackThumbUrl) {
-    imageUrl = fallbackThumbUrl
-  }
-  if (!imageUrl && imageUrls.length > 0) {
-    imageUrl = imageUrls[0]
-  }
+  const imageUrl: string | null = largeUrl
 
   const itemUrl = row.itemUrl && String(row.itemUrl).trim() ? row.itemUrl.trim() : null
-  const isLittlePrince = row.itemType === 'littlePrinceItem'
-  const rawOk =
-    row.rawSourceItem != null &&
-    String(row.rawSourceItem).trim() !== ''
-  const hasContent =
-    !!imageUrl ||
-    !!itemUrl ||
-    pdfs.length > 0 ||
-    imageUrls.length > 0 ||
-    ebooks.length > 0 ||
-    videos.length > 0 ||
-    audios.length > 0 ||
-    otherFiles.length > 0 ||
-    (includeLittlePrinceRawFallback && isLittlePrince && rawOk)
-  if (!hasContent) return null
 
   const troveName = row.trove != null && String(row.trove).trim() ? String(row.trove).trim() : null
   const itemType = row.itemType != null && String(row.itemType).trim() ? String(row.itemType).trim() : null
-
-  const isFallbackThumbnail = !!(!largeUrl && imageUrl && fallbackThumbUrl && imageUrl === fallbackThumbUrl)
 
   return {
     imageUrl,
@@ -144,12 +218,11 @@ function rowToLightboxPayload(
     itemType,
     trove: troveName,
     title: row.title ?? '',
-    isFallbackThumbnail,
   }
 }
 
 function getLightboxPayload(row: SearchResultRow | undefined | null) {
-  return rowToLightboxPayload(row, false, false)
+  return rowToLightboxPayload(row)
 }
 
 function getFileTypeTooltip(pdfs: string[], imageUrls: string[], ebooks: string[], videos: string[], audios: string[], otherFiles: string[], itemUrl: string | null, hasLargeImage: boolean): string | null {
@@ -196,7 +269,6 @@ function ThumbColumnHeader({ column }: { column: { getIsSorted: () => false | 'a
 
 function thumbnailColumnDef(
   onThumbnailClick: (payload: LightboxPayload) => void,
-  allowThumbnailFallbackLightbox = false,
   isMobile = false,
   setRawSourceLightbox: ((state: { title: string; rawSourceItem: string } | null) => void) | null = null,
   hasThumbnails = true
@@ -225,40 +297,50 @@ function thumbnailColumnDef(
       const otherFiles = files.filter((u) => typeof u === 'string' && !known.has(u))
       const isLittlePrince = itemType === 'littlePrinceItem'
       const thumbIsPlaceholder = isPlaceholderThumb(url)
-      const fallbackThumbUrl = !thumbIsPlaceholder && url ? String(url).trim() : null
       const showLinkIconInsteadOfThumb = isLittlePrince && (!url || thumbIsPlaceholder)
       const showLinkIconOnly = isLittlePrince && !url && itemUrl
-      const hasThumbnailImage = url && !showLinkIconInsteadOfThumb
-      if (!isLittlePrince || (!url && !itemUrl)) return <span aria-hidden="true">&nbsp;</span>
+      const hasThumbnailImage = isLittlePrince && url && !showLinkIconInsteadOfThumb
+      const showNonLpThumb = !isLittlePrince && url && String(url).trim() && !thumbIsPlaceholder
       const fileTypeTooltip = getFileTypeTooltip(pdfs, imageUrls, ebooks, videos, audios, otherFiles, itemUrl, !!largeUrl)
-      const payload = rowToLightboxPayload(row, allowThumbnailFallbackLightbox, true)
-      const canClick = !!payload
+      const payload = rowToLightboxPayload(row)
       const linkIcon = (
         <span className="search-thumb-link-icon" aria-hidden="true">
           <PopOutIcon className="search-thumb-link-icon-img" />
         </span>
       )
+      const defaultTitle = hasThumbnailImage || showNonLpThumb || showLinkIconOnly ? 'View full size' : 'View details'
       return (
         <button
           type="button"
           className="search-thumb-btn"
-          title={fileTypeTooltip ?? (hasThumbnailImage || showLinkIconOnly ? 'View full size' : undefined)}
-          onClick={() => canClick && onThumbnailClick(payload)}
-          aria-label={showLinkIconOnly ? 'Open link' : (fileTypeTooltip ?? 'View full size')}
+          title={fileTypeTooltip ?? defaultTitle}
+          onClick={() => payload && onThumbnailClick(payload)}
+          aria-label={showLinkIconOnly ? 'Open link' : (fileTypeTooltip ?? defaultTitle)}
         >
-          {largeUrl && url && !thumbIsPlaceholder && (
+          {largeUrl && url && !thumbIsPlaceholder && isLittlePrince && (
             <span className="search-thumb-pop-icon" aria-hidden="true">↗</span>
           )}
-          {showLinkIconInsteadOfThumb ? (
-            linkIcon
-          ) : url ? (
+          {isLittlePrince ? (
+            showLinkIconInsteadOfThumb ? (
+              linkIcon
+            ) : url ? (
+              <img
+                src={url}
+                alt=""
+                className="search-thumb"
+                loading="lazy"
+              />
+            ) : null
+          ) : showNonLpThumb ? (
             <img
               src={url}
               alt=""
               className="search-thumb"
               loading="lazy"
             />
-          ) : null}
+          ) : (
+            linkIcon
+          )}
         </button>
       )
     },
@@ -283,7 +365,7 @@ export function rawSourceDisplay(rawSourceItem: unknown): string {
   return (rawSourceItem != null && rawSourceItem !== '') ? String(rawSourceItem) : RAW_SOURCE_NOT_AVAILABLE
 }
 
-export function SearchResultsGrid({ data, sortBy = null, sortDir = 'asc', onSortChange, showScoreColumn = false, afterFilterSlot = null, viewMode = 'list', hideTroveInGallery = false, hideTroveInList = false, showPdfSashInGallery = false, showGalleryDecorations = true, allowThumbnailFallbackLightbox = false, isMobile = false }: SearchResultsGridProps) {
+export function SearchResultsGrid({ data, sortBy = null, sortDir = 'asc', onSortChange, showScoreColumn = false, afterFilterSlot = null, viewMode = 'list', hideTroveInGallery = false, hideTroveInList = false, showPdfSashInGallery = false, showGalleryDecorations = true, isMobile = false }: SearchResultsGridProps) {
   const [globalFilter, setGlobalFilter] = useState('')
   const [lightbox, setLightbox] = useState<LightboxPayload | null>(null)
   const [rawSourceLightbox, setRawSourceLightbox] = useState<{ title: string; rawSourceItem: string } | null>(null)
@@ -293,6 +375,9 @@ export function SearchResultsGrid({ data, sortBy = null, sortDir = 'asc', onSort
   const [urlTooltipState, setUrlTooltipState] = useState<{ startX: number; startY: number; endX: number; endY: number; above: boolean; url: string } | null>(null)
   const urlTooltipLeaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const urlTooltipShowTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const [listUrlTooltipState, setListUrlTooltipState] = useState<{ startX: number; startY: number; endX: number; endY: number; above: boolean; url: string } | null>(null)
+  const listUrlTooltipLeaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const listUrlTooltipShowTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const closeLightbox = useCallback(() => setLightbox(null), [])
   const closeRawSourceLightbox = useCallback(() => setRawSourceLightbox(null), [])
@@ -303,6 +388,17 @@ export function SearchResultsGrid({ data, sortBy = null, sortDir = 'asc', onSort
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [lightbox, rawSourceLightbox, closeLightbox, closeRawSourceLightbox])
+
+  useEffect(() => {
+    if (lightbox || rawSourceLightbox) {
+      setListUrlTooltipState(null)
+    }
+  }, [lightbox, rawSourceLightbox])
+
+  useEffect(() => () => {
+    if (listUrlTooltipShowTimerRef.current) clearTimeout(listUrlTooltipShowTimerRef.current)
+    if (listUrlTooltipLeaveTimerRef.current) clearTimeout(listUrlTooltipLeaveTimerRef.current)
+  }, [])
 
   useEffect(() => () => {
     if (galleryClickTimeoutRef.current) clearTimeout(galleryClickTimeoutRef.current)
@@ -320,8 +416,8 @@ export function SearchResultsGrid({ data, sortBy = null, sortDir = 'asc', onSort
   const baseColumns = useMemo(
     () => [thumbnailColumnDef((payload) => {
       setLightbox(payload)
-    }, allowThumbnailFallbackLightbox, isMobile, setRawSourceLightbox, hasThumbnails), ...listTextColumns],
-    [hasThumbnails, allowThumbnailFallbackLightbox, isMobile, listTextColumns]
+    }, isMobile, setRawSourceLightbox, hasThumbnails), ...listTextColumns],
+    [hasThumbnails, isMobile, listTextColumns]
   )
   const columns = useMemo(
     () => (showScoreColumn ? [...baseColumns, scoreColumn] : baseColumns),
@@ -446,6 +542,34 @@ export function SearchResultsGrid({ data, sortBy = null, sortDir = 'asc', onSort
           </a>
         </div>
       )}
+      {listUrlTooltipState && !showGallery && (
+        <div
+          className={`search-results-gallery-url-tooltip search-results-gallery-url-tooltip--centered${listUrlTooltipState.above ? ' search-results-gallery-url-tooltip--above' : ' search-results-gallery-url-tooltip--below'}`}
+          style={{
+            ['--tooltip-start-x' as string]: `${listUrlTooltipState.startX}px`,
+            ['--tooltip-start-y' as string]: `${listUrlTooltipState.startY}px`,
+            ['--tooltip-end-x' as string]: `${listUrlTooltipState.endX}px`,
+            ['--tooltip-end-y' as string]: `${listUrlTooltipState.endY}px`,
+          }}
+          onMouseEnter={() => {
+            if (listUrlTooltipLeaveTimerRef.current) {
+              clearTimeout(listUrlTooltipLeaveTimerRef.current)
+              listUrlTooltipLeaveTimerRef.current = null
+            }
+          }}
+          onMouseLeave={() => setListUrlTooltipState(null)}
+        >
+          Open{' '}
+          <a
+            href={listUrlTooltipState.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {listUrlTooltipState.url}
+          </a>
+        </div>
+      )}
       {rawSourceLightbox && (() => {
         const rawSourceContent = (
           <div
@@ -478,7 +602,7 @@ export function SearchResultsGrid({ data, sortBy = null, sortDir = 'asc', onSort
       {lightbox && (() => {
         const lightboxContent = (
           <div
-            className={`search-thumb-lightbox${lightbox?.isFallbackThumbnail ? ' search-thumb-lightbox--thumb-fallback' : ''}`}
+            className="search-thumb-lightbox"
             role="dialog"
             aria-modal="true"
             aria-label="Image full size"
@@ -691,114 +815,10 @@ export function SearchResultsGrid({ data, sortBy = null, sortDir = 'asc', onSort
                 }
                 const cardEl = e.currentTarget
                 urlTooltipShowTimerRef.current = setTimeout(() => {
-                  const cardRect = cardEl.getBoundingClientRect()
-                  const startX = cardRect.left + cardRect.width / 2
-                  const startY = cardRect.top + cardRect.height / 2
-
-                  const gridEl = gridRef.current
-                  const tooltipApproxHalfHeight = 24
-                  let clampedEndX = startX
-                  let endY
-                  let above
-
-                  const vv = typeof window !== 'undefined' && window.visualViewport ? window.visualViewport : null
-                  const viewportHeight = vv ? vv.height : (window.innerHeight || document.documentElement.clientHeight || 0)
-                  const viewportTopOffset = vv ? vv.offsetTop : 0
-
-                  if (gridEl) {
-                    const gridRect = gridEl.getBoundingClientRect()
-                    const relX = startX - gridRect.left
-                    const containerWidth = gridRect.width
-                    if (containerWidth > 0) {
-                      const maxTooltipFraction = 2 / 3
-                      const halfMaxWidth = (maxTooltipFraction * containerWidth) / 2
-                      const edgeMargin = 8
-                      const minCenter = gridRect.left + halfMaxWidth + edgeMargin
-                      const maxCenter = gridRect.right - halfMaxWidth - edgeMargin
-                      clampedEndX = Math.min(Math.max(startX, minCenter), maxCenter)
-                    }
-
-                    if (isMobile) {
-                      const marginAbove = 60
-                      const gapBelow = 4
-                      const viewportTopMargin = 8
-                      const viewportBottomMargin = 8
-
-                      let endYCandidate
-                      let useAbove = false
-
-                      if (viewportHeight > 0) {
-                        const preferredAboveCenterY = cardRect.top - tooltipApproxHalfHeight - marginAbove
-                        const tooltipTopIfAbove = preferredAboveCenterY - tooltipApproxHalfHeight
-
-                        if (tooltipTopIfAbove >= viewportTopMargin) {
-                          endYCandidate = preferredAboveCenterY
-                          useAbove = true
-                        } else {
-                          // Place tooltip just below the card: gapBelow between card bottom and tooltip top
-                          const preferredBelowCenterY = cardRect.bottom + tooltipApproxHalfHeight + gapBelow
-                          endYCandidate = preferredBelowCenterY
-                        }
-
-                        const minCenterY = viewportTopOffset + tooltipApproxHalfHeight + viewportTopMargin
-                        const maxCenterY = viewportTopOffset + viewportHeight - tooltipApproxHalfHeight - viewportBottomMargin
-                        endY = Math.min(Math.max(endYCandidate, minCenterY), maxCenterY)
-                        above = useAbove
-                      } else {
-                        // Fallback if viewport height is unavailable
-                        const preferredBelowCenterY = cardRect.bottom + tooltipApproxHalfHeight + gapBelow
-                        endY = preferredBelowCenterY
-                        above = false
-                      }
-                    } else {
-                      const spaceAbove = cardRect.top - gridRect.top
-                      const showAbove = spaceAbove > 120
-                      const margin = 6
-                      if (showAbove) {
-                        endY = cardRect.top - tooltipApproxHalfHeight - margin
-                      } else {
-                        endY = cardRect.bottom + tooltipApproxHalfHeight + margin
-                      }
-                      above = showAbove
-                    }
-                  } else {
-                    // Fallback if gridRef is missing
-                    const viewportTopMargin = 8
-                    const viewportBottomMargin = 8
-                    const marginAbove = 60
-                    const gapBelow = 4
-
-                    const preferredAboveCenterY = cardRect.top - tooltipApproxHalfHeight - marginAbove
-                    const tooltipTopIfAbove = preferredAboveCenterY - tooltipApproxHalfHeight
-
-                    let endYCandidate
-                    let useAbove = false
-
-                    if (tooltipTopIfAbove >= viewportTopMargin) {
-                      endYCandidate = preferredAboveCenterY
-                      useAbove = true
-                    } else {
-                      const preferredBelowCenterY = cardRect.bottom + tooltipApproxHalfHeight + gapBelow
-                      endYCandidate = preferredBelowCenterY
-                    }
-
-                    if (viewportHeight > 0) {
-                      const minCenterY = tooltipApproxHalfHeight + viewportTopMargin
-                      const maxCenterY = viewportHeight - tooltipApproxHalfHeight - viewportBottomMargin
-                      endY = Math.min(Math.max(endYCandidate, minCenterY), maxCenterY)
-                    } else {
-                      endY = endYCandidate
-                    }
-                    above = useAbove
-                  }
-
+                  const anchor = getUrlTooltipAnchor(cardEl, gridRef.current, isMobile)
                   setUrlTooltipState({
                     url: payload.itemUrl ?? '',
-                    startX,
-                    startY,
-                    endX: clampedEndX,
-                    endY,
-                    above,
+                    ...anchor,
                   })
                 }, 500)
               }
@@ -837,16 +857,11 @@ export function SearchResultsGrid({ data, sortBy = null, sortDir = 'asc', onSort
                         return
                       }
 
-                      if (!payload) return
                       if (galleryClickTimeoutRef.current) {
                         clearTimeout(galleryClickTimeoutRef.current)
                         galleryClickTimeoutRef.current = null
                       }
                       const next = { ...payload, title }
-                      if (next.itemUrl && !next.imageUrl) {
-                        window.open(next.itemUrl, '_blank', 'noopener,noreferrer')
-                        return
-                      }
                       galleryClickTimeoutRef.current = setTimeout(() => {
                         galleryClickTimeoutRef.current = null
                         setLightbox(next)
@@ -1003,6 +1018,8 @@ export function SearchResultsGrid({ data, sortBy = null, sortDir = 'asc', onSort
             ) : (
               table.getRowModel().rows.map((row) => {
                 const rowData = row.original
+                const listItemUrl =
+                  rowData?.itemUrl && String(rowData.itemUrl).trim() ? String(rowData.itemUrl).trim() : null
                 const handleRowClick = () => {
                   const now = Date.now()
                   const rowId = row.id
@@ -1014,15 +1031,48 @@ export function SearchResultsGrid({ data, sortBy = null, sortDir = 'asc', onSort
                       clearTimeout(galleryClickTimeoutRef.current)
                       galleryClickTimeoutRef.current = null
                     }
-                    const lb = rowToLightboxPayload(rowData, allowThumbnailFallbackLightbox, true)
+                    const lb = rowToLightboxPayload(rowData)
                     if (lb) setLightbox(lb)
                   }
                 }
+                const handleListUrlTooltipEnter = listItemUrl
+                  ? (e: MouseEvent<HTMLTableRowElement>) => {
+                    if (listUrlTooltipLeaveTimerRef.current) {
+                      clearTimeout(listUrlTooltipLeaveTimerRef.current)
+                      listUrlTooltipLeaveTimerRef.current = null
+                    }
+                    if (listUrlTooltipShowTimerRef.current) {
+                      clearTimeout(listUrlTooltipShowTimerRef.current)
+                      listUrlTooltipShowTimerRef.current = null
+                    }
+                    const rowEl = e.currentTarget
+                    listUrlTooltipShowTimerRef.current = setTimeout(() => {
+                      const anchor = getUrlTooltipAnchor(rowEl, gridRef.current, isMobile)
+                      setListUrlTooltipState({
+                        url: listItemUrl,
+                        ...anchor,
+                      })
+                    }, 500)
+                  }
+                  : undefined
+                const handleListUrlTooltipLeave = listItemUrl
+                  ? () => {
+                    if (listUrlTooltipShowTimerRef.current) {
+                      clearTimeout(listUrlTooltipShowTimerRef.current)
+                      listUrlTooltipShowTimerRef.current = null
+                    }
+                    listUrlTooltipLeaveTimerRef.current = setTimeout(() => {
+                      setListUrlTooltipState(null)
+                    }, 150)
+                  }
+                  : undefined
                 return (
                   <tr
                     key={row.id}
                     className="grid-row-double-clickable"
                     onClick={handleRowClick}
+                    onMouseEnter={handleListUrlTooltipEnter}
+                    onMouseLeave={handleListUrlTooltipLeave}
                   >
                     {row.getVisibleCells().map((cell) => (
                       <td key={cell.id} className={`col-${cell.column.id}`}>

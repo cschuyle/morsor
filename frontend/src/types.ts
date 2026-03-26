@@ -85,6 +85,5 @@ export interface LightboxPayload {
   audios?: string[]
   otherFiles?: string[]
   itemUrl?: string | null
-  isFallbackThumbnail?: boolean
   rawSourceItem?: unknown
 }
