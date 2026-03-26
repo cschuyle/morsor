@@ -76,19 +76,51 @@ function formatLittlePrinceFieldLabel(key: string): string {
     .join(' ')
 }
 
-function formatLittlePrinceExtraLines(extra: Record<string, unknown> | null | undefined): Array<{ label: string; content: string }> {
+/** One row in the Little Prince extra hover tooltip (includes original JSON key for catalog links). */
+type LittlePrinceExtraLine = { label: string; content: string; jsonKey: string }
+
+function formatLittlePrinceExtraLines(extra: Record<string, unknown> | null | undefined): LittlePrinceExtraLine[] {
   if (extra == null || typeof extra !== 'object') {
     return []
   }
-  const out: Array<{ label: string; content: string }> = []
+  const out: LittlePrinceExtraLine[] = []
   for (const [key, value] of Object.entries(extra)) {
     const content = formatLittlePrinceExtraValue(value)
     if (content === '') {
       continue
     }
-    out.push({ label: formatLittlePrinceFieldLabel(key), content })
+    out.push({ label: formatLittlePrinceFieldLabel(key), content, jsonKey: key })
   }
   return out
+}
+
+/** Digits after the last hyphen (PP-4277 → 4277), else trailing digit run. */
+function lpidNumericSuffixForCatalog(lpidRaw: string): string | null {
+  const s = lpidRaw.trim()
+  const afterHyphen = s.match(/-(\d+)$/)
+  if (afterHyphen) {
+    return afterHyphen[1]
+  }
+  const tail = s.match(/(\d+)$/)
+  return tail ? tail[1] : null
+}
+
+function littlePrinceExtraCatalogLinkHref(jsonKey: string, content: string): string | null {
+  if (jsonKey === 'lpid') {
+    const n = lpidNumericSuffixForCatalog(content)
+    if (!n) {
+      return null
+    }
+    return `https://petit-prince-collection.com/lang/show_livre.php?id=${encodeURIComponent(n)}`
+  }
+  if (jsonKey === 'tintenfassId') {
+    const id = content.trim()
+    if (!id) {
+      return null
+    }
+    return `https://editiontintenfass.de/en/catalog/${encodeURIComponent(id)}`
+  }
+  return null
 }
 
 /** Plain "Label: value" lines (e.g. aria-label); use formatLittlePrinceExtraLines + rich tooltip for bold labels. */
@@ -395,7 +427,7 @@ function ThumbColumnHeader({ column }: { column: { getIsSorted: () => false | 'a
 }
 
 type LpExtraHoverHandlers = {
-  onEnter: (lines: Array<{ label: string; content: string }>, e: MouseEvent<HTMLElement>) => void
+  onEnter: (lines: LittlePrinceExtraLine[], e: MouseEvent<HTMLElement>) => void
   onMove: (e: MouseEvent<HTMLElement>) => void
   onLeave: () => void
 }
@@ -534,14 +566,14 @@ export function SearchResultsGrid({ data, sortBy = null, sortDir = 'asc', onSort
   const [lpExtraRichTooltipState, setLpExtraRichTooltipState] = useState<{
     left: number
     top: number
-    lines: Array<{ label: string; content: string }>
+    lines: LittlePrinceExtraLine[]
   } | null>(null)
   const lpExtraTooltipLeaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const lpExtraTooltipShowTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const lpExtraPointerRef = useRef({ x: 0, y: 0 })
 
   const handleLpExtraMouseEnter = useCallback(
-    (lines: Array<{ label: string; content: string }>, e: MouseEvent<HTMLElement>) => {
+    (lines: LittlePrinceExtraLine[], e: MouseEvent<HTMLElement>) => {
       if (lines.length === 0) {
         return
       }
@@ -793,13 +825,33 @@ export function SearchResultsGrid({ data, sortBy = null, sortDir = 'asc', onSort
           }}
           onMouseLeave={() => setLpExtraRichTooltipState(null)}
         >
-          {lpExtraRichTooltipState.lines.map((line, i) => (
-            <div key={i} className="search-results-lp-extra-tooltip-line">
-              <strong>{line.label}</strong>
-              {': '}
-              <span className="search-results-lp-extra-tooltip-content">{linkifyTextWithUrls(line.content)}</span>
-            </div>
-          ))}
+          {lpExtraRichTooltipState.lines.map((line, i) => {
+            const catalogHref = littlePrinceExtraCatalogLinkHref(line.jsonKey, line.content)
+            return (
+              <div key={i} className="search-results-lp-extra-tooltip-line">
+                <strong>{line.label}</strong>
+                {': '}
+                <span className="search-results-lp-extra-tooltip-content">{linkifyTextWithUrls(line.content)}</span>
+                {catalogHref ? (
+                  <>
+                    {' '}
+                    (
+                    <a
+                      href={catalogHref}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="search-results-lp-extra-tooltip-catalog-link"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <span className="search-results-lp-extra-tooltip-catalog-link-text">Link</span>
+                      <PopOutIcon className="search-results-lp-extra-tooltip-catalog-link-icon" />
+                    </a>
+                    )
+                  </>
+                ) : null}
+              </div>
+            )
+          })}
         </div>
       )}
       {rawSourceLightbox && (() => {

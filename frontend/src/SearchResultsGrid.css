@@ -678,6 +678,33 @@
   color: #5522aa;
 }
 
+.search-results-lp-extra-tooltip-catalog-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2em;
+  color: #6633cc;
+  text-decoration: none;
+}
+
+.search-results-lp-extra-tooltip-catalog-link-text {
+  font-weight: 400;
+  text-decoration: underline;
+}
+
+.search-results-lp-extra-tooltip-catalog-link:hover {
+  color: #5522aa;
+}
+
+.search-results-lp-extra-tooltip-catalog-link-icon {
+  display: block;
+  width: 0.85em;
+  height: 0.85em;
+  flex-shrink: 0;
+  stroke: currentColor;
+  stroke-width: 1.25px;
+  paint-order: stroke fill;
+}
+
 .search-results-gallery-url-tooltip {
   position: absolute;
   padding: 0.5rem 0.6rem;
