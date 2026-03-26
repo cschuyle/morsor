@@ -651,10 +651,11 @@ export function SearchResultsGrid({ data, sortBy = null, sortDir = 'asc', onSort
                   <div className="search-thumb-lightbox-description">
                     {typeLabel && troveLabel ? (
                       <>
+                        {'A '}
                         <strong>{typeLabel}</strong>
-                        {' from '}
+                        {" from the '"}
                         <strong>{troveLabel}</strong>
-                        {' trove'}
+                        {"' trove"}
                       </>
                     ) : typeLabel ? (
                       <strong>{typeLabel}</strong>
