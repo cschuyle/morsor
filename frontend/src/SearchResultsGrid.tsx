@@ -27,6 +27,21 @@ export interface SearchResultsGridProps {
 
 const AMAZON_PLACEHOLDER_THUMB = 'https://m.media-amazon.com/images/I/01RmK+J4pJL._SS135_.gif'
 
+/** Display label for API itemType in lightbox (falls back to a trimmed string). */
+function formatItemTypeForLightbox(value: unknown): string {
+  if (value == null) return ''
+  const s = String(value).trim()
+  if (!s) return ''
+  const map: Record<string, string> = {
+    littlePrinceItem: 'Book',
+    domain: 'Domain',
+    movie: 'Movie',
+  }
+  if (map[s]) return map[s]
+  const spaced = s.replace(/([a-z])([A-Z])/g, '$1 $2')
+  return spaced.charAt(0).toUpperCase() + spaced.slice(1)
+}
+
 function isPlaceholderThumb(url: unknown): boolean {
   if (!url || !String(url).trim()) return false
   const u = String(url).trim()
@@ -63,7 +78,15 @@ const textColumns = [
   },
 ]
 
-function getLightboxPayload(row: SearchResultRow | undefined | null) {
+/**
+ * Build lightbox payload. List view passes allowThumbnailFallback / includeLittlePrinceRawFallback so link-only or
+ * raw-only little-prince rows still open the lightbox (title + item type + media links) instead of a new tab.
+ */
+function rowToLightboxPayload(
+  row: SearchResultRow | undefined | null,
+  allowThumbnailFallback: boolean,
+  includeLittlePrinceRawFallback: boolean
+): LightboxPayload | null {
   if (!row) return null
   const files = Array.isArray(row.files) ? row.files : []
   const pdfs = files.filter((u) => typeof u === 'string' && /\.pdf(\?|$)/i.test(u))
@@ -73,11 +96,60 @@ function getLightboxPayload(row: SearchResultRow | undefined | null) {
   const audios = files.filter((u) => typeof u === 'string' && /\.(mp3|m4a|wav|ogg|flac|aac|wma)(\?|$)/i.test(u))
   const known = new Set([...pdfs, ...imageUrls, ...ebooks, ...videos, ...audios])
   const otherFiles = files.filter((u) => typeof u === 'string' && !known.has(u))
-  const imageUrl = row.largeImageUrl || (imageUrls.length > 0 ? imageUrls[0] : null)
+  const largeUrl =
+    row.largeImageUrl && String(row.largeImageUrl).trim() ? String(row.largeImageUrl).trim() : null
+  let imageUrl: string | null = largeUrl
+  const thumbUrlRaw = row.thumbnailUrl
+  const fallbackThumbUrl =
+    thumbUrlRaw && !isPlaceholderThumb(thumbUrlRaw) ? String(thumbUrlRaw).trim() : null
+  if (!imageUrl && allowThumbnailFallback && fallbackThumbUrl) {
+    imageUrl = fallbackThumbUrl
+  }
+  if (!imageUrl && imageUrls.length > 0) {
+    imageUrl = imageUrls[0]
+  }
+
   const itemUrl = row.itemUrl && String(row.itemUrl).trim() ? row.itemUrl.trim() : null
-  const hasContent = imageUrl || itemUrl || pdfs.length > 0 || imageUrls.length > 0 || ebooks.length > 0 || videos.length > 0 || audios.length > 0 || otherFiles.length > 0
+  const isLittlePrince = row.itemType === 'littlePrinceItem'
+  const rawOk =
+    row.rawSourceItem != null &&
+    String(row.rawSourceItem).trim() !== ''
+  const hasContent =
+    !!imageUrl ||
+    !!itemUrl ||
+    pdfs.length > 0 ||
+    imageUrls.length > 0 ||
+    ebooks.length > 0 ||
+    videos.length > 0 ||
+    audios.length > 0 ||
+    otherFiles.length > 0 ||
+    (includeLittlePrinceRawFallback && isLittlePrince && rawOk)
   if (!hasContent) return null
-  return { imageUrl, pdfs, imageUrls, ebooks, videos, audios, otherFiles, itemUrl, rawSourceItem: row.rawSourceItem }
+
+  const troveName = row.trove != null && String(row.trove).trim() ? String(row.trove).trim() : null
+  const itemType = row.itemType != null && String(row.itemType).trim() ? String(row.itemType).trim() : null
+
+  const isFallbackThumbnail = !!(!largeUrl && imageUrl && fallbackThumbUrl && imageUrl === fallbackThumbUrl)
+
+  return {
+    imageUrl,
+    pdfs,
+    imageUrls,
+    ebooks,
+    videos,
+    audios,
+    otherFiles,
+    itemUrl,
+    rawSourceItem: row.rawSourceItem,
+    itemType,
+    trove: troveName,
+    title: row.title ?? '',
+    isFallbackThumbnail,
+  }
+}
+
+function getLightboxPayload(row: SearchResultRow | undefined | null) {
+  return rowToLightboxPayload(row, false, false)
 }
 
 function getFileTypeTooltip(pdfs: string[], imageUrls: string[], ebooks: string[], videos: string[], audios: string[], otherFiles: string[], itemUrl: string | null, hasLargeImage: boolean): string | null {
@@ -154,16 +226,13 @@ function thumbnailColumnDef(
       const isLittlePrince = itemType === 'littlePrinceItem'
       const thumbIsPlaceholder = isPlaceholderThumb(url)
       const fallbackThumbUrl = !thumbIsPlaceholder && url ? String(url).trim() : null
-      const lightboxImageUrl = largeUrl || (allowThumbnailFallbackLightbox ? fallbackThumbUrl : null)
-      const isFallbackThumbnail = !!(!largeUrl && lightboxImageUrl && fallbackThumbUrl)
       const showLinkIconInsteadOfThumb = isLittlePrince && (!url || thumbIsPlaceholder)
       const showLinkIconOnly = isLittlePrince && !url && itemUrl
       const hasThumbnailImage = url && !showLinkIconInsteadOfThumb
-      const rawSourceItem = row?.rawSourceItem
       if (!isLittlePrince || (!url && !itemUrl)) return <span aria-hidden="true">&nbsp;</span>
       const fileTypeTooltip = getFileTypeTooltip(pdfs, imageUrls, ebooks, videos, audios, otherFiles, itemUrl, !!largeUrl)
-      const payload = { imageUrl: lightboxImageUrl, title: row?.title ?? '', pdfs, imageUrls, ebooks, videos, audios, otherFiles, itemUrl, isFallbackThumbnail, rawSourceItem }
-      const canClick = lightboxImageUrl || itemUrl || pdfs.length > 0 || imageUrls.length > 0 || ebooks.length > 0 || videos.length > 0 || audios.length > 0 || otherFiles.length > 0
+      const payload = rowToLightboxPayload(row, allowThumbnailFallbackLightbox, true)
+      const canClick = !!payload
       const linkIcon = (
         <span className="search-thumb-link-icon" aria-hidden="true">
           <PopOutIcon className="search-thumb-link-icon-img" />
@@ -250,10 +319,6 @@ export function SearchResultsGrid({ data, sortBy = null, sortDir = 'asc', onSort
   )
   const baseColumns = useMemo(
     () => [thumbnailColumnDef((payload) => {
-      if (payload.itemUrl && !payload.imageUrl) {
-        window.open(payload.itemUrl, '_blank', 'noopener,noreferrer')
-        return
-      }
       setLightbox(payload)
     }, allowThumbnailFallbackLightbox, isMobile, setRawSourceLightbox, hasThumbnails), ...listTextColumns],
     [hasThumbnails, allowThumbnailFallbackLightbox, isMobile, listTextColumns]
@@ -426,6 +491,27 @@ export function SearchResultsGrid({ data, sortBy = null, sortDir = 'asc', onSort
                   {lightbox.title}
                 </div>
               )}
+              {(() => {
+                const typeLabel = formatItemTypeForLightbox(lightbox.itemType)
+                const troveLabel = lightbox.trove != null ? String(lightbox.trove).trim() : ''
+                if (!typeLabel && !troveLabel) return null
+                return (
+                  <div className="search-thumb-lightbox-description">
+                    {typeLabel ? (
+                      <div className="search-thumb-lightbox-description-row">
+                        <span className="search-thumb-lightbox-description-label">Item type</span>
+                        <span className="search-thumb-lightbox-description-value">{typeLabel}</span>
+                      </div>
+                    ) : null}
+                    {troveLabel ? (
+                      <div className="search-thumb-lightbox-description-row">
+                        <span className="search-thumb-lightbox-description-label">Trove name</span>
+                        <span className="search-thumb-lightbox-description-value">{troveLabel}</span>
+                      </div>
+                    ) : null}
+                  </div>
+                )
+              })()}
               {lightbox.imageUrl && (
                 <img src={lightbox.imageUrl} alt="" />
               )}
@@ -917,7 +1003,6 @@ export function SearchResultsGrid({ data, sortBy = null, sortDir = 'asc', onSort
             ) : (
               table.getRowModel().rows.map((row) => {
                 const rowData = row.original
-                const rawSourceItem = rowData?.rawSourceItem
                 const handleRowClick = () => {
                   const now = Date.now()
                   const rowId = row.id
@@ -929,7 +1014,8 @@ export function SearchResultsGrid({ data, sortBy = null, sortDir = 'asc', onSort
                       clearTimeout(galleryClickTimeoutRef.current)
                       galleryClickTimeoutRef.current = null
                     }
-                    setRawSourceLightbox({ title: rowData?.title ?? '', rawSourceItem: rawSourceDisplay(rawSourceItem) })
+                    const lb = rowToLightboxPayload(rowData, allowThumbnailFallbackLightbox, true)
+                    if (lb) setLightbox(lb)
                   }
                 }
                 return (

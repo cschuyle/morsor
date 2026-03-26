@@ -1994,10 +1994,10 @@
   max-height: 4.32rem;
 }
 
-/* When lightbox falls back to thumbnail, let it consume maximum space while reserving room for title/footer controls. */
+/* When lightbox falls back to thumbnail, let it consume maximum space while reserving room for title/meta/footer controls. */
 .search-thumb-lightbox.search-thumb-lightbox--thumb-fallback .search-thumb-lightbox-content img {
   max-width: min(100%, calc(100dvw - 2rem));
-  max-height: calc(100dvh - 5rem);
+  max-height: calc(100dvh - 7rem);
 }
 
 /* Mobile gallery: tiles 1/2 size (height and width) */

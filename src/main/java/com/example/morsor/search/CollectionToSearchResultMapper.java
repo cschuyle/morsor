@@ -7,7 +7,11 @@ import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 
 import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.stream.StreamSupport;
 
 /**
@@ -23,6 +27,18 @@ import java.util.stream.StreamSupport;
 public final class CollectionToSearchResultMapper {
     private static final String AMAZON_PLACEHOLDER_THUMB = "https://m.media-amazon.com/images/I/01RmK+J4pJL._SS135_.gif";
     private static final ObjectMapper PRETTY_MAPPER = new ObjectMapper().enable(SerializationFeature.INDENT_OUTPUT);
+
+    /** Keys already represented on {@link SearchResult} for little-prince items; omitted from {@code littlePrinceItemExtra}. */
+    private static final Set<String> LITTLE_PRINCE_TOP_LEVEL_KEYS = Set.of(
+            "_itemType",
+            "lpid",
+            "id",
+            "display-title",
+            "title",
+            "smallImageUrl",
+            "largeImageUrl",
+            "files",
+            "itemUrl");
 
     private CollectionToSearchResultMapper() {}
 
@@ -88,7 +104,7 @@ public final class CollectionToSearchResultMapper {
             String title = titleNode != null && titleNode.isTextual() ? titleNode.asText() : (titleNode != null ? titleNode.toString() : "");
             String rawSourceItem = toRawSourceItem(titleNode);
             String id = troveId != null && !troveId.isEmpty() ? troveId + "-" + i : "trove-" + i;
-            out.add(new SearchResult(id, null, title, title, troveName, troveId, false, null, null, List.of(), null, null, null, null, null, rawSourceItem));
+            out.add(new SearchResult(id, null, title, title, troveName, troveId, false, null, null, rawSourceItem, List.of(), null, null, null, null, null, null));
         }
     }
 
@@ -154,9 +170,11 @@ public final class CollectionToSearchResultMapper {
         String punycodeDomainName = null;
         String expirationDate = null;
         Boolean autoRenew = null;
+        Map<String, Object> littlePrinceItemExtra = null;
 
         if ("littlePrinceItem".equals(itemTypeRaw)) {
             itemUrl = text(item, "itemUrl");
+            littlePrinceItemExtra = buildLittlePrinceItemExtra(item);
         } else if ("domain".equals(itemTypeRaw)) {
             domainName = text(item, "domain-name");
             punycodeDomainName = text(item, "punycode-domain-name");
@@ -169,7 +187,27 @@ public final class CollectionToSearchResultMapper {
             }
         }
 
-        return new SearchResult(id, itemType, title, snippet, troveName, troveId, hasThumbnail, thumbnailUrl, largeImageUrl, files, itemUrl, domainName, punycodeDomainName, expirationDate, autoRenew, rawSourceItem);
+        return new SearchResult(id, itemType, title, snippet, troveName, troveId, hasThumbnail, thumbnailUrl, largeImageUrl, rawSourceItem, files, itemUrl, domainName, punycodeDomainName, expirationDate, autoRenew, littlePrinceItemExtra);
+    }
+
+    /**
+     * Remaining JSON properties for a little-prince item (everything not already mapped onto {@link SearchResult}).
+     */
+    private static Map<String, Object> buildLittlePrinceItemExtra(JsonNode item) {
+        if (item == null || !item.isObject()) {
+            return null;
+        }
+        Map<String, Object> out = new LinkedHashMap<>();
+        Iterator<Map.Entry<String, JsonNode>> it = item.fields();
+        while (it.hasNext()) {
+            Map.Entry<String, JsonNode> e = it.next();
+            if (LITTLE_PRINCE_TOP_LEVEL_KEYS.contains(e.getKey())) {
+                continue;
+            }
+            Object javaVal = PRETTY_MAPPER.convertValue(e.getValue(), Object.class);
+            out.put(e.getKey(), javaVal);
+        }
+        return out.isEmpty() ? null : out;
     }
 
     private static boolean hasRealThumbnail(String thumbnailUrl) {

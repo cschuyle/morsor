@@ -195,6 +195,10 @@ class CollectionToSearchResultMapperTest {
         assertThat(results.get(1).itemUrl()).isNull();
         assertThat(results.get(2).itemType()).isEqualTo("movie");
         assertThat(results.get(2).itemUrl()).isNull();
+        assertThat(results.get(0).littlePrinceItemExtra()).isNull();
+        assertThat(results.get(1).littlePrinceItemExtra()).isNotNull();
+        assertThat(results.get(1).littlePrinceItemExtra()).containsEntry("author", "Antoine de Saint-Exupéry");
+        assertThat(results.get(2).littlePrinceItemExtra()).isNull();
 
         // rawSourceItem: JSON items get pretty-printed multi-line JSON
         assertThat(results.get(0).rawSourceItem()).contains("littlePrinceItem");
@@ -336,6 +340,7 @@ class CollectionToSearchResultMapperTest {
         assertThat(results.get(0).punycodeDomainName()).isEqualTo("example.com");
         assertThat(results.get(0).expirationDate()).isEqualTo("2026-12-31");
         assertThat(results.get(0).autoRenew()).isTrue();
+        assertThat(results.get(0).littlePrinceItemExtra()).isNull();
     }
 
     @Test

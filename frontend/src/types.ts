@@ -2,6 +2,8 @@
 export interface SearchResultRow {
   id?: string
   title?: string
+  /** JSON item shape key, e.g. littlePrinceItem, domain, movie */
+  itemType?: string | null
   trove?: string
   troveId?: string
   score?: number
@@ -13,6 +15,8 @@ export interface SearchResultRow {
   punycodeDomainName?: string | null
   expirationDate?: string | null
   autoRenew?: boolean | null
+  /** Present when itemType is littlePrinceItem: source fields not mapped to top-level props. */
+  littlePrinceItemExtra?: Record<string, unknown> | null
   [key: string]: unknown
 }
 
@@ -72,6 +76,8 @@ export interface UniquesResultData {
 export interface LightboxPayload {
   imageUrl?: string | null
   title?: string
+  itemType?: string | null
+  trove?: string | null
   pdfs?: string[]
   imageUrls?: string[]
   ebooks?: string[]
