@@ -82,7 +82,7 @@ class AuthControllerAuthSessionTest {
                         "n/a",
                         List.of(new SimpleGrantedAuthority("ROLE_USER"))));
 
-        ResponseEntity<Map<String, Boolean>> res = controller.authSession();
+        ResponseEntity<Map<String, Object>> res = controller.authSession();
 
         assertThat(res.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
     }

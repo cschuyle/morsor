@@ -15,6 +15,7 @@ import java.util.stream.StreamSupport;
  * <ul>
  *   <li>Items format: {@code { "id", "name", "shortName", "items": [ { "littlePrinceItem": { ... } }, ... ] }}</li>
  *   <li>Items format (movie/screening): {@code { "id", "name", "shortName", "items": [ { "movie": { "title", "year", "director" } }, ... ] }}</li>
+ *   <li>Items format (domains): {@code { "id", "name", "shortName", "items": [ { "domain": { "domain-name", "title", ... } }, ... ] }}</li>
  *   <li>Titles format: {@code { "id", "name", "shortName", "titles": [ "Title 1", "Title 2", ... ] }}</li>
  *   <li>Array of collections (either format): {@code [ { ... }, ... ]}</li>
  * </ul>
@@ -146,8 +147,13 @@ public final class CollectionToSearchResultMapper {
         boolean hasThumbnail = hasRealThumbnail(thumbnailUrl);
         String largeImageUrl = text(item, "largeImageUrl");
         List<String> files = textArray(item, "files");
-        String itemType = text(item, "_itemType");
-        String itemUrl = "littlePrinceItem".equals(itemType) ? text(item, "itemUrl") : null;
+        String itemTypeRaw = text(item, "_itemType");
+        String itemType = itemTypeRaw;
+        String itemUrl = null;
+
+        if ("littlePrinceItem".equals(itemTypeRaw)) {
+            itemUrl = text(item, "itemUrl");
+        }
 
         return new SearchResult(id, title, snippet, troveName, troveId, hasThumbnail, thumbnailUrl, largeImageUrl, files, itemType, itemUrl, rawSourceItem);
     }

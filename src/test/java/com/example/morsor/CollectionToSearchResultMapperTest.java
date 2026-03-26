@@ -301,6 +301,39 @@ class CollectionToSearchResultMapperTest {
     }
 
     @Test
+    void mapsDomainItemsToDomainSearchResults() throws Exception {
+        String json = """
+            {
+              "id": "namecheap",
+              "name": "Namecheap domains",
+              "shortName": "Namecheap",
+              "items": [
+                {
+                  "domain": {
+                    "domain-name": "example.com",
+                    "title": "example.com",
+                    "expiration-date": "2026-12-31",
+                    "auto-renew": "true"
+                  }
+                }
+              ]
+            }
+            """;
+
+        JsonNode root = objectMapper.readTree(json);
+        List<SearchResult> results = CollectionToSearchResultMapper.mapRootToSearchResults(root);
+
+        assertThat(results).hasSize(1);
+        assertThat(results.get(0).trove()).isEqualTo("Namecheap");
+        assertThat(results.get(0).troveId()).isEqualTo("namecheap");
+        assertThat(results.get(0).title()).isEqualTo("example.com");
+        assertThat(results.get(0).itemType()).isEqualTo("domain");
+        assertThat(results.get(0).itemUrl()).isNull();
+        assertThat(results.get(0).thumbnailUrl()).isNull();
+        assertThat(results.get(0).hasThumbnail()).isFalse();
+    }
+
+    @Test
     void rawSourceItemForTitlesIsTheTitleString() throws Exception {
         String json = """
             {"id": "t", "titles": ["Title A", "Title B"]}

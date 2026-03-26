@@ -1,0 +1,32 @@
+{
+  "id": "namecheap",
+  "name": "Namecheap domains",
+  "shortName": "Namecheap",
+  "items": [
+    {
+      "domain": {
+        "domain-name": "not-so-great-domain.com",
+        "title": "not-so-great-domain.com",
+        "expiration-date": "2026-12-25",
+        "auto-renew": "false"
+      }
+    },
+    {
+      "domain": {
+        "domain-name": "universe.ai",
+        "title": "universe.ai",
+        "expiration-date": "2026-12-31",
+        "auto-renew": "true"
+      }
+    },
+    {
+      "domain": {
+        "domain-name": "конченый.ai",
+        "punycode-domain-name": "xn--e1aibmbd8d8a.ai",
+        "title": "конченый.ai",
+        "expiration-date": "2026-04-01",
+        "auto-renew": "false"
+      }
+    }
+  ]
+}
