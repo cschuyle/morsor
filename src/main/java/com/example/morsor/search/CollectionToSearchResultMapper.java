@@ -88,7 +88,7 @@ public final class CollectionToSearchResultMapper {
             String title = titleNode != null && titleNode.isTextual() ? titleNode.asText() : (titleNode != null ? titleNode.toString() : "");
             String rawSourceItem = toRawSourceItem(titleNode);
             String id = troveId != null && !troveId.isEmpty() ? troveId + "-" + i : "trove-" + i;
-            out.add(new SearchResult(id, title, title, troveName, troveId, false, null, null, List.of(), null, null, rawSourceItem));
+            out.add(new SearchResult(id, title, title, troveName, troveId, false, null, null, List.of(), null, null, null, null, null, null, rawSourceItem));
         }
     }
 
@@ -150,12 +150,26 @@ public final class CollectionToSearchResultMapper {
         String itemTypeRaw = text(item, "_itemType");
         String itemType = itemTypeRaw;
         String itemUrl = null;
+        String domainName = null;
+        String punycodeDomainName = null;
+        String expirationDate = null;
+        Boolean autoRenew = null;
 
         if ("littlePrinceItem".equals(itemTypeRaw)) {
             itemUrl = text(item, "itemUrl");
+        } else if ("domain".equals(itemTypeRaw)) {
+            domainName = text(item, "domain-name");
+            punycodeDomainName = text(item, "punycode-domain-name");
+            expirationDate = text(item, "expiration-date");
+            String autoRenewStr = text(item, "auto-renew");
+            if (autoRenewStr != null) {
+                String v = autoRenewStr.trim();
+                if ("true".equalsIgnoreCase(v)) autoRenew = true;
+                else if ("false".equalsIgnoreCase(v)) autoRenew = false;
+            }
         }
 
-        return new SearchResult(id, title, snippet, troveName, troveId, hasThumbnail, thumbnailUrl, largeImageUrl, files, itemType, itemUrl, rawSourceItem);
+        return new SearchResult(id, title, snippet, troveName, troveId, hasThumbnail, thumbnailUrl, largeImageUrl, files, itemType, itemUrl, domainName, punycodeDomainName, expirationDate, autoRenew, rawSourceItem);
     }
 
     private static boolean hasRealThumbnail(String thumbnailUrl) {

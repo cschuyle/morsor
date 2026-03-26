@@ -9,6 +9,10 @@ export interface SearchResultRow {
   largeImageUrl?: string | null
   itemUrl?: string | null
   rawSourceItem?: unknown
+  domainName?: string | null
+  punycodeDomainName?: string | null
+  expirationDate?: string | null
+  autoRenew?: boolean | null
   [key: string]: unknown
 }
 

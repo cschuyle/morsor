@@ -4,6 +4,7 @@ import java.util.List;
 
 public record SearchResult(
         String id,
+        String itemType,
         String title,
         String snippet,
         String trove,
@@ -12,6 +13,12 @@ public record SearchResult(
         String thumbnailUrl,
         String largeImageUrl,
         List<String> files,
-        String itemType,
+        // itemType Amazon wish list item - at least that's where it came from
         String itemUrl,
-        String rawSourceItem) {}
+        // itemType "domain"
+        String domainName,
+        String punycodeDomainName,
+        String expirationDate,
+        Boolean autoRenew,
+        String rawSourceItem
+) {}

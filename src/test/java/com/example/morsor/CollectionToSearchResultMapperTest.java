@@ -311,6 +311,7 @@ class CollectionToSearchResultMapperTest {
                 {
                   "domain": {
                     "domain-name": "example.com",
+                    "punycode-domain-name": "example.com",
                     "title": "example.com",
                     "expiration-date": "2026-12-31",
                     "auto-renew": "true"
@@ -331,6 +332,10 @@ class CollectionToSearchResultMapperTest {
         assertThat(results.get(0).itemUrl()).isNull();
         assertThat(results.get(0).thumbnailUrl()).isNull();
         assertThat(results.get(0).hasThumbnail()).isFalse();
+        assertThat(results.get(0).domainName()).isEqualTo("example.com");
+        assertThat(results.get(0).punycodeDomainName()).isEqualTo("example.com");
+        assertThat(results.get(0).expirationDate()).isEqualTo("2026-12-31");
+        assertThat(results.get(0).autoRenew()).isTrue();
     }
 
     @Test
