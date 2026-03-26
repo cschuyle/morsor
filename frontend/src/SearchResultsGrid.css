@@ -634,6 +634,33 @@
   border-radius: 8px;
 }
 
+/* List view: plain fixed tooltip near pointer (no emerge animation); gallery keeps animated tooltip */
+.search-results-list-url-tooltip {
+  position: fixed;
+  margin: 0;
+  z-index: 1000;
+  padding: 0.35rem 0.5rem;
+  max-width: min(90vw, 36rem);
+  word-break: break-all;
+  pointer-events: auto;
+  font-size: 0.8rem;
+  line-height: 1.35;
+  background: #f4f4f4;
+  color: #222;
+  border: 1px solid #c8c8c8;
+  border-radius: 4px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+}
+
+.search-results-list-url-tooltip a {
+  color: #6633cc;
+  text-decoration: underline;
+}
+
+.search-results-list-url-tooltip a:hover {
+  color: #5522aa;
+}
+
 .search-results-gallery-url-tooltip {
   position: absolute;
   padding: 0.5rem 0.6rem;

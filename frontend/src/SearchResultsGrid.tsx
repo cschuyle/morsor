@@ -47,7 +47,33 @@ function isPlaceholderThumb(url: unknown): boolean {
   return u === AMAZON_PLACEHOLDER_THUMB || u.includes('/no_image')
 }
 
-/** Viewport / grid-relative anchor for gallery and list URL tooltips (hover). */
+/** List view URL tooltip: place near pointer like a default OS/browser hint (offset from cursor, clamped to viewport). */
+function listUrlTooltipPositionFromPointer(clientX: number, clientY: number): { left: number; top: number } {
+  const offsetX = 10
+  const offsetY = 18
+  const margin = 8
+  const estHeight = 72
+  const maxWidth = 480
+  let left = clientX + offsetX
+  let top = clientY + offsetY
+  if (typeof window === 'undefined') {
+    return { left, top }
+  }
+  const vw = window.innerWidth
+  const vh = window.innerHeight
+  if (left + maxWidth > vw - margin) {
+    left = Math.max(margin, vw - margin - maxWidth)
+  } else {
+    left = Math.max(margin, left)
+  }
+  if (top + estHeight > vh - margin) {
+    top = Math.max(margin, clientY - estHeight - 8)
+  }
+  top = Math.max(margin, Math.min(top, vh - margin - estHeight))
+  return { left, top }
+}
+
+/** Viewport / grid-relative anchor for gallery URL tooltips (hover). */
 function getUrlTooltipAnchor(
   cardEl: HTMLElement,
   gridEl: HTMLElement | null,
@@ -375,9 +401,14 @@ export function SearchResultsGrid({ data, sortBy = null, sortDir = 'asc', onSort
   const [urlTooltipState, setUrlTooltipState] = useState<{ startX: number; startY: number; endX: number; endY: number; above: boolean; url: string } | null>(null)
   const urlTooltipLeaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const urlTooltipShowTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const [listUrlTooltipState, setListUrlTooltipState] = useState<{ startX: number; startY: number; endX: number; endY: number; above: boolean; url: string } | null>(null)
+  const [listUrlTooltipState, setListUrlTooltipState] = useState<{
+    left: number
+    top: number
+    url: string
+  } | null>(null)
   const listUrlTooltipLeaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const listUrlTooltipShowTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const listUrlPointerRef = useRef({ x: 0, y: 0 })
 
   const closeLightbox = useCallback(() => setLightbox(null), [])
   const closeRawSourceLightbox = useCallback(() => setRawSourceLightbox(null), [])
@@ -544,12 +575,10 @@ export function SearchResultsGrid({ data, sortBy = null, sortDir = 'asc', onSort
       )}
       {listUrlTooltipState && !showGallery && (
         <div
-          className={`search-results-gallery-url-tooltip search-results-gallery-url-tooltip--centered${listUrlTooltipState.above ? ' search-results-gallery-url-tooltip--above' : ' search-results-gallery-url-tooltip--below'}`}
+          className="search-results-list-url-tooltip"
           style={{
-            ['--tooltip-start-x' as string]: `${listUrlTooltipState.startX}px`,
-            ['--tooltip-start-y' as string]: `${listUrlTooltipState.startY}px`,
-            ['--tooltip-end-x' as string]: `${listUrlTooltipState.endX}px`,
-            ['--tooltip-end-y' as string]: `${listUrlTooltipState.endY}px`,
+            left: listUrlTooltipState.left,
+            top: listUrlTooltipState.top,
           }}
           onMouseEnter={() => {
             if (listUrlTooltipLeaveTimerRef.current) {
@@ -559,7 +588,6 @@ export function SearchResultsGrid({ data, sortBy = null, sortDir = 'asc', onSort
           }}
           onMouseLeave={() => setListUrlTooltipState(null)}
         >
-          Open{' '}
           <a
             href={listUrlTooltipState.url}
             target="_blank"
@@ -1035,8 +1063,14 @@ export function SearchResultsGrid({ data, sortBy = null, sortDir = 'asc', onSort
                     if (lb) setLightbox(lb)
                   }
                 }
+                const handleListUrlTooltipMove = listItemUrl
+                  ? (e: MouseEvent<HTMLTableRowElement>) => {
+                    listUrlPointerRef.current = { x: e.clientX, y: e.clientY }
+                  }
+                  : undefined
                 const handleListUrlTooltipEnter = listItemUrl
                   ? (e: MouseEvent<HTMLTableRowElement>) => {
+                    listUrlPointerRef.current = { x: e.clientX, y: e.clientY }
                     if (listUrlTooltipLeaveTimerRef.current) {
                       clearTimeout(listUrlTooltipLeaveTimerRef.current)
                       listUrlTooltipLeaveTimerRef.current = null
@@ -1045,12 +1079,13 @@ export function SearchResultsGrid({ data, sortBy = null, sortDir = 'asc', onSort
                       clearTimeout(listUrlTooltipShowTimerRef.current)
                       listUrlTooltipShowTimerRef.current = null
                     }
-                    const rowEl = e.currentTarget
                     listUrlTooltipShowTimerRef.current = setTimeout(() => {
-                      const anchor = getUrlTooltipAnchor(rowEl, gridRef.current, isMobile)
+                      const { x, y } = listUrlPointerRef.current
+                      const { left, top } = listUrlTooltipPositionFromPointer(x, y)
                       setListUrlTooltipState({
                         url: listItemUrl,
-                        ...anchor,
+                        left,
+                        top,
                       })
                     }, 500)
                   }
@@ -1072,6 +1107,7 @@ export function SearchResultsGrid({ data, sortBy = null, sortDir = 'asc', onSort
                     className="grid-row-double-clickable"
                     onClick={handleRowClick}
                     onMouseEnter={handleListUrlTooltipEnter}
+                    onMouseMove={handleListUrlTooltipMove}
                     onMouseLeave={handleListUrlTooltipLeave}
                   >
                     {row.getVisibleCells().map((cell) => (
