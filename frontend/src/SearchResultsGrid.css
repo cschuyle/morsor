@@ -419,29 +419,9 @@
   line-height: 1.45;
 }
 
-.search-thumb-lightbox-description-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.35rem 0.5rem;
-  justify-content: center;
-  align-items: baseline;
-}
-
-.search-thumb-lightbox-description-row + .search-thumb-lightbox-description-row {
-  margin-top: 0.25rem;
-}
-
-.search-thumb-lightbox-description-label {
-  color: rgba(255, 255, 255, 0.65);
-  font-weight: 500;
-}
-
-.search-thumb-lightbox-description-label::after {
-  content: ':';
-}
-
-.search-thumb-lightbox-description-value {
-  color: rgba(255, 255, 255, 0.92);
+.search-thumb-lightbox-description strong {
+  color: rgba(255, 255, 255, 0.96);
+  font-weight: 600;
 }
 
 .search-thumb-lightbox-footer {

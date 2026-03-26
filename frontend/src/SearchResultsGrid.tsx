@@ -649,18 +649,21 @@ export function SearchResultsGrid({ data, sortBy = null, sortDir = 'asc', onSort
                 if (!typeLabel && !troveLabel) return null
                 return (
                   <div className="search-thumb-lightbox-description">
-                    {typeLabel ? (
-                      <div className="search-thumb-lightbox-description-row">
-                        <span className="search-thumb-lightbox-description-label">Item type</span>
-                        <span className="search-thumb-lightbox-description-value">{typeLabel}</span>
-                      </div>
-                    ) : null}
-                    {troveLabel ? (
-                      <div className="search-thumb-lightbox-description-row">
-                        <span className="search-thumb-lightbox-description-label">Trove name</span>
-                        <span className="search-thumb-lightbox-description-value">{troveLabel}</span>
-                      </div>
-                    ) : null}
+                    {typeLabel && troveLabel ? (
+                      <>
+                        <strong>{typeLabel}</strong>
+                        {' from '}
+                        <strong>{troveLabel}</strong>
+                        {' trove'}
+                      </>
+                    ) : typeLabel ? (
+                      <strong>{typeLabel}</strong>
+                    ) : (
+                      <>
+                        <strong>{troveLabel}</strong>
+                        {' trove'}
+                      </>
+                    )}
                   </div>
                 )
               })()}
