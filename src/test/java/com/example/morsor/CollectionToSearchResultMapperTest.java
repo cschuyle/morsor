@@ -26,7 +26,7 @@ class CollectionToSearchResultMapperTest {
             assertThat(results.get(0).troveId()).isEqualTo("little-prince");
             assertThat(results.get(0).title()).isEqualTo("Princi i Vogël - The Little Prince in Albanian");
             assertThat(results.get(0).id()).isEqualTo("little-prince-0");
-            assertThat(results.get(1).id()).isEqualTo("PP-4277");
+            assertThat(results.get(1).id()).isEqualTo("little-prince-1");
             assertThat(results.get(1).title()).isEqualTo("The Little Prince, in Ancient Greek");
         }
     }
@@ -198,6 +198,7 @@ class CollectionToSearchResultMapperTest {
         assertThat(results.get(0).littlePrinceItemExtra()).isNull();
         assertThat(results.get(1).littlePrinceItemExtra()).isNotNull();
         assertThat(results.get(1).littlePrinceItemExtra()).containsEntry("author", "Antoine de Saint-Exupéry");
+        assertThat(results.get(1).littlePrinceItemExtra()).containsEntry("lpid", "PP-4277");
         assertThat(results.get(2).littlePrinceItemExtra()).isNull();
 
         // rawSourceItem: JSON items get pretty-printed multi-line JSON
@@ -210,7 +211,7 @@ class CollectionToSearchResultMapperTest {
 // fields mapped directly onto SearchResult
         assertThat(kitchenSink.files()).containsExactly("https://example.com/sample.pdf");
         assertThat(kitchenSink.hasThumbnail()).isTrue();
-        assertThat(kitchenSink.id()).isEqualTo("PP-4277");
+        assertThat(kitchenSink.id()).isEqualTo("test-trove-1");
         assertThat(kitchenSink.itemType()).isEqualTo("littlePrinceItem");
         assertThat(kitchenSink.itemUrl()).isNull();
         assertThat(kitchenSink.largeImageUrl()).isEqualTo("https://example.com/large2.jpg");

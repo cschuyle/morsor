@@ -27,7 +27,8 @@ public record SearchResult(
         Boolean autoRenew,
         /**
          * When {@code itemType} is {@code "littlePrinceItem"}, extra fields from the source object that are not
-         * already exposed as top-level properties (author, language, isbn, etc.). Null for other item types.
+         * already exposed as top-level properties (author, language, isbn, etc.). Includes {@code lpid} when present
+         * in source JSON (it is not {@link #id()}). Null for other item types.
          */
         Map<String, Object> littlePrinceItemExtra
 ) {}

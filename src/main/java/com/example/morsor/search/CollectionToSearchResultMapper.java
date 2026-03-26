@@ -28,10 +28,14 @@ public final class CollectionToSearchResultMapper {
     private static final String AMAZON_PLACEHOLDER_THUMB = "https://m.media-amazon.com/images/I/01RmK+J4pJL._SS135_.gif";
     private static final ObjectMapper PRETTY_MAPPER = new ObjectMapper().enable(SerializationFeature.INDENT_OUTPUT);
 
-    /** Keys already represented on {@link SearchResult} for little-prince items; omitted from {@code littlePrinceItemExtra}. */
+    /**
+     * Keys already represented on {@link SearchResult} for little-prince items, or otherwise omitted from {@code
+     * littlePrinceItemExtra}. Vendor-specific identifiers ({@code lpid}, {@code tintenfassId}, {@code asin}, etc.) are
+     * <strong>not</strong> listed here so they remain in {@code littlePrinceItemExtra} and must never be used as
+     * {@link SearchResult#id()}.
+     */
     private static final Set<String> LITTLE_PRINCE_TOP_LEVEL_KEYS = Set.of(
             "_itemType",
-            "lpid",
             "id",
             "display-title",
             "title",
@@ -142,10 +146,9 @@ public final class CollectionToSearchResultMapper {
     }
 
     private static SearchResult mapItemToSearchResult(JsonNode item, String rawSourceItem, String troveName, String troveId, int index) {
-        String id = text(item, "lpid");
-        if (id == null || id.isEmpty()) {
-            id = text(item, "id");
-        }
+        // SearchResult.id: ONLY the JSON property named exactly "id". Do not fall back to lpid, tintenfassId, or any
+        // other *Id field—those stay in littlePrinceItemExtra / raw JSON unless product owner approves otherwise.
+        String id = text(item, "id");
         if (id == null || id.isEmpty()) {
             id = troveId + "-" + index;
         }
@@ -175,6 +178,7 @@ public final class CollectionToSearchResultMapper {
         if ("littlePrinceItem".equals(itemTypeRaw)) {
             itemUrl = text(item, "itemUrl");
             littlePrinceItemExtra = buildLittlePrinceItemExtra(item);
+            littlePrinceItemExtra = mergeLpidIntoLittlePrinceItemExtra(item, littlePrinceItemExtra);
         } else if ("domain".equals(itemTypeRaw)) {
             domainName = text(item, "domain-name");
             punycodeDomainName = text(item, "punycode-domain-name");
@@ -188,6 +192,25 @@ public final class CollectionToSearchResultMapper {
         }
 
         return new SearchResult(id, itemType, title, snippet, troveName, troveId, hasThumbnail, thumbnailUrl, largeImageUrl, rawSourceItem, files, itemUrl, domainName, punycodeDomainName, expirationDate, autoRenew, littlePrinceItemExtra);
+    }
+
+    /**
+     * Ensures {@code lpid} from the source JSON is present in {@code littlePrinceItemExtra} when the field exists.
+     * It is not a {@link SearchResult#id()} and is not in {@link #LITTLE_PRINCE_TOP_LEVEL_KEYS}, so it normally appears
+     * via {@link #buildLittlePrinceItemExtra}; this merge guarantees it is never dropped if that set is edited.
+     */
+    private static Map<String, Object> mergeLpidIntoLittlePrinceItemExtra(JsonNode item, Map<String, Object> extra) {
+        if (item == null || !item.isObject()) {
+            return extra;
+        }
+        JsonNode lpidNode = item.get("lpid");
+        if (lpidNode == null || lpidNode.isNull()) {
+            return extra;
+        }
+        Object lpidVal = PRETTY_MAPPER.convertValue(lpidNode, Object.class);
+        Map<String, Object> out = extra != null ? new LinkedHashMap<>(extra) : new LinkedHashMap<>();
+        out.put("lpid", lpidVal);
+        return out;
     }
 
     /**
