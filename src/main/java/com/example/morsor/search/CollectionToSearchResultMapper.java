@@ -88,7 +88,7 @@ public final class CollectionToSearchResultMapper {
             String title = titleNode != null && titleNode.isTextual() ? titleNode.asText() : (titleNode != null ? titleNode.toString() : "");
             String rawSourceItem = toRawSourceItem(titleNode);
             String id = troveId != null && !troveId.isEmpty() ? troveId + "-" + i : "trove-" + i;
-            out.add(new SearchResult(id, title, title, troveName, troveId, false, null, null, List.of(), null, null, null, null, null, null, rawSourceItem));
+            out.add(new SearchResult(id, null, title, title, troveName, troveId, false, null, null, List.of(), null, null, null, null, null, rawSourceItem));
         }
     }
 
@@ -169,7 +169,7 @@ public final class CollectionToSearchResultMapper {
             }
         }
 
-        return new SearchResult(id, title, snippet, troveName, troveId, hasThumbnail, thumbnailUrl, largeImageUrl, files, itemType, itemUrl, domainName, punycodeDomainName, expirationDate, autoRenew, rawSourceItem);
+        return new SearchResult(id, itemType, title, snippet, troveName, troveId, hasThumbnail, thumbnailUrl, largeImageUrl, files, itemUrl, domainName, punycodeDomainName, expirationDate, autoRenew, rawSourceItem);
     }
 
     private static boolean hasRealThumbnail(String thumbnailUrl) {

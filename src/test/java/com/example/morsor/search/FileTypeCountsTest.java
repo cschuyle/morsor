@@ -11,10 +11,22 @@ class FileTypeCountsTest {
 
     private static SearchResult result(String id, List<String> files, String itemUrl) {
         return new SearchResult(
-                id, null, null, null, null,
-                false, null, null,
+                id,
+                null,
+                null,
+                null,
+                null,
+                null,
+                false,
+                null,
+                null,
                 files != null ? files : List.of(),
-                null, itemUrl, null);
+                itemUrl,
+                null,
+                null,
+                null,
+                null,
+                null);
     }
 
     private static SearchResultWithScore withScore(SearchResult result) {
