@@ -105,5 +105,14 @@ public class DevDataSeeder implements ApplicationRunner {
                 + "name VARCHAR(255), "
                 + "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, "
                 + "FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE)");
+        jdbc.execute("CREATE TABLE IF NOT EXISTS saved_queries ("
+                + "id BIGINT AUTO_INCREMENT PRIMARY KEY, "
+                + "user_id BIGINT NOT NULL, "
+                + "label VARCHAR(512) NOT NULL DEFAULT '', "
+                + "console_query CLOB NOT NULL, "
+                + "mode VARCHAR(32) NOT NULL DEFAULT 'search', "
+                + "summary VARCHAR(512), "
+                + "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, "
+                + "FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE)");
     }
 }

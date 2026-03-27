@@ -215,8 +215,9 @@ docker compose up -d
 
 ## Create schema and a user (once)
    ```bash
-   # Load the auth tables (run once)
+   # Load the auth tables (run once, or re-run after updates — uses IF NOT EXISTS)
    PGPASSWORD=morsor psql -h localhost -U morsor -d morsor -f src/main/resources/schema.sql
+   # Includes `saved_queries` for per-user queries saved from the History page.
 
    # Create a user (and optionally an API token)
    python3 scripts/create-user.py

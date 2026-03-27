@@ -2745,6 +2745,72 @@
   line-height: 1.35;
 }
 
-.history-cell-open {
+.history-cell-actions {
   white-space: nowrap;
+}
+
+.history-rerun-link {
+  font-weight: 600;
+  color: #6633cc;
+  text-decoration: none;
+}
+
+.history-rerun-link:hover {
+  text-decoration: underline;
+}
+
+.history-actions-sep {
+  color: #888;
+}
+
+.history-save-btn,
+.history-remove-saved-btn {
+  padding: 0;
+  border: none;
+  background: none;
+  font: inherit;
+  color: #6633cc;
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.history-save-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  text-decoration: none;
+}
+
+.history-remove-saved-btn {
+  color: #822;
+}
+
+.history-inline-error {
+  margin: 0.5rem 0 0;
+  color: #b00020;
+  font-size: 0.9rem;
+}
+
+.history-saved-section {
+  margin-top: 2.5rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid #e0e0e0;
+}
+
+.history-saved-heading {
+  margin: 0 0 0.35rem;
+  font-size: 1.35rem;
+  font-weight: 700;
+  color: #442266;
+}
+
+.history-saved-lead {
+  margin: 0 0 1rem;
+  line-height: 1.45;
+  color: #555;
+  max-width: 70ch;
+}
+
+.history-saved-status {
+  margin: 0;
+  color: #666;
 }

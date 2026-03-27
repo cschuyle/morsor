@@ -26,3 +26,16 @@ CREATE TABLE IF NOT EXISTS api_tokens (
 
 CREATE INDEX IF NOT EXISTS idx_api_tokens_token_hash ON api_tokens (token_hash);
 CREATE INDEX IF NOT EXISTS idx_api_tokens_user_id ON api_tokens (user_id);
+
+-- Saved query console URLs per user (History page "Save"; replay via same query string as local history).
+CREATE TABLE IF NOT EXISTS saved_queries (
+  id            BIGSERIAL PRIMARY KEY,
+  user_id       BIGINT NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+  label         VARCHAR(512) NOT NULL DEFAULT '',
+  console_query TEXT NOT NULL,
+  mode          VARCHAR(32) NOT NULL DEFAULT 'search',
+  summary       VARCHAR(512),
+  created_at    TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_saved_queries_user_created ON saved_queries (user_id, created_at DESC);
