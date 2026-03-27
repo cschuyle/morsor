@@ -18,17 +18,9 @@ public record SearchResult(
         // itemType Amazon wish list item - at least that's where it came from
         String itemUrl,
         /**
-         * The following four fields apply only when {@code itemType} is {@code "domain"} (Namecheap-style S3 JSON).
-         * They are null for other item types.
+         * Fields from the source item JSON that are not mapped onto this record (any {@code itemType}). For example
+         * author, language, isbn, {@code domain-name} / {@code expiration-date} for domains; vendor-specific ids
+         * ({@code lpid}, {@code tintenfassId}, etc.) stay here and must not be used as {@link #id()}. Null when empty.
          */
-        String domainName,
-        String punycodeDomainName,
-        String expirationDate,
-        Boolean autoRenew,
-        /**
-         * When {@code itemType} is {@code "littlePrinceItem"}, extra fields from the source object that are not
-         * already exposed as top-level properties (author, language, isbn, etc.). Includes {@code lpid} when present
-         * in source JSON (it is not {@link #id()}). Null for other item types.
-         */
-        Map<String, Object> littlePrinceItemExtra
+        Map<String, Object> extraFields
 ) {}

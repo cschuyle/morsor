@@ -11,11 +11,9 @@ export interface SearchResultRow {
   largeImageUrl?: string | null
   itemUrl?: string | null
   rawSourceItem?: unknown
-  domainName?: string | null
-  punycodeDomainName?: string | null
-  expirationDate?: string | null
-  autoRenew?: boolean | null
-  /** Present when itemType is littlePrinceItem: source fields not mapped to top-level props. */
+  /** Source fields not mapped to top-level props (any itemType). */
+  extraFields?: Record<string, unknown> | null
+  /** Legacy API name for {@link extraFields}; clients may still receive this until all caches expire. */
   littlePrinceItemExtra?: Record<string, unknown> | null
   [key: string]: unknown
 }
@@ -86,6 +84,8 @@ export interface LightboxPayload {
   otherFiles?: string[]
   itemUrl?: string | null
   rawSourceItem?: unknown
-  /** When present (e.g. littlePrinceItem), shown in the lightbox under the type/trove line. */
+  /** When present, shown in the lightbox under the type/trove line (all item types). */
+  extraFields?: Record<string, unknown> | null
+  /** Legacy; merged with {@link extraFields} when building lightbox lines. */
   littlePrinceItemExtra?: Record<string, unknown> | null
 }

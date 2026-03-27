@@ -14,6 +14,9 @@ import java.util.Map;
 import java.util.Set;
 import java.util.stream.StreamSupport;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 /**
  * Maps collection JSON into {@link SearchResult} for search. Supports:
  *
@@ -31,16 +34,18 @@ import java.util.stream.StreamSupport;
  *
  */
 public final class CollectionToSearchResultMapper {
+    private static final Logger log = LoggerFactory.getLogger(CollectionToSearchResultMapper.class);
+
     private static final String AMAZON_PLACEHOLDER_THUMB = "https://m.media-amazon.com/images/I/01RmK+J4pJL._SS135_.gif";
     private static final ObjectMapper PRETTY_MAPPER = new ObjectMapper().enable(SerializationFeature.INDENT_OUTPUT);
 
     /**
-     * Keys already represented on {@link SearchResult} for little-prince items, or otherwise omitted from {@code
-     * littlePrinceItemExtra}. Vendor-specific identifiers ({@code lpid}, {@code tintenfassId}, {@code asin}, etc.) are
-     * <strong>not</strong> listed here so they remain in {@code littlePrinceItemExtra} and must never be used as
+     * JSON property names mapped directly onto {@link SearchResult} (any item shape). Everything else is copied into
+     * {@link SearchResult#extraFields()}. Vendor-specific identifiers ({@code lpid}, {@code tintenfassId}, etc.) are
+     * <strong>not</strong> listed here so they remain in {@code extraFields} and must never be used as
      * {@link SearchResult#id()}.
      */
-    private static final Set<String> LITTLE_PRINCE_TOP_LEVEL_KEYS = Set.of(
+    private static final Set<String> MAPPED_ITEM_FIELD_KEYS = Set.of(
             "_itemType",
             "id",
             "display-title",
@@ -114,7 +119,7 @@ public final class CollectionToSearchResultMapper {
             String title = titleNode != null && titleNode.isTextual() ? titleNode.asText() : (titleNode != null ? titleNode.toString() : "");
             String rawSourceItem = toRawSourceItem(titleNode);
             String id = troveId != null && !troveId.isEmpty() ? troveId + "-" + i : "trove-" + i;
-            out.add(new SearchResult(id, null, title, title, troveName, troveId, false, null, null, rawSourceItem, List.of(), null, null, null, null, null, null));
+            out.add(new SearchResult(id, null, title, title, troveName, troveId, false, null, null, rawSourceItem, List.of(), null, null));
         }
     }
 
@@ -153,10 +158,20 @@ public final class CollectionToSearchResultMapper {
 
     private static SearchResult mapItemToSearchResult(JsonNode item, String rawSourceItem, String troveName, String troveId, int index) {
         // SearchResult.id: ONLY the JSON property named exactly "id". Do not fall back to lpid, tintenfassId, or any
-        // other *Id field—those stay in littlePrinceItemExtra / raw JSON unless product owner approves otherwise.
+        // other *Id field—those stay in extraFields / raw JSON unless product owner approves otherwise.
         String id = text(item, "id");
         if (id == null || id.isEmpty()) {
             id = troveId + "-" + index;
+        }
+
+        String itemTypeRaw = text(item, "_itemType");
+        if (!hasNonEmptyTitleProperty(item)) {
+            log.error(
+                    "Skipping item during import: required non-empty JSON property \"title\" is missing (troveId={} index={} itemType={})",
+                    troveId,
+                    index,
+                    itemTypeRaw != null ? itemTypeRaw : "(unknown)");
+            return null;
         }
 
         String title = text(item, "display-title");
@@ -172,40 +187,42 @@ public final class CollectionToSearchResultMapper {
         boolean hasThumbnail = hasRealThumbnail(thumbnailUrl);
         String largeImageUrl = text(item, "largeImageUrl");
         List<String> files = textArray(item, "files");
-        String itemTypeRaw = text(item, "_itemType");
         String itemType = itemTypeRaw;
         String itemUrl = null;
-        String domainName = null;
-        String punycodeDomainName = null;
-        String expirationDate = null;
-        Boolean autoRenew = null;
-        Map<String, Object> littlePrinceItemExtra = null;
 
         if ("littlePrinceItem".equals(itemTypeRaw)) {
             itemUrl = text(item, "itemUrl");
-            littlePrinceItemExtra = buildLittlePrinceItemExtra(item);
-            littlePrinceItemExtra = mergeLpidIntoLittlePrinceItemExtra(item, littlePrinceItemExtra);
-        } else if ("domain".equals(itemTypeRaw)) {
-            domainName = text(item, "domain-name");
-            punycodeDomainName = text(item, "punycode-domain-name");
-            expirationDate = text(item, "expiration-date");
-            String autoRenewStr = text(item, "auto-renew");
-            if (autoRenewStr != null) {
-                String v = autoRenewStr.trim();
-                if ("true".equalsIgnoreCase(v)) autoRenew = true;
-                else if ("false".equalsIgnoreCase(v)) autoRenew = false;
-            }
         }
 
-        return new SearchResult(id, itemType, title, snippet, troveName, troveId, hasThumbnail, thumbnailUrl, largeImageUrl, rawSourceItem, files, itemUrl, domainName, punycodeDomainName, expirationDate, autoRenew, littlePrinceItemExtra);
+        Map<String, Object> extraFields = buildExtraFields(item);
+        if ("littlePrinceItem".equals(itemTypeRaw)) {
+            extraFields = mergeLpidIntoExtraFields(item, extraFields);
+        }
+
+        return new SearchResult(id, itemType, title, snippet, troveName, troveId, hasThumbnail, thumbnailUrl, largeImageUrl, rawSourceItem, files, itemUrl, extraFields);
+    }
+
+    /** Import requires a JSON {@code title} string property (non-blank); {@code display-title} alone is not enough. */
+    private static boolean hasNonEmptyTitleProperty(JsonNode item) {
+        if (item == null || !item.isObject()) {
+            return false;
+        }
+        JsonNode t = item.get("title");
+        if (t == null || t.isNull()) {
+            return false;
+        }
+        if (t.isTextual()) {
+            return !t.asText().trim().isEmpty();
+        }
+        return t.isNumber() || t.isBoolean();
     }
 
     /**
-     * Ensures {@code lpid} from the source JSON is present in {@code littlePrinceItemExtra} when the field exists.
-     * It is not a {@link SearchResult#id()} and is not in {@link #LITTLE_PRINCE_TOP_LEVEL_KEYS}, so it normally appears
-     * via {@link #buildLittlePrinceItemExtra}; this merge guarantees it is never dropped if that set is edited.
+     * Ensures {@code lpid} from the source JSON is present in {@link SearchResult#extraFields()} when the field exists.
+     * It is not a {@link SearchResult#id()} and is not in {@link #MAPPED_ITEM_FIELD_KEYS}, so it normally appears via
+     * {@link #buildExtraFields}; this merge guarantees it is never dropped if that set is edited.
      */
-    private static Map<String, Object> mergeLpidIntoLittlePrinceItemExtra(JsonNode item, Map<String, Object> extra) {
+    private static Map<String, Object> mergeLpidIntoExtraFields(JsonNode item, Map<String, Object> extra) {
         if (item == null || !item.isObject()) {
             return extra;
         }
@@ -220,9 +237,9 @@ public final class CollectionToSearchResultMapper {
     }
 
     /**
-     * Remaining JSON properties for a little-prince item (everything not already mapped onto {@link SearchResult}).
+     * JSON properties not mapped onto {@link SearchResult} top-level fields (any {@code itemType}).
      */
-    private static Map<String, Object> buildLittlePrinceItemExtra(JsonNode item) {
+    private static Map<String, Object> buildExtraFields(JsonNode item) {
         if (item == null || !item.isObject()) {
             return null;
         }
@@ -230,7 +247,7 @@ public final class CollectionToSearchResultMapper {
         Iterator<Map.Entry<String, JsonNode>> it = item.fields();
         while (it.hasNext()) {
             Map.Entry<String, JsonNode> e = it.next();
-            if (LITTLE_PRINCE_TOP_LEVEL_KEYS.contains(e.getKey())) {
+            if (MAPPED_ITEM_FIELD_KEYS.contains(e.getKey())) {
                 continue;
             }
             Object javaVal = PRETTY_MAPPER.convertValue(e.getValue(), Object.class);

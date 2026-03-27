@@ -180,6 +180,7 @@ class CollectionToSearchResultMapperTest {
                   "movie": {
                     "title": "A Movie",
                     "year": "2020",
+                    "director": "Test Director",
                     "itemUrl": "https://example.com/movie"
                   }
                 }
@@ -195,11 +196,13 @@ class CollectionToSearchResultMapperTest {
         assertThat(results.get(1).itemUrl()).isNull();
         assertThat(results.get(2).itemType()).isEqualTo("movie");
         assertThat(results.get(2).itemUrl()).isNull();
-        assertThat(results.get(0).littlePrinceItemExtra()).isNull();
-        assertThat(results.get(1).littlePrinceItemExtra()).isNotNull();
-        assertThat(results.get(1).littlePrinceItemExtra()).containsEntry("author", "Antoine de Saint-Exupéry");
-        assertThat(results.get(1).littlePrinceItemExtra()).containsEntry("lpid", "PP-4277");
-        assertThat(results.get(2).littlePrinceItemExtra()).isNull();
+        assertThat(results.get(0).extraFields()).isNull();
+        assertThat(results.get(1).extraFields()).isNotNull();
+        assertThat(results.get(1).extraFields()).containsEntry("author", "Antoine de Saint-Exupéry");
+        assertThat(results.get(1).extraFields()).containsEntry("lpid", "PP-4277");
+        assertThat(results.get(2).extraFields()).isNotNull();
+        assertThat(results.get(2).extraFields()).containsEntry("year", "2020");
+        assertThat(results.get(2).extraFields()).containsEntry("director", "Test Director");
 
         // rawSourceItem: JSON items get pretty-printed multi-line JSON
         assertThat(results.get(0).rawSourceItem()).contains("littlePrinceItem");
@@ -337,11 +340,31 @@ class CollectionToSearchResultMapperTest {
         assertThat(results.get(0).itemUrl()).isNull();
         assertThat(results.get(0).thumbnailUrl()).isNull();
         assertThat(results.get(0).hasThumbnail()).isFalse();
-        assertThat(results.get(0).domainName()).isEqualTo("example.com");
-        assertThat(results.get(0).punycodeDomainName()).isEqualTo("example.com");
-        assertThat(results.get(0).expirationDate()).isEqualTo("2026-12-31");
-        assertThat(results.get(0).autoRenew()).isTrue();
-        assertThat(results.get(0).littlePrinceItemExtra()).isNull();
+        assertThat(results.get(0).extraFields()).isNotNull();
+        assertThat(results.get(0).extraFields()).containsEntry("domain-name", "example.com");
+        assertThat(results.get(0).extraFields()).containsEntry("punycode-domain-name", "example.com");
+        assertThat(results.get(0).extraFields()).containsEntry("expiration-date", "2026-12-31");
+        assertThat(results.get(0).extraFields()).containsEntry("auto-renew", "true");
+    }
+
+    @Test
+    void skipsItemsWithoutTitleProperty() throws Exception {
+        String json = """
+            {
+              "id": "t",
+              "shortName": "T",
+              "items": [
+                { "movie": { "title": "Kept", "year": "1999" } },
+                { "movie": { "year": "2000" } },
+                { "littlePrinceItem": { "display-title": "Only display", "title": "Has title" } }
+              ]
+            }
+            """;
+        JsonNode root = objectMapper.readTree(json);
+        List<SearchResult> results = CollectionToSearchResultMapper.mapRootToSearchResults(root);
+        assertThat(results).hasSize(2);
+        assertThat(results.get(0).title()).isEqualTo("Kept");
+        assertThat(results.get(1).title()).isEqualTo("Only display");
     }
 
     @Test

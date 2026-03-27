@@ -412,7 +412,47 @@ const textColumns = [
 ]
 
 /**
- * Build lightbox payload for any result row. Center image uses API largeImageUrl only (not thumbnail or file attachments).
+ * Extra field map from a search row: {@link SearchResultRow.extraFields} (current API) or legacy
+ * {@code littlePrinceItemExtra} so older responses and the lightbox/tooltips stay in sync.
+ */
+function extraFieldsFromRow(row: SearchResultRow | undefined | null): Record<string, unknown> | null {
+  if (!row) {
+    return null
+  }
+  const asRecord = (v: unknown): Record<string, unknown> | null =>
+    v != null && typeof v === 'object' && !Array.isArray(v) ? (v as Record<string, unknown>) : null
+  return asRecord(row.extraFields) ?? asRecord((row as Record<string, unknown>).littlePrinceItemExtra)
+}
+
+/** Extra map for lightbox / tooltips (supports legacy field on the payload). */
+function extraFieldsFromLightboxPayload(lb: LightboxPayload): Record<string, unknown> | null {
+  const asRecord = (v: unknown): Record<string, unknown> | null =>
+    v != null && typeof v === 'object' && !Array.isArray(v) ? (v as Record<string, unknown>) : null
+  const rawExtra: unknown = lb.extraFields
+  const fromPrimary = asRecord(rawExtra)
+  if (fromPrimary) {
+    return fromPrimary
+  }
+  const legacy = asRecord((lb as Record<string, unknown>).littlePrinceItemExtra)
+  if (legacy) {
+    return legacy
+  }
+  if (typeof rawExtra === 'string') {
+    const t = rawExtra.trim()
+    if (t.startsWith('{') || t.startsWith('[')) {
+      try {
+        const parsed: unknown = JSON.parse(t)
+        return asRecord(parsed)
+      } catch {
+        return null
+      }
+    }
+  }
+  return null
+}
+
+/**
+ * Build lightbox payload for any result row. Center image prefers {@link SearchResultRow.largeImageUrl}, then a non-placeholder {@link SearchResultRow.thumbnailUrl}.
  * Always returns a payload when the row is present so the lightbox can open even with no media.
  */
 function rowToLightboxPayload(row: SearchResultRow | undefined | null): LightboxPayload | null {
@@ -427,7 +467,14 @@ function rowToLightboxPayload(row: SearchResultRow | undefined | null): Lightbox
   const otherFiles = files.filter((u) => typeof u === 'string' && !known.has(u))
   const largeUrl =
     row.largeImageUrl && String(row.largeImageUrl).trim() ? String(row.largeImageUrl).trim() : null
-  const imageUrl: string | null = largeUrl
+  const thumbCandidate =
+    row.thumbnailUrl && String(row.thumbnailUrl).trim() ? String(row.thumbnailUrl).trim() : null
+  const imageUrl: string | null =
+    largeUrl != null
+      ? largeUrl
+      : thumbCandidate != null && !isPlaceholderThumb(thumbCandidate)
+        ? thumbCandidate
+        : null
 
   const itemUrl = row.itemUrl && String(row.itemUrl).trim() ? row.itemUrl.trim() : null
 
@@ -447,10 +494,7 @@ function rowToLightboxPayload(row: SearchResultRow | undefined | null): Lightbox
     itemType,
     trove: troveName,
     title: row.title ?? '',
-    littlePrinceItemExtra:
-      row.littlePrinceItemExtra != null && typeof row.littlePrinceItemExtra === 'object'
-        ? row.littlePrinceItemExtra
-        : null,
+    extraFields: extraFieldsFromRow(row),
   }
 }
 
@@ -542,10 +586,9 @@ function thumbnailColumnDef(
       const hasThumbnailImage = isLittlePrince && url && !showLinkIconInsteadOfThumb
       const showNonLpThumb = !isLittlePrince && url && String(url).trim() && !thumbIsPlaceholder
       const fileTypeTooltip = getFileTypeTooltip(pdfs, imageUrls, ebooks, videos, audios, otherFiles, itemUrl, !!largeUrl)
-      const lpLines = isLittlePrince
-        ? formatLittlePrinceExtraLines(row?.littlePrinceItemExtra as Record<string, unknown> | undefined)
-        : []
-      const lpExtraPlain = formatLittlePrinceExtraTooltip(row?.littlePrinceItemExtra as Record<string, unknown> | undefined)
+      const rowExtras = extraFieldsFromRow(row)
+      const lpLines = formatLittlePrinceExtraLines(rowExtras ?? undefined)
+      const lpExtraPlain = formatLittlePrinceExtraTooltip(rowExtras ?? undefined)
       const payload = rowToLightboxPayload(row)
       const linkIcon = (
         <span className="search-thumb-link-icon" aria-hidden="true">
@@ -932,7 +975,7 @@ export function SearchResultsGrid({ data, sortBy = null, sortDir = 'asc', onSort
           : rawSourceContent
       })()}
       {lightbox && (() => {
-        const lpExtraLines = formatLittlePrinceExtraLines(lightbox.littlePrinceItemExtra)
+        const lpExtraLines = formatLittlePrinceExtraLines(extraFieldsFromLightboxPayload(lightbox) ?? undefined)
         const hasLpExtra = lpExtraLines.length > 0
         const hasLightboxImage = Boolean(lightbox.imageUrl && String(lightbox.imageUrl).trim())
         const desktopLpExtraBesideImage = !isMobile && hasLpExtra && hasLightboxImage
@@ -1169,11 +1212,9 @@ export function SearchResultsGrid({ data, sortBy = null, sortDir = 'asc', onSort
                 setRawSourceLightbox({ title, rawSourceItem: rawSourceDisplay(rawSourceItem) })
               }
               const showUrlTooltip = payload?.itemUrl && !payload?.imageUrl
-              const lpLines =
-                row?.itemType === 'littlePrinceItem'
-                  ? formatLittlePrinceExtraLines(row.littlePrinceItemExtra as Record<string, unknown> | undefined)
-                  : []
-              const lpExtraPlain = formatLittlePrinceExtraTooltip(row.littlePrinceItemExtra as Record<string, unknown> | undefined)
+              const rowExtras = extraFieldsFromRow(row)
+              const lpLines = formatLittlePrinceExtraLines(rowExtras ?? undefined)
+              const lpExtraPlain = formatLittlePrinceExtraTooltip(rowExtras ?? undefined)
               const galleryCardTitle =
                 showUrlTooltip
                   ? undefined
@@ -1413,8 +1454,8 @@ export function SearchResultsGrid({ data, sortBy = null, sortDir = 'asc', onSort
                 const listItemUrl =
                   rowData?.itemUrl && String(rowData.itemUrl).trim() ? String(rowData.itemUrl).trim() : null
                 const listRowLpLines =
-                  rowData?.itemType === 'littlePrinceItem' && !listItemUrl
-                    ? formatLittlePrinceExtraLines(rowData.littlePrinceItemExtra as Record<string, unknown> | undefined)
+                  !listItemUrl
+                    ? formatLittlePrinceExtraLines(extraFieldsFromRow(rowData) ?? undefined)
                     : []
                 const handleRowClick = () => {
                   const now = Date.now()

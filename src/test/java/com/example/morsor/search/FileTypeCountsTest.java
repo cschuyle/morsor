@@ -23,10 +23,6 @@ class FileTypeCountsTest {
                 null,
                 files != null ? files : List.of(),
                 itemUrl,
-                null,
-                null,
-                null,
-                null,
                 null);
     }
 
