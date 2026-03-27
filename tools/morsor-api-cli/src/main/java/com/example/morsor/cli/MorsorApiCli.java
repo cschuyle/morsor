@@ -49,7 +49,7 @@ public final class MorsorApiCli {
         int i = 0;
         while (i < args.length) {
             String a = args[i];
-            if (a.equals("-h") || a.equals("--help") || a.equals("help")) {
+            if (a.equals("-h") || a.equals("--man") || a.equals("--help") || a.equals("help")) {
                 printUsageAndExit(0);
             }
             if (a.equals("-b") || a.equals("--base")) {
@@ -96,7 +96,8 @@ public final class MorsorApiCli {
                 continue;
             }
             if (a.startsWith("-")) {
-                die("unknown option: " + a);
+                // Command-level shorthand flags like --q/--p begin here.
+                break;
             }
             break;
         }
@@ -134,36 +135,50 @@ public final class MorsorApiCli {
             return;
         }
 
-        String method = args[i++].toUpperCase(Locale.ROOT);
-        if (!method.equals("GET") && !method.equals("POST") && !method.equals("HEAD")) {
-            die("method must be GET, POST, or HEAD, or use login, got: " + method);
-        }
-        if (i >= args.length) {
-            die("missing path");
-        }
-        String path = args[i++];
-        if (path.startsWith("http://") || path.startsWith("https://")) {
-            die("path must be relative (e.g. /api/status), not a full URL");
-        }
-        if (!path.startsWith("/")) {
-            path = "/" + path;
-        }
-
+        String method;
+        String path;
         String query = "";
-        if (i < args.length) {
-            if (args[i].equals("--")) {
-                i++;
-                StringBuilder sb = new StringBuilder();
-                while (i < args.length) {
-                    if (sb.length() > 0) {
-                        sb.append('&');
-                    }
-                    sb.append(args[i++]);
-                }
-                query = sb.toString();
-            } else {
-                die("unexpected arguments after path (use -- for query string)");
+
+        String first = args[i];
+        if (isHttpMethod(first)) {
+            method = args[i++].toUpperCase(Locale.ROOT);
+            if (i >= args.length) {
+                die("missing path");
             }
+            path = args[i++];
+            if (path.startsWith("http://") || path.startsWith("https://")) {
+                die("path must be relative (e.g. /api/status), not a full URL");
+            }
+            if (!path.startsWith("/")) {
+                path = "/" + path;
+            }
+
+            if (i < args.length) {
+                if (args[i].equals("--")) {
+                    i++;
+                    StringBuilder sb = new StringBuilder();
+                    while (i < args.length) {
+                        if (sb.length() > 0) {
+                            sb.append('&');
+                        }
+                        sb.append(args[i++]);
+                    }
+                    query = sb.toString();
+                } else {
+                    die("unexpected arguments after path (use -- for query string)");
+                }
+            }
+        } else {
+            ActionSpec action = resolveActionSpec(first);
+            if (action != null) {
+                method = action.method;
+                path = action.path;
+                i++;
+            } else {
+                method = "GET";
+                path = "/api/search";
+            }
+            query = parseShorthandQuery(args, i);
         }
 
         if (bodyFile != null && !method.equals("POST")) {
@@ -427,6 +442,153 @@ public final class MorsorApiCli {
         return s;
     }
 
+    private static boolean isHttpMethod(String s) {
+        String m = s.toUpperCase(Locale.ROOT);
+        return m.equals("GET") || m.equals("POST") || m.equals("HEAD");
+    }
+
+    private static ActionSpec resolveActionSpec(String token) {
+        String t = token.toLowerCase(Locale.ROOT);
+        if (t.endsWith(":")) {
+            t = t.substring(0, t.length() - 1);
+        }
+        return switch (t) {
+            case "troves" -> new ActionSpec("GET", "/api/troves");
+            case "status" -> new ActionSpec("GET", "/api/status");
+            case "search" -> new ActionSpec("GET", "/api/search");
+            case "dups", "duplicates", "dupliicates" -> new ActionSpec("GET", "/api/search/duplicates");
+            case "unique", "uniques" -> new ActionSpec("GET", "/api/search/uniques");
+            default -> null;
+        };
+    }
+
+    private static String parseShorthandQuery(String[] args, int startIdx) {
+        List<QueryParam> params = new ArrayList<>();
+        List<String> nakedTerms = new ArrayList<>();
+        int i = startIdx;
+        while (i < args.length) {
+            String a = args[i];
+            if (a.equals("--man") || a.equals("--help") || a.equals("-h") || a.equals("help")) {
+                printUsageAndExit(0);
+            }
+            if (a.equals("--")) {
+                i++;
+                while (i < args.length) {
+                    String raw = args[i++];
+                    int eq = raw.indexOf('=');
+                    if (eq <= 0) {
+                        die("raw query items after -- must be key=value, got: " + raw);
+                    }
+                    params.add(new QueryParam(raw.substring(0, eq), raw.substring(eq + 1)));
+                }
+                break;
+            }
+            if (a.startsWith("--")) {
+                String nameValue = a.substring(2);
+                if (nameValue.isEmpty()) {
+                    die("empty parameter name: " + a);
+                }
+                String key;
+                String value;
+                int eq = nameValue.indexOf('=');
+                if (eq >= 0) {
+                    key = nameValue.substring(0, eq);
+                    value = nameValue.substring(eq + 1);
+                } else {
+                    key = nameValue;
+                    if (i + 1 >= args.length) {
+                        die("missing value for --" + key);
+                    }
+                    value = args[++i];
+                }
+                addShorthandParam(params, key, value);
+            } else if (a.startsWith("-")) {
+                die("unknown parameter: " + a + " (use --man for usage)");
+            } else {
+                nakedTerms.add(a);
+            }
+            i++;
+        }
+        if (!nakedTerms.isEmpty()) {
+            addOrAppendQuery(params, String.join(" ", nakedTerms));
+        }
+        return encodeQuery(params);
+    }
+
+    private static void addShorthandParam(List<QueryParam> params, String key, String value) {
+        String k = mapShorthandKey(key);
+        if (k.equals("trove")) {
+            String[] parts = value.split(",");
+            for (String p : parts) {
+                String trimmed = p.trim();
+                if (!trimmed.isEmpty()) {
+                    params.add(new QueryParam("trove", trimmed));
+                }
+            }
+            return;
+        }
+        params.add(new QueryParam(k, value));
+    }
+
+    private static String mapShorthandKey(String key) {
+        return switch (key) {
+            case "q" -> "query";
+            case "p", "primary" -> "primaryTrove";
+            case "c", "compare" -> "compareTrove";
+            case "P", "page" -> "page";
+            case "S", "pageSize", "size" -> "size";
+            case "s", "sortBy" -> "sortBy";
+            case "d", "sortDir" -> "sortDir";
+            case "t", "trove" -> "trove";
+            default -> key;
+        };
+    }
+
+    private static void addOrAppendQuery(List<QueryParam> params, String value) {
+        for (int j = 0; j < params.size(); j++) {
+            QueryParam p = params.get(j);
+            if (p.key.equals("query")) {
+                params.set(j, new QueryParam("query", p.value + " " + value));
+                return;
+            }
+        }
+        params.add(new QueryParam("query", value));
+    }
+
+    private static String encodeQuery(List<QueryParam> params) {
+        if (params.isEmpty()) {
+            return "";
+        }
+        StringBuilder sb = new StringBuilder();
+        for (QueryParam p : params) {
+            if (sb.length() > 0) {
+                sb.append('&');
+            }
+            sb.append(urlEncode(p.key)).append('=').append(urlEncode(p.value));
+        }
+        return sb.toString();
+    }
+
+    private static final class ActionSpec {
+        final String method;
+        final String path;
+
+        ActionSpec(String method, String path) {
+            this.method = method;
+            this.path = path;
+        }
+    }
+
+    private static final class QueryParam {
+        final String key;
+        final String value;
+
+        QueryParam(String key, String value) {
+            this.key = key;
+            this.value = value;
+        }
+    }
+
     private static void printRequestDebug(HttpRequest request) {
         System.err.println("[debug] request: " + request.method() + " " + request.uri());
         request.headers().map().forEach((name, values) -> {
@@ -494,6 +656,7 @@ public final class MorsorApiCli {
                 USAGE
                   morsor-api-cli [OPTIONS] login
                   morsor-api-cli [OPTIONS] [<baseUrl>] <METHOD> <path> [-- <query>]
+                  morsor-api-cli [OPTIONS] [<baseUrl>] [<action>] [--<key> <value> ...] [naked query text]
 
                 OPTIONS
                   -b, --base URL     Base URL without trailing slash (default: http://localhost:8080)
@@ -504,7 +667,7 @@ public final class MorsorApiCli {
                   -d, --data FILE    POST body from FILE (POST only; default Content-Type: application/json)
                   -i, --include-headers  Print response status line and headers before body
                   -v, --debug        Print request and response diagnostics to stderr
-                  -h, --help         Show this message
+                  -h, --man, --help  Show this message
 
                 login
                   Prompts for username and password (password is not echoed). Performs form login against
@@ -517,12 +680,26 @@ public final class MorsorApiCli {
                 METHOD
                   GET | POST | HEAD
 
+                action (shorthand)
+                  troves                -> GET /api/troves
+                  status                -> GET /api/status
+                  search                -> GET /api/search
+                  dups | duplicates | dupliicates -> GET /api/search/duplicates
+                  unique | uniques      -> GET /api/search/uniques
+                  If no METHOD and no action are provided, defaults to search.
+
                 path
                   Must start with /. Examples: /api/status, /actuator/health
 
                 query
                   Optional, after --. Raw query string, e.g. query=*&page=0&size=10
                   (repeat trove= for multiple troves: trove=a&trove=b)
+                  For shorthand/default-search mode, you can pass params as:
+                    --KEY VALUE   or   --KEY=VALUE
+                  Key aliases:
+                    --q query, --p primaryTrove, --c compareTrove, --P page, --S size,
+                    --s sortBy, --d sortDir, --t trove (comma-separated values supported)
+                  Naked params (without --KEY) are treated as query text.
 
                 AUTHENTICATION
                   Most /api/** endpoints require a logged-in session or API token.
@@ -567,8 +744,12 @@ public final class MorsorApiCli {
 
                 EXAMPLES
 
+                  ./scripts/morsor-api --help
                   ./scripts/morsor-api http://localhost:8080 login
                   ./scripts/morsor-api -v -b http://localhost:8080 GET /api/search -- 'query=*&page=0&size=10'
+                  ./scripts/morsor-api alien
+                  ./scripts/morsor-api search --q alien --P 0 --S 10
+                  ./scripts/morsor-api dups --p my-trove --c other-trove --q alien
                   ./scripts/morsor-api GET /actuator/health
                   ./scripts/morsor-api https://example.com GET /actuator/health
                   ./scripts/morsor-api -t "$MORSOR_CLI_TOKEN" GET /api/status
