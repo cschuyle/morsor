@@ -41,9 +41,39 @@ function formatItemTypeForLightbox(value: unknown): string {
   return spaced.charAt(0).toUpperCase() + spaced.slice(1)
 }
 
+/** One entry when a field value is an array: comma + space between items; no JSON quotes around strings. */
+function formatLittlePrinceListItem(item: unknown): string {
+  if (item === null || item === undefined) {
+    return ''
+  }
+  if (typeof item === 'string') {
+    return item
+  }
+  if (typeof item === 'number' || typeof item === 'boolean') {
+    return String(item)
+  }
+  if (typeof item === 'bigint') {
+    return String(item)
+  }
+  if (Array.isArray(item)) {
+    return item.map(formatLittlePrinceListItem).filter((s) => s !== '').join(', ')
+  }
+  if (typeof item === 'object') {
+    try {
+      return JSON.stringify(item)
+    } catch {
+      return String(item)
+    }
+  }
+  return String(item)
+}
+
 function formatLittlePrinceExtraValue(value: unknown): string {
   if (value === null || value === undefined) {
     return ''
+  }
+  if (Array.isArray(value)) {
+    return value.map(formatLittlePrinceListItem).filter((s) => s !== '').join(', ')
   }
   if (typeof value === 'string') {
     return value
