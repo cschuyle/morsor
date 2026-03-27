@@ -400,53 +400,52 @@
   padding-top: 0.15rem;
 }
 
-/* Do not stretch the row to fill leftover column height (keeps extra-metadata box at the top). */
-.search-thumb-lightbox-content--lp-extra-beside-image .search-thumb-lightbox-image-and-extra {
+/* Single panel: image | gap (padding) | extra; same height columns, no stray tooltip max-height. */
+.search-thumb-lightbox-content--lp-extra-beside-image .search-thumb-lightbox-media-panel {
   flex: 0 1 auto;
 }
 
-.search-thumb-lightbox-image-and-extra {
+.search-thumb-lightbox-media-panel {
   display: flex;
   flex-direction: row;
   align-items: stretch;
-  justify-content: center;
-  gap: 1.5rem;
-  width: 100%;
-  max-width: min(100%, 100vw - 2rem);
+  box-sizing: border-box;
   flex: 1 1 auto;
   min-height: 0;
+  max-width: min(100%, 100vw - 2rem);
   margin-bottom: 0.65rem;
-  box-sizing: border-box;
+  padding: 0.75rem 1rem;
+  gap: 1.5rem;
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
 }
 
-.search-thumb-lightbox-image-cell {
+.search-thumb-lightbox-media-panel-image {
   flex: 0 1 auto;
   min-width: 0;
-  min-height: 0;
   display: flex;
   flex-direction: column;
   justify-content: flex-start;
   align-items: center;
 }
 
-.search-thumb-lightbox-image-and-extra .search-thumb-lightbox-image-cell img {
+.search-thumb-lightbox-media-panel-image img {
   max-width: 100%;
   max-height: min(78vh, calc(100vh - 11rem));
   width: auto;
   height: auto;
   object-fit: contain;
+  display: block;
 }
 
-.search-results-lp-extra-tooltip--in-lightbox--beside-image {
+.search-thumb-lightbox-media-panel-extra {
   flex: 0 1 auto;
-  width: auto;
   min-width: min(14rem, 32vw);
   max-width: min(40ch, 36vw);
   min-height: 0;
-  align-self: stretch;
-  margin: 0;
-  overflow-x: hidden;
-  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
 }
 
 .search-thumb-lightbox-content img {
@@ -454,6 +453,10 @@
   /* Leave room for the title, optional meta lines, and footer below */
   max-height: calc(100% - 6rem);
   object-fit: contain;
+}
+
+.search-thumb-lightbox-content .search-thumb-lightbox-media-panel-image img {
+  max-height: min(78vh, calc(100vh - 11rem));
 }
 
 .search-thumb-lightbox-title {
@@ -734,6 +737,25 @@
   max-width: min(60ch, calc(100% - 4rem));
   max-height: min(38vh, 18rem);
   align-self: center;
+}
+
+/*
+ * Column beside the image: override .search-results-lp-extra-tooltip max-height/overflow/padding
+ * (defined earlier for the hover popup) so we match the image column height and only scroll when needed.
+ */
+.search-thumb-lightbox-media-panel-extra .search-results-lp-extra-tooltip--in-lightbox--beside-image {
+  flex: 1 1 auto;
+  align-self: stretch;
+  width: 100%;
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+  max-height: none;
+  max-width: none;
+  margin: 0;
+  padding: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
 }
 
 .search-results-lp-extra-tooltip--in-lightbox .search-results-lp-extra-tooltip-line strong {

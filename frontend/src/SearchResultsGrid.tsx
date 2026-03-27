@@ -955,12 +955,14 @@ export function SearchResultsGrid({ data, sortBy = null, sortDir = 'asc', onSort
                 )
               })()}
               {desktopLpExtraBesideImage ? (
-                <div className="search-thumb-lightbox-image-and-extra">
-                  <div className="search-thumb-lightbox-image-cell">
+                <div className="search-thumb-lightbox-media-panel">
+                  <div className="search-thumb-lightbox-media-panel-image">
                     <img src={lightbox.imageUrl!} alt="" />
                   </div>
-                  <div className="search-results-lp-extra-tooltip search-results-lp-extra-tooltip--in-lightbox search-results-lp-extra-tooltip--in-lightbox--beside-image">
-                    <LittlePrinceExtraLinesRich lines={lpExtraLines} />
+                  <div className="search-thumb-lightbox-media-panel-extra">
+                    <div className="search-results-lp-extra-tooltip search-results-lp-extra-tooltip--in-lightbox search-results-lp-extra-tooltip--in-lightbox--beside-image">
+                      <LittlePrinceExtraLinesRich lines={lpExtraLines} />
+                    </div>
                   </div>
                 </div>
               ) : (
