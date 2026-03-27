@@ -48,7 +48,6 @@ public final class MorsorApiCli {
         }
         List<String> extraHeaders = new ArrayList<>();
         String base = "http://localhost:8080";
-        boolean baseFromOption = false;
         String bearerToken = null;
         String bodyFile = null;
         String outputMode = "text";
@@ -69,11 +68,10 @@ public final class MorsorApiCli {
                     die("missing value for " + a);
                 }
                 base = stripTrailingSlash(args[++idx]);
-                baseFromOption = true;
                 idx++;
                 continue;
             }
-            if (a.equals("-t") || a.equals("--token")) {
+            if (a.equals("-T") || a.equals("--token")) {
                 if (idx + 1 >= args.length) {
                     die("missing value for " + a);
                 }
@@ -89,7 +87,7 @@ public final class MorsorApiCli {
                 idx++;
                 continue;
             }
-            if (a.equals("-d") || a.equals("--data")) {
+            if (a.equals("-F") || a.equals("--file")) {
                 if (idx + 1 >= args.length) {
                     die("missing value for " + a);
                 }
@@ -128,18 +126,13 @@ public final class MorsorApiCli {
         }
 
         int i = 0;
-        if (i < positional.size()) {
-            String maybeBase = positional.get(i);
-            if (maybeBase.startsWith("http://") || maybeBase.startsWith("https://")) {
-                if (baseFromOption) {
-                    die("use either -b/--base or a leading base URL, not both");
-                }
-                base = stripTrailingSlash(maybeBase);
-                i++;
-            }
-        }
         if (i >= positional.size()) {
             printUsageAndExit(0);
+        }
+
+        String envBase = System.getenv("MORSOR_CLI_BASE_URL");
+        if (envBase != null && !envBase.isBlank()) {
+            base = stripTrailingSlash(envBase.trim());
         }
 
         if (positional.get(i).equalsIgnoreCase("login")) {
@@ -645,7 +638,25 @@ public final class MorsorApiCli {
                 }
                 addShorthandParam(params, key, value);
             } else if (a.startsWith("-")) {
-                die("unknown parameter: " + a + " (use --man for usage)");
+                // Single-dash shorthand, e.g. -q alien or -q=alien.
+                String nameValue = a.substring(1);
+                if (nameValue.isEmpty()) {
+                    die("unknown parameter: " + a + " (use --man for usage)");
+                }
+                String key;
+                String value;
+                int eq = nameValue.indexOf('=');
+                if (eq >= 0) {
+                    key = nameValue.substring(0, eq);
+                    value = nameValue.substring(eq + 1);
+                } else {
+                    key = nameValue;
+                    if (i + 1 >= args.length) {
+                        die("missing value for -" + key);
+                    }
+                    value = args[++i];
+                }
+                addShorthandParam(params, key, value);
             } else {
                 nakedTerms.add(a);
             }
@@ -800,38 +811,51 @@ public final class MorsorApiCli {
     static String summaryUsage() {
         return """
                 USAGE SUMMARY
-                  morsor-cli [OPTIONS] login
-                  morsor-cli [OPTIONS] [<baseUrl>] [<action>] [--<key> <value> ...] [naked query text]
+                  
+                  morsor-cli --help      # Short usage message (this message)
+                  morsor-cli --man       # Full manual page
 
-                HELP
-                  -h, --help  Show this summary
-                  --man        Show full manual
-                  -o, --output json|text|txt  Response output format (default: txt)
+                  morsor-cli [OPTIONS] login
+                      Prompts for username/password and Generates a login token. Then, tells you where to put it:
+                      export MORSOR_CLI_TOKEN='...'
+
+                  morsor-cli [OPTIONS] [<action>] [--<key> <value> ...] [query text]
 
                 ACTIONS
-                  troves                -> GET /api/troves
-                  status                -> GET /api/status
-                  search                -> GET /api/search
-                  dups | duplicates | dupliicates -> GET /api/search/duplicates
-                  unique | uniques      -> GET /api/search/uniques
-                  default (no action): search
 
-                SHORTHAND PARAMS
-                  --KEY VALUE   or   --KEY=VALUE
-                  --q query, --p primaryTrove, --c compareTrove, --P page, --S size,
-                  --s sortBy, --d sortDir, --t trove (comma-separated values supported)
-                  Naked params are treated as query text.
+                  search                           Search troves. This is the default.
+                  dups | duplicates | dupliicates  Search for duplicates.
+                  unique | uniques                 Search for unique items within a trove.
 
-                LOGIN
-                  Prompts for username/password and prints:
-                    export MORSOR_CLI_TOKEN='...'
+                  troves                           Get list of troves
+                  status                           Get server status
+                  
+                OPTIONS
 
+                        -o, --output json|text|txt  Response output format (default: txt)
+                    
+                    ENV:
+                        MORSOR_CLI_BASE_URL env var overrides -b/--base when set
+
+                    --KEY VALUE / --KEY=VALUE, or -k VALUE / -k=VALUE for single-char keys (e.g. -q query)
+
+                    Options for action = search: 
+                        -q --query : Query text (multiple space-delimited words OK).
+                                     NOTE: You can use the named parameter or not - ONLY for this option.
+                      Paging, sorting:
+                        -P --page : Page number (0-based)
+                        -S --size : Page size (default: 10)
+                        -s --sortBy : Sort by field (default: score)
+                        -d --sortDir : Sort direction (asc or desc; default: desc) 
+                        -t --trove : Comma-separated list of trove IDs (use trove IDs, not names)
+                
+                    Options for action = duplicates / uniques:
+                        -p --primaryTrove : Primary trove ID (use trove ID, not name)
+                        -c --compareTrove : Comma-separated list of trove IDs (use trove IDs, not names)
+            
                 EXAMPLES
-                  morsor-cli --help
-                  morsor-cli --man
                   morsor-cli alien
-                  morsor-cli search --q alien --P 0 --S 10
-                  morsor-cli login
+                  morsor-cli search -q alien -P 0 -S 10
                 """;
     }
 
@@ -840,22 +864,24 @@ public final class MorsorApiCli {
         return """
                 USAGE
                   morsor-cli [OPTIONS] login
-                  morsor-cli [OPTIONS] [<baseUrl>] <METHOD> <path> [-- <query>]
-                  morsor-cli [OPTIONS] [<baseUrl>] [<action>] [--<key> <value> ...] [naked query text]
+                  morsor-cli [OPTIONS] <METHOD> <path> [-- <query>]
+                  morsor-cli [OPTIONS] [<action>] [--<key> <value> ...] [query text]
 
                 OPTIONS
                   -b, --base URL     Base URL without trailing slash (default: http://localhost:8080)
-                                     (same as optional leading <baseUrl> http:// or https:// …; do not use both)
-                  -t, --token TOKEN  Authorization: Bearer <TOKEN> (API token; most /api routes require auth)
+                  -T, --token TOKEN  Authorization: Bearer <TOKEN> (API token; most /api routes require auth)
                                      If omitted for localhost/127.0.0.1, defaults to dev token "dev-token"
                   -o, --output MODE  Output format: text/txt (default) or json
                                      text prints tab-delimited: title, troveId, score(2dp)
                   -H, --header LINE  Extra header "Name: value" (repeatable)
-                  -d, --data FILE    POST body from FILE (POST only; default Content-Type: application/json)
+                  -F, --file FILE    POST body from FILE (POST only; default Content-Type: application/json)
                   -i, --include-headers  Print response status line and headers before body
                   -v, --debug        Print request and response diagnostics to stderr
                   -h, --help        Show short summary
                   --man             Show full manual
+
+                ENVIRONMENT
+                  MORSOR_CLI_BASE_URL  If set and non-empty, overrides -b/--base.
 
                 login
                   Prompts for username and password (password is not echoed). Performs form login against
@@ -883,11 +909,10 @@ public final class MorsorApiCli {
                   Optional, after --. Raw query string, e.g. query=*&page=0&size=10
                   (repeat trove= for multiple troves: trove=a&trove=b)
                   For shorthand/default-search mode, you can pass params as:
-                    --KEY VALUE   or   --KEY=VALUE
+                    --KEY VALUE / --KEY=VALUE, or -k VALUE / -k=VALUE for single-char keys
                   Key aliases:
-                    --q query, --p primaryTrove, --c compareTrove, --P page, --S size,
-                    --s sortBy, --d sortDir, --t trove (comma-separated values supported)
-                  Naked params (without --KEY) are treated as query text.
+                    -q query, -p primaryTrove, -c compareTrove, -P page, -S size,
+                    -s sortBy, -d sortDir, -t trove (comma-separated values supported)
 
                 AUTHENTICATION
                   Most /api/** endpoints require a logged-in session or API token.
@@ -933,11 +958,11 @@ public final class MorsorApiCli {
                 EXAMPLES
 
                   morsor-cli --help
-                  morsor-cli http://localhost:8080 login
+                  morsor-cli -b http://localhost:8080 login
                   morsor-cli -v -b http://localhost:8080 GET /api/search -- 'query=*&page=0&size=10'
                   morsor-cli alien
-                  morsor-cli search --q alien --P 0 --S 10
-                  morsor-cli dups --p my-trove --c other-trove --q alien
+                  morsor-cli search -q alien -P 0 -S 10
+                  morsor-cli dups -p my-trove -c other-trove -q alien
                   morsor-cli GET /actuator/health
                   morsor-cli https://example.com GET /actuator/health
                   morsor-cli -t "$MORSOR_CLI_TOKEN" GET /api/status
