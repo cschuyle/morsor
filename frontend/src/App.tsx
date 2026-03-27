@@ -14,6 +14,8 @@ import { getApiAuthHeaders } from './apiAuth'
 import { getCsrfToken } from './getCsrfToken'
 import { performLogout } from './performLogout'
 import { queryCache } from './queryCache'
+import { appendQueryHistoryEntry } from './queryHistory'
+import { searchHistoryLabels, duplicatesHistoryLabels, uniquesHistoryLabels } from './queryHistoryLabels'
 import type { QueryResultTiming } from './queryResultTiming'
 import { QueryTimingText } from './QueryTimingText'
 import { formatCount, formatCacheBytes } from './formatCount'
@@ -235,11 +237,23 @@ function App() {
       return
     }
     const troveIds = troveIdsOverride ?? selectedTroveIds
-    const nextSortBy = sortByOverride !== undefined && sortByOverride !== null ? sortByOverride : effectiveSortBy
-    const nextSortDir = sortDirOverride !== undefined && sortDirOverride !== null ? sortDirOverride : effectiveSortDir
+    const qt = q.trim()
+    const fetchIsStarQuery = qt === '*'
+    const nextSortBy =
+      sortByOverride !== undefined && sortByOverride !== null
+        ? sortByOverride
+        : fetchIsStarQuery
+          ? starSortBy ?? 'title'
+          : otherSortBy ?? 'score'
+    const nextSortDir =
+      sortDirOverride !== undefined && sortDirOverride !== null
+        ? sortDirOverride
+        : fetchIsStarQuery
+          ? starSortDir ?? 'asc'
+          : otherSortDir ?? 'desc'
     const fileTypesToUse = fileTypesOverride !== undefined ? fileTypesOverride : fileTypeFilters
     const params = new URLSearchParams({
-      query: q.trim(),
+      query: qt,
       page: String(pageNum),
       size: String(size),
     })
@@ -248,7 +262,7 @@ function App() {
     if (fileTypesToUse && fileTypesToUse.size > 0) params.set('fileTypes', [...fileTypesToUse].sort().join(','))
     if (thumbnailOnly) params.set('thumbs', '1')
     if (sortByOverride !== undefined || sortDirOverride !== undefined) {
-      if (isStarQuery) {
+      if (fetchIsStarQuery) {
         setStarSortBy(nextSortBy || null)
         setStarSortDir(nextSortDir)
       } else {
@@ -274,6 +288,29 @@ function App() {
           return [...next].sort()
         })
       }
+      const sl = searchHistoryLabels(
+        troves,
+        qt,
+        searchResultsViewMode,
+        [...troveIds],
+        nextSortBy || null,
+        nextSortDir,
+        fileTypesToUse,
+        thumbnailOnly,
+        boostTroveId,
+        cached.page,
+        size
+      )
+      appendQueryHistoryEntry({
+        mode: 'search',
+        ranAtMs: hit.receivedAtMs,
+        durationMs: hit.durationMs,
+        consoleQuery: buildAppUrlParams({ searchPage0BasedOverride: cached.page }).toString(),
+        apiCacheKey: url,
+        resultCount: cached.count,
+        summary: sl.summary,
+        detail: sl.detail,
+      })
       return
     }
     setSearchQueryTiming(null)
@@ -303,6 +340,29 @@ function App() {
             return [...next].sort()
           })
         }
+        const sl = searchHistoryLabels(
+          troves,
+          qt,
+          searchResultsViewMode,
+          [...troveIds],
+          nextSortBy || null,
+          nextSortDir,
+          fileTypesToUse,
+          thumbnailOnly,
+          boostTroveId,
+          data.page,
+          size
+        )
+        appendQueryHistoryEntry({
+          mode: 'search',
+          ranAtMs: receivedAtMs,
+          durationMs,
+          consoleQuery: buildAppUrlParams({ searchPage0BasedOverride: data.page }).toString(),
+          apiCacheKey: url,
+          resultCount: data.count,
+          summary: sl.summary,
+          detail: sl.detail,
+        })
         refreshStatusMessage()
       })
       .catch((err) => {
@@ -537,6 +597,9 @@ function App() {
       uniqPrimary?: string
       uniqCompare?: Set<string>
       uniqPageSize?: number
+      searchPage0BasedOverride?: number | null
+      dupPage0BasedOverride?: number | null
+      uniqPage0BasedOverride?: number | null
     } = {}
   ): URLSearchParams {
     const mode = overrides.mode ?? searchMode
@@ -550,7 +613,8 @@ function App() {
       searchQuery,
       searchTroveIds: overrides.searchTroveIds ?? searchSelectedTroveIds,
       pageSize,
-      searchPage0Based: searchResult?.page,
+      searchPage0Based:
+        overrides.searchPage0BasedOverride !== undefined ? overrides.searchPage0BasedOverride : searchResult?.page,
       fileTypeFilters: ft,
       fileTypeQuickMode: overrides.fileTypeQuickMode ?? fileTypeQuickMode,
       thumbnailOnly: overrides.thumbnailOnly ?? thumbnailOnly,
@@ -561,14 +625,16 @@ function App() {
       dupPrimary: overrides.dupPrimary ?? dupPrimaryTroveId,
       dupCompare: overrides.dupCompare ?? dupCompareTroveIds,
       dupPageSize: overrides.dupPageSize ?? dupPageSize,
-      dupPage0Based: duplicatesResult?.page,
+      dupPage0Based:
+        overrides.dupPage0BasedOverride !== undefined ? overrides.dupPage0BasedOverride : duplicatesResult?.page,
       duplicatesSortBy,
       duplicatesSortDir,
       uniqQuery: overrides.uniqQuery ?? uniqQuery,
       uniqPrimary: overrides.uniqPrimary ?? uniqPrimaryTroveId,
       uniqCompare: overrides.uniqCompare ?? uniqCompareTroveIds,
       uniqPageSize: overrides.uniqPageSize ?? uniqPageSize,
-      uniqPage0Based: uniquesResult?.page,
+      uniqPage0Based:
+        overrides.uniqPage0BasedOverride !== undefined ? overrides.uniqPage0BasedOverride : uniquesResult?.page,
       uniquesSortBy,
       uniquesSortDir,
       effectiveSearchSortBy: effBy,
@@ -875,6 +941,27 @@ function App() {
       setDuplicatesResult(cached)
       setDuplicatesPage(pageNum)
       setCompareQueryTiming({ durationMs: dupHit.durationMs, receivedAtMs: dupHit.receivedAtMs })
+      const compareIdsToSend = selectedTroveIds.size > 0 ? selectedTroveIds : new Set([primaryTroveId.trim()])
+      const dl = duplicatesHistoryLabels(
+        troves,
+        q,
+        primaryTroveId.trim(),
+        [...compareIdsToSend],
+        sortBy || null,
+        sortDir,
+        cached.page,
+        size
+      )
+      appendQueryHistoryEntry({
+        mode: 'duplicates',
+        ranAtMs: dupHit.receivedAtMs,
+        durationMs: dupHit.durationMs,
+        consoleQuery: buildAppUrlParams({ dupPage0BasedOverride: cached.page }).toString(),
+        apiCacheKey: restUrl,
+        resultCount: cached.total,
+        summary: dl.summary,
+        detail: dl.detail,
+      })
       return
     }
     setCompareQueryTiming(null)
@@ -903,6 +990,27 @@ function App() {
         setDuplicatesResult(dup)
         setDuplicatesPage(pageNum)
         setCompareProgress({ current: 0, total: 0 })
+        const compareIdsToSend = selectedTroveIds.size > 0 ? selectedTroveIds : new Set([primaryTroveId.trim()])
+        const dl = duplicatesHistoryLabels(
+          troves,
+          q,
+          primaryTroveId.trim(),
+          [...compareIdsToSend],
+          sortBy || null,
+          sortDir,
+          dup.page,
+          size
+        )
+        appendQueryHistoryEntry({
+          mode: 'duplicates',
+          ranAtMs: receivedAtMs,
+          durationMs,
+          consoleQuery: buildAppUrlParams({ dupPage0BasedOverride: dup.page }).toString(),
+          apiCacheKey: restUrl,
+          resultCount: dup.total,
+          summary: dl.summary,
+          detail: dl.detail,
+        })
         refreshStatusMessage()
       }
     ).catch((err) => {
@@ -962,6 +1070,26 @@ function App() {
       setUniquesResult(cached)
       setUniquesPage(pageNum)
       setCompareQueryTiming({ durationMs: uniqHit.durationMs, receivedAtMs: uniqHit.receivedAtMs })
+      const ul = uniquesHistoryLabels(
+        troves,
+        q,
+        primaryTroveId.trim(),
+        [...selectedTroveIds],
+        sortBy || null,
+        sortDir,
+        cached.page,
+        size
+      )
+      appendQueryHistoryEntry({
+        mode: 'uniques',
+        ranAtMs: uniqHit.receivedAtMs,
+        durationMs: uniqHit.durationMs,
+        consoleQuery: buildAppUrlParams({ uniqPage0BasedOverride: cached.page }).toString(),
+        apiCacheKey: restUrl,
+        resultCount: cached.total,
+        summary: ul.summary,
+        detail: ul.detail,
+      })
       return
     }
     setCompareQueryTiming(null)
@@ -990,6 +1118,26 @@ function App() {
         setUniquesResult(uniq)
         setUniquesPage(pageNum)
         setCompareProgress({ current: 0, total: 0 })
+        const ul = uniquesHistoryLabels(
+          troves,
+          q,
+          primaryTroveId.trim(),
+          [...selectedTroveIds],
+          sortBy || null,
+          sortDir,
+          uniq.page,
+          size
+        )
+        appendQueryHistoryEntry({
+          mode: 'uniques',
+          ranAtMs: receivedAtMs,
+          durationMs,
+          consoleQuery: buildAppUrlParams({ uniqPage0BasedOverride: uniq.page }).toString(),
+          apiCacheKey: restUrl,
+          resultCount: uniq.total,
+          summary: ul.summary,
+          detail: ul.detail,
+        })
         refreshStatusMessage()
       }
     ).catch((err) => {
@@ -2849,6 +2997,7 @@ function App() {
       <footer className="app-footer">
         <div className="app-footer-row">
           <Link to="/about" className="app-footer-link">About</Link>
+          <Link to="/history" className="app-footer-link">History</Link>
           <Link to={`/mobile${location.search}`} className="app-footer-link" onClick={() => sessionStorage.removeItem('morsorPreferDesktop')}>Mobile</Link>
         </div>
         <div className="app-footer-row">
