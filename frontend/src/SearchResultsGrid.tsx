@@ -322,6 +322,44 @@ function PopOutIcon({ className }: { className?: string }) {
   )
 }
 
+/** Rich LP extra lines (bold labels, linkified URLs, catalog links)—shared by hover tooltip and lightbox. */
+function LittlePrinceExtraLinesRich({ lines }: { lines: LittlePrinceExtraLine[] }) {
+  return (
+    <>
+      {lines.map((line, i) => {
+        const catalogHref = littlePrinceExtraCatalogLinkHref(line.jsonKey, line.content)
+        return (
+          <div key={i} className="search-results-lp-extra-tooltip-line">
+            <strong className="search-results-lp-extra-tooltip-line-label">{`${line.label}:`}</strong>
+            {/* NBSP: keep field name + value on the same line when the line wraps (no break right after ":"). */}
+            {'\u00A0'}
+            <span className="search-results-lp-extra-tooltip-line-value">
+              <span className="search-results-lp-extra-tooltip-content">{linkifyTextWithUrls(line.content)}</span>
+              {catalogHref ? (
+                <>
+                  {' '}
+                  (
+                  <a
+                    href={catalogHref}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="search-results-lp-extra-tooltip-catalog-link"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <span className="search-results-lp-extra-tooltip-catalog-link-text">Link</span>
+                    <PopOutIcon className="search-results-lp-extra-tooltip-catalog-link-icon" />
+                  </a>
+                  )
+                </>
+              ) : null}
+            </span>
+          </div>
+        )
+      })}
+    </>
+  )
+}
+
 const textColumns = [
   {
     id: 'title',
@@ -379,6 +417,10 @@ function rowToLightboxPayload(row: SearchResultRow | undefined | null): Lightbox
     itemType,
     trove: troveName,
     title: row.title ?? '',
+    littlePrinceItemExtra:
+      row.littlePrinceItemExtra != null && typeof row.littlePrinceItemExtra === 'object'
+        ? row.littlePrinceItemExtra
+        : null,
   }
 }
 
@@ -827,33 +869,7 @@ export function SearchResultsGrid({ data, sortBy = null, sortDir = 'asc', onSort
           }}
           onMouseLeave={() => setLpExtraRichTooltipState(null)}
         >
-          {lpExtraRichTooltipState.lines.map((line, i) => {
-            const catalogHref = littlePrinceExtraCatalogLinkHref(line.jsonKey, line.content)
-            return (
-              <div key={i} className="search-results-lp-extra-tooltip-line">
-                <strong>{line.label}</strong>
-                {': '}
-                <span className="search-results-lp-extra-tooltip-content">{linkifyTextWithUrls(line.content)}</span>
-                {catalogHref ? (
-                  <>
-                    {' '}
-                    (
-                    <a
-                      href={catalogHref}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="search-results-lp-extra-tooltip-catalog-link"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      <span className="search-results-lp-extra-tooltip-catalog-link-text">Link</span>
-                      <PopOutIcon className="search-results-lp-extra-tooltip-catalog-link-icon" />
-                    </a>
-                    )
-                  </>
-                ) : null}
-              </div>
-            )
-          })}
+          <LittlePrinceExtraLinesRich lines={lpExtraRichTooltipState.lines} />
         </div>
       )}
       {rawSourceLightbox && (() => {
@@ -886,6 +902,11 @@ export function SearchResultsGrid({ data, sortBy = null, sortDir = 'asc', onSort
           : rawSourceContent
       })()}
       {lightbox && (() => {
+        const lpExtraLines = formatLittlePrinceExtraLines(lightbox.littlePrinceItemExtra)
+        const hasLpExtra = lpExtraLines.length > 0
+        const hasLightboxImage = Boolean(lightbox.imageUrl && String(lightbox.imageUrl).trim())
+        const desktopLpExtraBesideImage = !isMobile && hasLpExtra && hasLightboxImage
+
         const lightboxContent = (
           <div
             className="search-thumb-lightbox"
@@ -895,7 +916,14 @@ export function SearchResultsGrid({ data, sortBy = null, sortDir = 'asc', onSort
             onClick={closeLightbox}
           >
             <button type="button" className="search-thumb-lightbox-close" onClick={closeLightbox} aria-label="Close">×</button>
-            <div className="search-thumb-lightbox-content" onClick={(e) => e.stopPropagation()}>
+            <div
+              className={
+                desktopLpExtraBesideImage
+                  ? 'search-thumb-lightbox-content search-thumb-lightbox-content--lp-extra-beside-image'
+                  : 'search-thumb-lightbox-content'
+              }
+              onClick={(e) => e.stopPropagation()}
+            >
               {lightbox.title && (
                 <div className="search-thumb-lightbox-title">
                   {lightbox.title}
@@ -926,8 +954,24 @@ export function SearchResultsGrid({ data, sortBy = null, sortDir = 'asc', onSort
                   </div>
                 )
               })()}
-              {lightbox.imageUrl && (
-                <img src={lightbox.imageUrl} alt="" />
+              {desktopLpExtraBesideImage ? (
+                <div className="search-thumb-lightbox-image-and-extra">
+                  <div className="search-thumb-lightbox-image-cell">
+                    <img src={lightbox.imageUrl!} alt="" />
+                  </div>
+                  <div className="search-results-lp-extra-tooltip search-results-lp-extra-tooltip--in-lightbox search-results-lp-extra-tooltip--in-lightbox--beside-image">
+                    <LittlePrinceExtraLinesRich lines={lpExtraLines} />
+                  </div>
+                </div>
+              ) : (
+                <>
+                  {hasLpExtra ? (
+                    <div className="search-results-lp-extra-tooltip search-results-lp-extra-tooltip--in-lightbox">
+                      <LittlePrinceExtraLinesRich lines={lpExtraLines} />
+                    </div>
+                  ) : null}
+                  {hasLightboxImage ? <img src={lightbox.imageUrl!} alt="" /> : null}
+                </>
               )}
             </div>
             <div className="search-thumb-lightbox-footer" onClick={(e) => e.stopPropagation()}>

@@ -394,6 +394,61 @@
   width: 100%;
 }
 
+/* Desktop LP metadata: top-align header + main row (image | extra). */
+.search-thumb-lightbox-content--lp-extra-beside-image {
+  justify-content: flex-start;
+  padding-top: 0.15rem;
+}
+
+/* Do not stretch the row to fill leftover column height (keeps extra-metadata box at the top). */
+.search-thumb-lightbox-content--lp-extra-beside-image .search-thumb-lightbox-image-and-extra {
+  flex: 0 1 auto;
+}
+
+.search-thumb-lightbox-image-and-extra {
+  display: flex;
+  flex-direction: row;
+  align-items: stretch;
+  justify-content: center;
+  gap: 1.5rem;
+  width: 100%;
+  max-width: min(100%, 100vw - 2rem);
+  flex: 1 1 auto;
+  min-height: 0;
+  margin-bottom: 0.65rem;
+  box-sizing: border-box;
+}
+
+.search-thumb-lightbox-image-cell {
+  flex: 0 1 auto;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  align-items: center;
+}
+
+.search-thumb-lightbox-image-and-extra .search-thumb-lightbox-image-cell img {
+  max-width: 100%;
+  max-height: min(78vh, calc(100vh - 11rem));
+  width: auto;
+  height: auto;
+  object-fit: contain;
+}
+
+.search-results-lp-extra-tooltip--in-lightbox--beside-image {
+  flex: 0 1 auto;
+  width: auto;
+  min-width: min(14rem, 32vw);
+  max-width: min(40ch, 36vw);
+  min-height: 0;
+  align-self: stretch;
+  margin: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
 .search-thumb-lightbox-content img {
   max-width: 100%;
   /* Leave room for the title, optional meta lines, and footer below */
@@ -659,6 +714,59 @@
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
 }
 
+.search-results-lp-extra-tooltip--in-lightbox {
+  position: static;
+  z-index: auto;
+  margin: 0 0 0.65rem;
+  box-sizing: border-box;
+  /* Match lightbox chrome: dark overlay shows through, light typography */
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 0.9rem;
+  text-align: left;
+}
+
+/* Stacked (mobile / no side-by-side): full-width cap, scroll; beside-image uses row stretch + width auto above. */
+.search-results-lp-extra-tooltip--in-lightbox:not(.search-results-lp-extra-tooltip--in-lightbox--beside-image) {
+  width: 100%;
+  max-width: min(60ch, calc(100% - 4rem));
+  max-height: min(38vh, 18rem);
+  align-self: center;
+}
+
+.search-results-lp-extra-tooltip--in-lightbox .search-results-lp-extra-tooltip-line strong {
+  color: rgba(255, 255, 255, 0.96);
+}
+
+.search-results-lp-extra-tooltip--in-lightbox .search-results-lp-extra-tooltip-content a {
+  color: #c9b3f0;
+}
+
+.search-results-lp-extra-tooltip--in-lightbox .search-results-lp-extra-tooltip-content a:hover {
+  color: #ebe4ff;
+}
+
+.search-results-lp-extra-tooltip--in-lightbox .search-results-lp-extra-tooltip-catalog-link {
+  color: #c9b3f0;
+}
+
+.search-results-lp-extra-tooltip--in-lightbox .search-results-lp-extra-tooltip-catalog-link:hover {
+  color: #ebe4ff;
+}
+
+/*
+ * Hanging indent on the whole row (not on the value span): avoids inline-block snapping to
+ * the next line and leaving “Description:“ alone. Value stays inline with the label.
+ */
+.search-results-lp-extra-tooltip-line {
+  display: block;
+  padding-left: 1.25em;
+  text-indent: -1.25em;
+  box-sizing: border-box;
+}
+
 .search-results-lp-extra-tooltip-line + .search-results-lp-extra-tooltip-line {
   margin-top: 0.2rem;
 }
@@ -666,6 +774,22 @@
 .search-results-lp-extra-tooltip strong {
   font-weight: 600;
   color: #111;
+}
+
+.search-results-lp-extra-tooltip-content {
+  display: inline;
+}
+
+/* inline-flex + block text-indent clash; keep catalog/URL links inline inside the line. */
+.search-results-lp-extra-tooltip-line .search-results-lp-extra-tooltip-catalog-link {
+  display: inline;
+  vertical-align: baseline;
+}
+
+.search-results-lp-extra-tooltip-line .search-results-lp-extra-tooltip-catalog-link-icon {
+  display: inline-block;
+  vertical-align: -0.15em;
+  margin-left: 0.12em;
 }
 
 .search-results-lp-extra-tooltip-content a {
@@ -682,6 +806,7 @@
   display: inline-flex;
   align-items: center;
   gap: 0.2em;
+  vertical-align: middle;
   color: #6633cc;
   text-decoration: none;
 }

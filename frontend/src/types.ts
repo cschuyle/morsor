@@ -86,4 +86,6 @@ export interface LightboxPayload {
   otherFiles?: string[]
   itemUrl?: string | null
   rawSourceItem?: unknown
+  /** When present (e.g. littlePrinceItem), shown in the lightbox under the type/trove line. */
+  littlePrinceItemExtra?: Record<string, unknown> | null
 }
