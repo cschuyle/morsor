@@ -31,6 +31,8 @@ export default function About() {
           Version {APP_VERSION}
         </span>
         <Link to="/" className="app-footer-link">Go back</Link>
+        {' · '}
+        <Link to="/history" className="app-footer-link">History</Link>
       </footer>
     </>
   )

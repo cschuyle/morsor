@@ -34,6 +34,8 @@ export default function MobileAbout() {
         </div>
         <div className="mobile-footer-row">
           <Link to="/" className="mobile-footer-link" onClick={() => sessionStorage.setItem('morsorPreferDesktop', 'true')}>Desktop</Link>
+          <span className="mobile-footer-sep" aria-hidden="true">·</span>
+          <Link to="/history" className="mobile-footer-link">History</Link>
           <button
             type="button"
             className="mobile-footer-link mobile-footer-logout-btn"
