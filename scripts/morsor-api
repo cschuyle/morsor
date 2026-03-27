@@ -4,10 +4,10 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 JAR="$ROOT/tools/morsor-api-cli/build/libs/morsor-api-cli-0.0.1-SNAPSHOT.jar"
-echo Looking for $JAR... 
+echo Looking for $JAR... 1>&2
 if [[ ! -f "$JAR" ]]; then
-  echo "Building morsor-api-cli..."
+  echo "@@@@ WARNING: Jar not found. Building morsor-api-cli..." 1>&2
   ./gradlew :morsor-api-cli:jar -q
 fi
-echo "Running morsor-api-cli..."
+echo "Running morsor-api-cli..." 1>&2
 exec java -jar "$JAR" "$@"
