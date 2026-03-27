@@ -11,7 +11,6 @@ import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.context.annotation.Profile;
 import org.springframework.core.annotation.Order;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 
@@ -19,8 +18,8 @@ import javax.sql.DataSource;
 import java.sql.SQLException;
 
 /**
- * Seeds H2 when postgres profile is not active: creates auth tables (H2-compatible DDL) and inserts
- * a single user plus hardwired API token (form: dev / dev or Authorization: Bearer dev-token).
+ * Seeds H2 when postgres profile is not active: inserts a dev user plus hardwired API token
+ * (form: dev / dev or Authorization: Bearer dev-token). Tables are created by Flyway ({@code db/migration/h2+postgres}).
  * Skips if the datasource is not H2 (e.g. postgres profile overrides to Postgres).
  */
 @Component
@@ -30,7 +29,6 @@ public class DevDataSeeder implements ApplicationRunner {
 
     private static final Logger log = LoggerFactory.getLogger(DevDataSeeder.class);
 
-    private final JdbcTemplate jdbc;
     private final DataSource dataSource;
     private final UserRepository userRepository;
     private final ApiTokenRepository apiTokenRepository;
@@ -46,13 +44,11 @@ public class DevDataSeeder implements ApplicationRunner {
     @Value("${app.dev.api-token:dev-token}")
     private String devApiToken;
 
-    public DevDataSeeder(JdbcTemplate jdbc,
-                         DataSource dataSource,
+    public DevDataSeeder(DataSource dataSource,
                          UserRepository userRepository,
                          ApiTokenRepository apiTokenRepository,
                          PasswordEncoder passwordEncoder,
                          TokenHashService tokenHashService) {
-        this.jdbc = jdbc;
         this.dataSource = dataSource;
         this.userRepository = userRepository;
         this.apiTokenRepository = apiTokenRepository;
@@ -66,7 +62,6 @@ public class DevDataSeeder implements ApplicationRunner {
             log.debug("DevDataSeeder skipped: datasource is not H2 (postgres profile active)");
             return;
         }
-        createTablesIfNeeded();
         if (userRepository.findByUsername(devUsername).isPresent()) {
             return;
         }
@@ -89,30 +84,5 @@ public class DevDataSeeder implements ApplicationRunner {
             log.warn("DevDataSeeder could not determine datasource URL: {}", e.getMessage());
             return false;
         }
-    }
-
-    private void createTablesIfNeeded() {
-        jdbc.execute("CREATE TABLE IF NOT EXISTS users ("
-                + "id BIGINT AUTO_INCREMENT PRIMARY KEY, "
-                + "username VARCHAR(255) NOT NULL UNIQUE, "
-                + "password_hash VARCHAR(255) NOT NULL, "
-                + "enabled BOOLEAN NOT NULL DEFAULT true, "
-                + "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)");
-        jdbc.execute("CREATE TABLE IF NOT EXISTS api_tokens ("
-                + "id BIGINT AUTO_INCREMENT PRIMARY KEY, "
-                + "user_id BIGINT NOT NULL, "
-                + "token_hash VARCHAR(255) NOT NULL UNIQUE, "
-                + "name VARCHAR(255), "
-                + "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, "
-                + "FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE)");
-        jdbc.execute("CREATE TABLE IF NOT EXISTS saved_queries ("
-                + "id BIGINT AUTO_INCREMENT PRIMARY KEY, "
-                + "user_id BIGINT NOT NULL, "
-                + "label VARCHAR(512) NOT NULL DEFAULT '', "
-                + "console_query CLOB NOT NULL, "
-                + "mode VARCHAR(32) NOT NULL DEFAULT 'search', "
-                + "summary VARCHAR(512), "
-                + "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, "
-                + "FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE)");
     }
 }
