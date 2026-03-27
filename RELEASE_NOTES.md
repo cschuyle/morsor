@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+*(Tag created when deploy runs.)*
+
+## release-v20260327-0315-77099d5
+
 ### CLI (`morsor-cli`)
 - Added morsor CLI:
   - interactive `login` (username/password prompt, hidden password) and token export output
