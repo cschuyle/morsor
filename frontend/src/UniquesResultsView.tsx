@@ -125,7 +125,8 @@ export function UniquesResultsView({ results = [], sortBy = null, sortDir = 'asc
             const nearMisses = row?.nearMisses ?? []
             const nearMissWords = getWordsFromTitles(nearMisses)
             const primaryWords = getWordsFromTitle(item?.title ?? '')
-            const primaryThumb = item?.thumbnailUrl
+            const rawThumb = item?.thumbnailUrl
+            const primaryThumb = typeof rawThumb === 'string' && rawThumb.trim() ? rawThumb : ''
             return (
               <Fragment key={idx}>
                 <tr

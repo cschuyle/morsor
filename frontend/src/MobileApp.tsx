@@ -19,12 +19,45 @@ import {
 import { DuplicateResultsView } from './DuplicateResultsView'
 import { UniquesResultsView } from './UniquesResultsView'
 import { isCompareToSelfVisible } from './compareToSelfVisible'
-import { deserializeTabUrl, serializeTabUrl } from './tabUrlParams'
+import {
+  deserializeActiveTabFromUrl,
+  serializeActiveTabToUrl,
+  serializeUrlFromTabSessions,
+  type TabMode,
+} from './tabUrlParams'
+import {
+  loadSearchTabSession,
+  loadDuplicatesTabSession,
+  loadUniquesTabSession,
+  saveSearchTabSession,
+  saveDuplicatesTabSession,
+  saveUniquesTabSession,
+  type SearchTabSession,
+  type DuplicatesTabSession,
+  type UniquesTabSession,
+} from './sessionTabState'
 import './MobileApp.css'
 
 const MOBILE_PAGE_SIZE = 100
 const MOBILE_PAGE_SIZE_OPTIONS = [10, 25, 50, 100, 250, 500]
 const DUP_UNIQUES_PAGE_SIZE = 50
+
+const DEFAULT_DUP_SESSION: DuplicatesTabSession = {
+  dupQuery: '',
+  dupPrimaryTroveId: '',
+  dupCompareTroveIds: [],
+  dupPageSize: DUP_UNIQUES_PAGE_SIZE,
+  duplicatesSortBy: null,
+  duplicatesSortDir: 'asc',
+}
+const DEFAULT_UNIQ_SESSION: UniquesTabSession = {
+  uniqQuery: '',
+  uniqPrimaryTroveId: '',
+  uniqCompareTroveIds: [],
+  uniqPageSize: DUP_UNIQUES_PAGE_SIZE,
+  uniquesSortBy: null,
+  uniquesSortDir: 'asc',
+}
 const AMAZON_PLACEHOLDER_THUMB = 'https://m.media-amazon.com/images/I/01RmK+J4pJL._SS135_.gif'
 
 interface FileTypePanelRect {
@@ -43,7 +76,11 @@ function hasUsableThumbnail(row: SearchResultRow | undefined | null): boolean {
 
 function MobileApp() {
   const [troves, setTroves] = useState<Trove[]>([])
-  const [searchMode, setSearchMode] = useState<'search' | 'duplicates' | 'uniques'>('search')
+  const [searchParams, setSearchParams] = useSearchParams()
+  const searchMode = (() => {
+    const m = searchParams.get('mode')
+    return (m === 'duplicates' || m === 'uniques' ? m : 'search') as 'search' | 'duplicates' | 'uniques'
+  })()
   const [selectedTroveIds, setSelectedTroveIds] = useState<Set<string>>(() => new Set())
   const [dupPrimaryTroveId, setDupPrimaryTroveId] = useState('')
   const [dupCompareTroveIds, setDupCompareTroveIds] = useState<Set<string>>(() => new Set())
@@ -138,9 +175,7 @@ function MobileApp() {
   const mobileMainRef = useRef<HTMLElement | null>(null)
   const [mobileMainGapTopOpen, setMobileMainGapTopOpen] = useState(true)
   const [mobileMainGapBottomOpen, setMobileMainGapBottomOpen] = useState(false)
-  const [searchParams, setSearchParams] = useSearchParams()
   const location = useLocation()
-  const prevSearchModeRef = useRef(searchMode)
   useLayoutEffect(() => {
     queryRef.current = searchMode === 'search' ? searchQuery : searchMode === 'duplicates' ? dupQuery : uniqQuery
   }, [searchMode, searchQuery, dupQuery, uniqQuery])
@@ -190,106 +225,206 @@ function MobileApp() {
     return t ? t.id : value
   }
 
-  // Restore per-tab state from URL (namespaced + legacy). Trove names → ids when troves load.
-  useEffect(() => {
-    const d = deserializeTabUrl(searchParams, troves, urlTroveId)
-    setSearchQuery(d.searchQuery)
-    setDupQuery(d.dupQuery)
-    setUniqQuery(d.uniqQuery)
-    setUrlSearchTroveIds(new Set(d.searchTroveIds))
-    setFileTypeFilters(new Set(d.fileTypeFilters))
-    setFileTypeQuickMode(d.fileTypeQuickMode)
-    setThumbnailOnly(d.thumbnailOnly)
-    setBoostTroveId(d.boostTroveId)
-    setSearchResultsViewMode(d.searchView)
-    setExtraGridFieldsSelected(new Set(d.extraGridFields))
-    if (d.pageSize != null) setPageSize(d.pageSize)
-    if (d.dupPageSize != null) setDupPageSize(d.dupPageSize)
-    if (d.uniqPageSize != null) setUniqPageSize(d.uniqPageSize)
-    if (d.searchPageOneBased != null) setPage(d.searchPageOneBased - 1)
-    if (d.dupPageOneBased != null) setDuplicatesPage(d.dupPageOneBased - 1)
-    if (d.uniqPageOneBased != null) setUniquesPage(d.uniqPageOneBased - 1)
-    setDuplicatesSortBy(d.duplicatesSortBy)
-    setDuplicatesSortDir(d.duplicatesSortDir)
-    setUniquesSortBy(d.uniquesSortBy)
-    setUniquesSortDir(d.uniquesSortDir)
-
-    const mode = searchParams.get('mode')
-    if (mode !== 'duplicates' && mode !== 'uniques') {
-      setSearchMode('search')
-      setSelectedTroveIds(new Set(d.searchTroveIds))
+  function saveActiveTabSnapshot() {
+    if (searchMode === 'search') {
+      saveSearchTabSession({
+        searchQuery,
+        searchSelectedTroveIds: [...urlSearchTroveIds],
+        pageSize,
+        fileTypeFilters: [...fileTypeFilters],
+        fileTypeQuickMode,
+        thumbnailOnly,
+        boostTroveId,
+        searchResultsViewMode,
+        extraGridFields: [...extraGridFieldsSelected],
+        starSortBy,
+        starSortDir,
+        otherSortBy,
+        otherSortDir,
+        searchPage0Based: typeof searchResult?.page === 'number' ? searchResult.page : page,
+      })
+    } else if (searchMode === 'duplicates') {
+      saveDuplicatesTabSession({
+        dupQuery,
+        dupPrimaryTroveId,
+        dupCompareTroveIds: [...dupCompareTroveIds],
+        dupPageSize,
+        duplicatesSortBy,
+        duplicatesSortDir,
+        duplicatesPage0Based: typeof duplicatesResult?.page === 'number' ? duplicatesResult.page : duplicatesPage,
+      })
     } else {
-      setSearchMode(mode)
-      setDupPrimaryTroveId(d.dupPrimary)
-      setDupCompareTroveIds(new Set(d.dupCompare))
-      setUniqPrimaryTroveId(d.uniqPrimary)
-      setUniqCompareTroveIds(new Set(d.uniqCompare))
+      saveUniquesTabSession({
+        uniqQuery,
+        uniqPrimaryTroveId,
+        uniqCompareTroveIds: [...uniqCompareTroveIds],
+        uniqPageSize,
+        uniquesSortBy,
+        uniquesSortDir,
+        uniquesPage0Based: typeof uniquesResult?.page === 'number' ? uniquesResult.page : uniquesPage,
+      })
     }
-    if (d.searchView === 'gallery') {
-      const urlQ = (d.searchQuery ?? '').trim()
-      if (urlQ === '*') {
-        setStarSortBy('title')
-        setStarSortDir('asc')
-      } else if (urlQ) {
-        setOtherSortBy('score')
-        setOtherSortDir('desc')
+  }
+
+  function mergeSearchFromSession(s: SearchTabSession | null) {
+    if (!s) return
+    setSearchQuery(s.searchQuery)
+    const ids = new Set(s.searchSelectedTroveIds)
+    setUrlSearchTroveIds(ids)
+    setSelectedTroveIds(ids)
+    setPageSize(s.pageSize)
+    setFileTypeFilters(new Set(s.fileTypeFilters))
+    setFileTypeQuickMode(s.fileTypeQuickMode)
+    setThumbnailOnly(s.thumbnailOnly)
+    setBoostTroveId(s.boostTroveId)
+    setSearchResultsViewMode(s.searchResultsViewMode)
+    setExtraGridFieldsSelected(new Set(s.extraGridFields))
+    setStarSortBy(s.starSortBy)
+    setStarSortDir(s.starSortDir)
+    setOtherSortBy(s.otherSortBy)
+    setOtherSortDir(s.otherSortDir)
+  }
+
+  function mergeDupFromSession(s: DuplicatesTabSession | null) {
+    const x = s ?? DEFAULT_DUP_SESSION
+    setDupQuery(x.dupQuery)
+    setDupPrimaryTroveId(x.dupPrimaryTroveId)
+    setDupCompareTroveIds(new Set(x.dupCompareTroveIds))
+    setDupPageSize(x.dupPageSize)
+    setDuplicatesSortBy(x.duplicatesSortBy)
+    setDuplicatesSortDir(x.duplicatesSortDir)
+  }
+
+  function mergeUniqFromSession(s: UniquesTabSession | null) {
+    const x = s ?? DEFAULT_UNIQ_SESSION
+    setUniqQuery(x.uniqQuery)
+    setUniqPrimaryTroveId(x.uniqPrimaryTroveId)
+    setUniqCompareTroveIds(new Set(x.uniqCompareTroveIds))
+    setUniqPageSize(x.uniqPageSize)
+    setUniquesSortBy(x.uniquesSortBy)
+    setUniquesSortDir(x.uniquesSortDir)
+  }
+
+  /** Active tab from URL; inactive tabs from session. */
+  useEffect(() => {
+    const u = deserializeActiveTabFromUrl(searchParams, troves, urlTroveId)
+    const sSearch = loadSearchTabSession()
+    const sDup = loadDuplicatesTabSession()
+    const sUniq = loadUniquesTabSession()
+
+    if (u.mode === 'search') {
+      setSearchQuery(u.searchQuery)
+      const st = new Set(u.searchTroveIds)
+      setUrlSearchTroveIds(st)
+      setSelectedTroveIds(st)
+      if (u.pageSize != null) setPageSize(u.pageSize)
+      if (u.searchPageOneBased != null) setPage(u.searchPageOneBased - 1)
+      setFileTypeFilters(new Set(u.fileTypeFilters))
+      setFileTypeQuickMode(u.fileTypeQuickMode)
+      setThumbnailOnly(u.thumbnailOnly)
+      setBoostTroveId(u.boostTroveId)
+      setSearchResultsViewMode(u.searchView)
+      setExtraGridFieldsSelected(new Set(u.extraGridFields))
+      const sq = u.searchQuery.trim()
+      const isStar = sq === '*'
+      if (u.searchSortBy) {
+        if (isStar) {
+          setStarSortBy(u.searchSortBy)
+          setStarSortDir(u.searchSortDir === 'desc' ? 'desc' : 'asc')
+        } else {
+          setOtherSortBy(u.searchSortBy)
+          setOtherSortDir(u.searchSortDir === 'asc' ? 'asc' : 'desc')
+        }
+      } else if (u.searchView === 'gallery') {
+        if (isStar) {
+          setStarSortBy('title')
+          setStarSortDir('asc')
+        } else if (sq) {
+          setOtherSortBy('score')
+          setOtherSortDir('desc')
+        }
       }
+      mergeDupFromSession(sDup)
+      mergeUniqFromSession(sUniq)
+    } else if (u.mode === 'duplicates') {
+      setDupQuery(u.dupQuery)
+      setDupPrimaryTroveId(u.dupPrimary)
+      setDupCompareTroveIds(new Set(u.dupCompare))
+      if (u.dupPageSize != null) setDupPageSize(u.dupPageSize)
+      if (u.dupPageOneBased != null) setDuplicatesPage(u.dupPageOneBased - 1)
+      setDuplicatesSortBy(u.duplicatesSortBy)
+      setDuplicatesSortDir(u.duplicatesSortDir)
+      mergeSearchFromSession(sSearch)
+      mergeUniqFromSession(sUniq)
+    } else {
+      setUniqQuery(u.uniqQuery)
+      setUniqPrimaryTroveId(u.uniqPrimary)
+      setUniqCompareTroveIds(new Set(u.uniqCompare))
+      if (u.uniqPageSize != null) setUniqPageSize(u.uniqPageSize)
+      if (u.uniqPageOneBased != null) setUniquesPage(u.uniqPageOneBased - 1)
+      setUniquesSortBy(u.uniquesSortBy)
+      setUniquesSortDir(u.uniquesSortDir)
+      mergeSearchFromSession(sSearch)
+      mergeDupFromSession(sDup)
     }
   }, [searchParams, troves])
 
-  function mobileSerialize(
-    activeMode: 'search' | 'duplicates' | 'uniques',
-    opts: {
-      fileTypesSet?: Set<string> | null
+  function buildAppUrlParams(
+    overrides: {
+      mode?: TabMode
       searchTroveIds?: Set<string>
-      boostOverride?: string | null | undefined
-      thumbnailOnlyOverride?: boolean
-      quickModeOverride?: FileTypeQuickModeValue
+      fileTypeFilters?: Set<string> | null
+      boostTroveId?: string | null
+      searchView?: 'list' | 'gallery'
+      thumbnailOnly?: boolean
+      fileTypeQuickMode?: FileTypeQuickModeValue
+      dupQuery?: string
       dupPrimary?: string
       dupCompare?: Set<string>
+      dupPageSize?: number
+      uniqQuery?: string
       uniqPrimary?: string
       uniqCompare?: Set<string>
+      uniqPageSize?: number
     } = {}
   ): URLSearchParams {
-    const ft = opts.fileTypesSet !== undefined && opts.fileTypesSet !== null ? opts.fileTypesSet : fileTypeFilters
-    const searchTroves =
-      opts.searchTroveIds !== undefined ? opts.searchTroveIds : urlSearchTroveIds
-    const boostResolved =
-      opts.boostOverride === undefined ? boostTroveId : opts.boostOverride
-    const useThumb =
-      opts.thumbnailOnlyOverride === undefined ? thumbnailOnly : opts.thumbnailOnlyOverride
-    const useQuick =
-      opts.quickModeOverride === undefined ? fileTypeQuickMode : opts.quickModeOverride
-    const dp = opts.dupPrimary !== undefined ? opts.dupPrimary : dupPrimaryTroveId
-    const dc = opts.dupCompare !== undefined ? opts.dupCompare : dupCompareTroveIds
-    const up = opts.uniqPrimary !== undefined ? opts.uniqPrimary : uniqPrimaryTroveId
-    const uc = opts.uniqCompare !== undefined ? opts.uniqCompare : uniqCompareTroveIds
-    return serializeTabUrl({
-      activeMode,
+    const mode = overrides.mode ?? searchMode
+    const ft =
+      overrides.fileTypeFilters !== undefined && overrides.fileTypeFilters !== null
+        ? overrides.fileTypeFilters
+        : fileTypeFilters
+    const sq = (searchQuery ?? '').trim()
+    const isStar = sq === '*'
+    const effBy = mode === 'search' ? (isStar ? (starSortBy ?? 'title') : (otherSortBy ?? 'score')) : effectiveSortBy
+    const effDir = mode === 'search' ? (isStar ? (starSortDir ?? 'asc') : (otherSortDir ?? 'desc')) : effectiveSortDir
+    return serializeActiveTabToUrl({
+      mode,
       searchQuery,
-      dupQuery,
-      uniqQuery,
-      searchTroveIds: searchTroves,
-      dupPrimary: dp,
-      dupCompare: dc,
-      uniqPrimary: up,
-      uniqCompare: uc,
-      fileTypeFilters: ft,
-      fileTypeQuickMode: useQuick,
-      thumbnailOnly: useThumb,
-      boostTroveId: boostResolved,
-      searchView: searchResultsViewMode,
-      extraGridFields: extraGridFieldsSelected,
+      searchTroveIds: overrides.searchTroveIds ?? urlSearchTroveIds,
       pageSize,
-      dupPageSize,
-      uniqPageSize,
       searchPage0Based: searchResult?.page ?? page,
+      fileTypeFilters: ft,
+      fileTypeQuickMode: overrides.fileTypeQuickMode ?? fileTypeQuickMode,
+      thumbnailOnly: overrides.thumbnailOnly ?? thumbnailOnly,
+      boostTroveId: overrides.boostTroveId !== undefined ? overrides.boostTroveId : boostTroveId,
+      searchView: overrides.searchView ?? searchResultsViewMode,
+      extraGridFields: extraGridFieldsSelected,
+      dupQuery: overrides.dupQuery ?? dupQuery,
+      dupPrimary: overrides.dupPrimary ?? dupPrimaryTroveId,
+      dupCompare: overrides.dupCompare ?? dupCompareTroveIds,
+      dupPageSize: overrides.dupPageSize ?? dupPageSize,
       dupPage0Based: duplicatesResult?.page ?? duplicatesPage,
-      uniqPage0Based: uniquesResult?.page ?? uniquesPage,
       duplicatesSortBy,
       duplicatesSortDir,
+      uniqQuery: overrides.uniqQuery ?? uniqQuery,
+      uniqPrimary: overrides.uniqPrimary ?? uniqPrimaryTroveId,
+      uniqCompare: overrides.uniqCompare ?? uniqCompareTroveIds,
+      uniqPageSize: overrides.uniqPageSize ?? uniqPageSize,
+      uniqPage0Based: uniquesResult?.page ?? uniquesPage,
       uniquesSortBy,
       uniquesSortDir,
+      effectiveSearchSortBy: effBy,
+      effectiveSearchSortDir: effDir,
       troves,
       urlTroveId,
     })
@@ -302,14 +437,13 @@ function MobileApp() {
     thumbnailOnlyOverride?: boolean,
     quickModeOverride?: FileTypeQuickModeValue
   ): URLSearchParams {
-    const searchTroves =
-      searchTrovesOverride !== null ? searchTrovesOverride : urlSearchTroveIds
-    return mobileSerialize(searchMode, {
-      fileTypesSet,
+    const searchTroves = searchTrovesOverride !== null ? searchTrovesOverride : urlSearchTroveIds
+    return buildAppUrlParams({
       searchTroveIds: searchTroves,
-      boostOverride,
-      thumbnailOnlyOverride,
-      quickModeOverride,
+      fileTypeFilters: fileTypesSet,
+      boostTroveId: boostOverride,
+      thumbnailOnly: thumbnailOnlyOverride,
+      fileTypeQuickMode: quickModeOverride,
     })
   }
 
@@ -318,7 +452,8 @@ function MobileApp() {
     const dc = mode === 'duplicates' ? compare : dupCompareTroveIds
     const up = mode === 'uniques' ? primary : uniqPrimaryTroveId
     const uc = mode === 'uniques' ? compare : uniqCompareTroveIds
-    return mobileSerialize(mode, {
+    return buildAppUrlParams({
+      mode,
       dupPrimary: dp,
       dupCompare: dc,
       uniqPrimary: up,
@@ -326,55 +461,35 @@ function MobileApp() {
     })
   }
 
-  // When the user actually switches from a compare tab back to Search, and the
-  // URL still has compare mode, normalize it to a search URL.
+  // Persist **active tab only** to the URL.
   useEffect(() => {
-    const prev = prevSearchModeRef.current
-    prevSearchModeRef.current = searchMode
-    // Only run on real tab transitions from duplicates/uniques → search
-    const cameFromCompare = prev === 'duplicates' || prev === 'uniques'
-    if (!cameFromCompare || searchMode !== 'search') return
-    const urlMode = searchParams.get('mode')
-    if (urlMode !== 'duplicates' && urlMode !== 'uniques') return
-    setSearchParams(buildSearchParams(), { replace: true })
-  }, [searchMode, searchParams])
-
-  // Persist all tabs’ state to the URL. Skip when URL is ahead of React (paste, desktop→mobile).
-  useEffect(() => {
-    const urlHasDupPick =
-      searchParams.get('dprimary') ||
-      searchParams.getAll('dcompare').length > 0 ||
-      (searchParams.get('mode') === 'duplicates' &&
-        (searchParams.get('primary') || searchParams.getAll('compare').length > 0))
-    const urlHasUniqPick =
-      searchParams.get('uprimary') ||
-      searchParams.getAll('ucompare').length > 0 ||
-      (searchParams.get('mode') === 'uniques' &&
-        (searchParams.get('primary') || searchParams.getAll('compare').length > 0))
+    const mode = searchParams.get('mode')
+    const urlMode: TabMode = mode === 'duplicates' || mode === 'uniques' ? mode : 'search'
+    if (urlMode !== searchMode) return
+    const urlHasPrimaryOrCompare =
+      (searchParams.get('mode') === 'duplicates' || searchParams.get('mode') === 'uniques') &&
+      (searchParams.get('primary') || searchParams.getAll('compare').length > 0)
     const primaryTroveIdLocal = searchMode === 'duplicates' ? dupPrimaryTroveId : uniqPrimaryTroveId
-    const compareTroveIdsLocal = searchMode === 'duplicates' ? dupCompareTroveIds : uniqCompareTroveIds
     const stateHasNone =
       !primaryTroveIdLocal && (searchMode === 'duplicates' ? !dupCompareTroveIds.size : !uniqCompareTroveIds.size)
-    if ((urlHasDupPick || urlHasUniqPick) && stateHasNone) return
+    if (urlHasPrimaryOrCompare && stateHasNone) return
 
-    const urlMode = searchParams.get('mode')
-    const urlHasDupUniquesMode = urlMode === 'duplicates' || urlMode === 'uniques'
     const urlHasQuery = searchParams.get('q') != null && searchParams.get('q') !== ''
     const urlHasTrove = searchParams.getAll('trove').length > 0
     const urlHasFileTypes = searchParams.getAll('fileTypes').length > 0
     const urlQuickMode = normalizeFileTypeQuickMode(searchParams.get('ftq'))
     const urlHasThumbs = searchParams.get('thumbs') === '1'
     const urlHasExtraFields = searchParams.getAll('extraFields').length > 0
-    const stateNotYetSynced =
-      (urlHasDupUniquesMode && searchMode === 'search') ||
-      (urlHasQuery && (!searchQuery || (searchQuery ?? '').trim() === '')) ||
-      (urlHasTrove && searchMode === 'search' && urlSearchTroveIds.size === 0) ||
-      (urlHasFileTypes && searchMode === 'search' && fileTypeFilters.size === 0) ||
-      (urlQuickMode !== fileTypeQuickMode) ||
-      (urlHasThumbs && searchMode === 'search' && !thumbnailOnly) ||
-      (urlHasExtraFields && searchMode === 'search' && extraGridFieldsSelected.size === 0)
-    if (stateNotYetSynced) return
-    const next = buildSearchParams()
+    const searchStateNotSynced =
+      searchMode === 'search' &&
+      ((urlHasQuery && (!searchQuery || (searchQuery ?? '').trim() === '')) ||
+        (urlHasTrove && urlSearchTroveIds.size === 0) ||
+        (urlHasFileTypes && fileTypeFilters.size === 0) ||
+        (urlQuickMode !== fileTypeQuickMode) ||
+        (urlHasThumbs && !thumbnailOnly) ||
+        (urlHasExtraFields && extraGridFieldsSelected.size === 0))
+    if (searchStateNotSynced) return
+    const next = buildAppUrlParams()
     if (next.toString() !== searchParams.toString()) {
       setSearchParams(next, { replace: true })
     }
@@ -384,7 +499,6 @@ function MobileApp() {
     uniqQuery,
     searchMode,
     urlSearchTroveIds,
-    selectedTroveIds,
     dupPrimaryTroveId,
     dupCompareTroveIds,
     uniqPrimaryTroveId,
@@ -409,6 +523,10 @@ function MobileApp() {
     duplicatesSortDir,
     uniquesSortBy,
     uniquesSortDir,
+    starSortBy,
+    starSortDir,
+    otherSortBy,
+    otherSortDir,
     searchParams,
   ])
 
@@ -1407,9 +1525,20 @@ function MobileApp() {
             aria-selected={searchMode === 'search'}
             className={`mobile-mode-tab ${searchMode === 'search' ? 'mobile-mode-tab--active' : ''}`}
             onClick={() => {
-              setSearchMode('search')
-              setSelectedTroveIds(new Set(urlSearchTroveIds))
-              setSearchParams(buildSearchParamsForMode('search', '', new Set()), { replace: true })
+              saveActiveTabSnapshot()
+              setSearchParams(
+                serializeUrlFromTabSessions(
+                  'search',
+                  {
+                    search: loadSearchTabSession(),
+                    duplicates: loadDuplicatesTabSession(),
+                    uniques: loadUniquesTabSession(),
+                  },
+                  troves,
+                  urlTroveId
+                ),
+                { replace: true }
+              )
               setSearchResult(null)
               setDuplicatesResult(null)
               setUniquesResult(null)
@@ -1423,16 +1552,30 @@ function MobileApp() {
             aria-selected={searchMode === 'duplicates'}
             className={`mobile-mode-tab ${searchMode === 'duplicates' ? 'mobile-mode-tab--active' : ''}`}
 onClick={() => {
-              if (searchMode === 'search') setUrlSearchTroveIds(new Set(selectedTroveIds))
-              const dupEmpty = !dupPrimaryTroveId && !dupCompareTroveIds.size
-              if (dupEmpty && (uniqPrimaryTroveId || uniqCompareTroveIds.size)) {
-                setDupPrimaryTroveId(uniqPrimaryTroveId)
-                setDupCompareTroveIds(new Set(uniqCompareTroveIds))
-                setSearchParams(buildSearchParamsForMode('duplicates', uniqPrimaryTroveId, uniqCompareTroveIds), { replace: true })
-              } else {
-                setSearchParams(buildSearchParamsForMode('duplicates', dupPrimaryTroveId, dupCompareTroveIds), { replace: true })
+              saveActiveTabSnapshot()
+              let dup = loadDuplicatesTabSession() ?? DEFAULT_DUP_SESSION
+              const uniq = loadUniquesTabSession()
+              const dupEmpty = !dup.dupPrimaryTroveId && dup.dupCompareTroveIds.length === 0
+              if (dupEmpty && uniq && (uniq.uniqPrimaryTroveId || uniq.uniqCompareTroveIds.length > 0)) {
+                dup = {
+                  ...dup,
+                  dupPrimaryTroveId: uniq.uniqPrimaryTroveId,
+                  dupCompareTroveIds: [...uniq.uniqCompareTroveIds],
+                }
               }
-              setSearchMode('duplicates')
+              setSearchParams(
+                serializeUrlFromTabSessions(
+                  'duplicates',
+                  {
+                    search: loadSearchTabSession(),
+                    duplicates: dup,
+                    uniques: loadUniquesTabSession(),
+                  },
+                  troves,
+                  urlTroveId
+                ),
+                { replace: true }
+              )
               setSearchResult(null)
               setUniquesResult(null)
             }}
@@ -1445,17 +1588,34 @@ onClick={() => {
             aria-selected={searchMode === 'uniques'}
             className={`mobile-mode-tab ${searchMode === 'uniques' ? 'mobile-mode-tab--active' : ''}`}
 onClick={() => {
-              if (searchMode === 'search') setUrlSearchTroveIds(new Set(selectedTroveIds))
-              const uniqEmpty = !uniqPrimaryTroveId && !uniqCompareTroveIds.size
-              const dupSelfCompare = dupCompareTroveIds.size === 1 && dupCompareTroveIds.has(dupPrimaryTroveId)
-              if (uniqEmpty && (dupPrimaryTroveId || dupCompareTroveIds.size) && !dupSelfCompare) {
-                setUniqPrimaryTroveId(dupPrimaryTroveId)
-                setUniqCompareTroveIds(new Set(dupCompareTroveIds))
-                setSearchParams(buildSearchParamsForMode('uniques', dupPrimaryTroveId, dupCompareTroveIds), { replace: true })
-              } else {
-                setSearchParams(buildSearchParamsForMode('uniques', uniqPrimaryTroveId, uniqCompareTroveIds), { replace: true })
+              saveActiveTabSnapshot()
+              let uniq = loadUniquesTabSession() ?? DEFAULT_UNIQ_SESSION
+              const dup = loadDuplicatesTabSession()
+              const uniqEmpty = !uniq.uniqPrimaryTroveId && uniq.uniqCompareTroveIds.length === 0
+              const dupSelfCompare =
+                !!dup &&
+                dup.dupCompareTroveIds.length === 1 &&
+                dup.dupCompareTroveIds[0] === dup.dupPrimaryTroveId
+              if (uniqEmpty && dup && (dup.dupPrimaryTroveId || dup.dupCompareTroveIds.length > 0) && !dupSelfCompare) {
+                uniq = {
+                  ...uniq,
+                  uniqPrimaryTroveId: dup.dupPrimaryTroveId,
+                  uniqCompareTroveIds: [...dup.dupCompareTroveIds],
+                }
               }
-              setSearchMode('uniques')
+              setSearchParams(
+                serializeUrlFromTabSessions(
+                  'uniques',
+                  {
+                    search: loadSearchTabSession(),
+                    duplicates: loadDuplicatesTabSession(),
+                    uniques: uniq,
+                  },
+                  troves,
+                  urlTroveId
+                ),
+                { replace: true }
+              )
               setSearchResult(null)
               setDuplicatesResult(null)
             }}
