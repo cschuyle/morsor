@@ -148,12 +148,12 @@ export default function Login() {
     setSubmitting(true)
     setError('')
     const formEl = formRef.current ?? e.currentTarget
+    // Password managers often trigger submit without a real pointer event on the button, so
+    // onPointerDown sync never runs. They may also commit .value a frame or two after submit.
+    syncControlledFieldsFromDom()
+    await waitForAutofillPaint()
     let { user, pass } = mergeCredentialsFromForm(formEl, username, password)
 
-    if (!user || !pass) {
-      await waitForAutofillPaint()
-      ;({ user, pass } = mergeCredentialsFromForm(formEl, username, password))
-    }
     if (!user || !pass) {
       await new Promise<void>((r) => setTimeout(r, 100))
       ;({ user, pass } = mergeCredentialsFromForm(formEl, username, password))
@@ -183,6 +183,10 @@ export default function Login() {
         }
       }
       const csrf = getCsrfToken()
+      // Final DOM read: autofill may land after the waits above, or between prime and POST.
+      const creds = mergeCredentialsFromForm(formEl, user, pass)
+      user = creds.user
+      pass = creds.pass
       const body = new URLSearchParams({ username: user, password: pass })
       const headers: Record<string, string> = { 'Content-Type': 'application/x-www-form-urlencoded' }
       if (csrf) headers['X-XSRF-TOKEN'] = csrf
