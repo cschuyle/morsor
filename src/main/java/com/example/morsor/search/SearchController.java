@@ -130,11 +130,16 @@ public class SearchController {
                 .toList();
         boolean descending = "desc".equalsIgnoreCase(sortDir != null ? sortDir : "asc");
         if (sortBy != null && !sortBy.isBlank()) {
-            Comparator<SearchResultWithScore> cmp = comparatorForWithScore(sortBy);
-            if (cmp != null) {
-                if (descending) {
+            Comparator<SearchResultWithScore> cmp;
+            if (sortBy.regionMatches(true, 0, EXTRA_SORT_PREFIX, 0, EXTRA_SORT_PREFIX.length())) {
+                cmp = comparatorForExtraFieldSort(sortBy, descending);
+            } else {
+                cmp = comparatorForWithScore(sortBy);
+                if (cmp != null && descending) {
                     cmp = cmp.reversed();
                 }
+            }
+            if (cmp != null) {
                 all = all.stream().sorted(cmp).toList();
             }
         }
@@ -441,15 +446,24 @@ public class SearchController {
 
     private static final String EXTRA_SORT_PREFIX = "extra:";
 
-    private static Comparator<SearchResultWithScore> comparatorForWithScore(String sortBy) {
-        if (sortBy != null && sortBy.regionMatches(true, 0, EXTRA_SORT_PREFIX, 0, EXTRA_SORT_PREFIX.length())) {
-            String jsonKey = sortBy.substring(EXTRA_SORT_PREFIX.length()).trim();
-            if (!jsonKey.isEmpty()) {
-                return Comparator.comparing(
-                        r -> extraFieldValueForSort(r.result(), jsonKey),
-                        Comparator.nullsLast(String.CASE_INSENSITIVE_ORDER));
-            }
+    /**
+     * Sort by an extra JSON key: rows with no value (missing / blank) always sort after rows with a value,
+     * for both ascending and descending string order (reversing the whole comparator would put nulls first).
+     */
+    private static Comparator<SearchResultWithScore> comparatorForExtraFieldSort(String sortBy, boolean descending) {
+        String jsonKey = sortBy.substring(EXTRA_SORT_PREFIX.length()).trim();
+        if (jsonKey.isEmpty()) {
+            return null;
         }
+        Comparator<String> byString = descending
+                ? String.CASE_INSENSITIVE_ORDER.reversed()
+                : String.CASE_INSENSITIVE_ORDER;
+        return Comparator
+                .comparing((SearchResultWithScore r) -> extraFieldValueForSort(r.result(), jsonKey) == null)
+                .thenComparing(r -> extraFieldValueForSort(r.result(), jsonKey), Comparator.nullsLast(byString));
+    }
+
+    private static Comparator<SearchResultWithScore> comparatorForWithScore(String sortBy) {
         return switch (sortBy.toLowerCase()) {
             case "title" -> Comparator.comparing(
                     r -> r.result().title() != null ? r.result().title().toLowerCase() : "");
