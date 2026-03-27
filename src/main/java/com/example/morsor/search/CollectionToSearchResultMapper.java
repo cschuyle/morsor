@@ -197,6 +197,7 @@ public final class CollectionToSearchResultMapper {
         Map<String, Object> extraFields = buildExtraFields(item);
         if ("littlePrinceItem".equals(itemTypeRaw)) {
             extraFields = mergeLpidIntoExtraFields(item, extraFields);
+            extraFields = mergeTintenfassIdIntoExtraFields(item, extraFields);
         }
 
         return new SearchResult(id, itemType, title, snippet, troveName, troveId, hasThumbnail, thumbnailUrl, largeImageUrl, rawSourceItem, files, itemUrl, extraFields);
@@ -233,6 +234,24 @@ public final class CollectionToSearchResultMapper {
         Object lpidVal = PRETTY_MAPPER.convertValue(lpidNode, Object.class);
         Map<String, Object> out = extra != null ? new LinkedHashMap<>(extra) : new LinkedHashMap<>();
         out.put("lpid", lpidVal);
+        return out;
+    }
+
+    /**
+     * Ensures {@code tintenfassId} from the source JSON is present in {@link SearchResult#extraFields()} when the field
+     * exists (same rationale as {@link #mergeLpidIntoExtraFields}).
+     */
+    private static Map<String, Object> mergeTintenfassIdIntoExtraFields(JsonNode item, Map<String, Object> extra) {
+        if (item == null || !item.isObject()) {
+            return extra;
+        }
+        JsonNode node = item.get("tintenfassId");
+        if (node == null || node.isNull()) {
+            return extra;
+        }
+        Object val = PRETTY_MAPPER.convertValue(node, Object.class);
+        Map<String, Object> out = extra != null ? new LinkedHashMap<>(extra) : new LinkedHashMap<>();
+        out.put("tintenfassId", val);
         return out;
     }
 

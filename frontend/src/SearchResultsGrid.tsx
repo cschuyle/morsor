@@ -426,18 +426,30 @@ export function extraFieldsFromRow(row: SearchResultRow | undefined | null): Rec
   return asRecord(row.extraFields) ?? asRecord((row as Record<string, unknown>).littlePrinceItemExtra)
 }
 
+/** LP vendor ids: always listed in the extra-fields picker when any row is a Little Prince item. */
+const LITTLE_PRINCE_EXTRA_FIELD_KEYS_ALWAYS_OFFERED = ['lpid', 'tintenfassId'] as const
+
 /** Distinct extra-field JSON keys on the current rows, sorted for stable column order. */
 export function collectExtraFieldKeysFromRows(rows: SearchResultRow[] | null | undefined): string[] {
   if (!Array.isArray(rows) || rows.length === 0) {
     return []
   }
   const keys = new Set<string>()
+  let hasLittlePrinceItem = false
   for (const row of rows) {
+    if (row?.itemType === 'littlePrinceItem') {
+      hasLittlePrinceItem = true
+    }
     const ex = extraFieldsFromRow(row)
     if (!ex) {
       continue
     }
     for (const k of Object.keys(ex)) {
+      keys.add(k)
+    }
+  }
+  if (hasLittlePrinceItem) {
+    for (const k of LITTLE_PRINCE_EXTRA_FIELD_KEYS_ALWAYS_OFFERED) {
       keys.add(k)
     }
   }

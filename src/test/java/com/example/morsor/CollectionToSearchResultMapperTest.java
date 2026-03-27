@@ -200,6 +200,7 @@ class CollectionToSearchResultMapperTest {
         assertThat(results.get(1).extraFields()).isNotNull();
         assertThat(results.get(1).extraFields()).containsEntry("author", "Antoine de Saint-Exupéry");
         assertThat(results.get(1).extraFields()).containsEntry("lpid", "PP-4277");
+        assertThat(results.get(1).extraFields()).containsEntry("tintenfassId", "81");
         assertThat(results.get(2).extraFields()).isNotNull();
         assertThat(results.get(2).extraFields()).containsEntry("year", "2020");
         assertThat(results.get(2).extraFields()).containsEntry("director", "Test Director");
