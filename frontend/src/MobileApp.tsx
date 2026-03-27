@@ -1476,9 +1476,11 @@ onClick={() => {
             const anyQuickSelected = fileTypeQuickMode === FileTypeQuickMode.Any
             const mehQuickSelected = fileTypeQuickMode === FileTypeQuickMode.Meh
             const hasThumbFilter = thumbnailOnly
+            const mediaPickerHasSelection =
+              hasThumbFilter || fileTypesForLabel.size > 0 || anyQuickSelected
             return (
               <div className="mobile-filetype-dropdown-wrap mobile-filetype-dropdown-wrap--form" ref={fileTypeDropdownRef}>
-              <div className={`mobile-filetype-trigger-wrap${!(mehQuickSelected && !hasThumbFilter) ? ' mobile-filetype-trigger-wrap--filtered' : ''}`}>
+              <div className={`mobile-filetype-trigger-wrap${mediaPickerHasSelection ? ' mobile-filetype-trigger-wrap--filtered' : ''}`}>
                 <button
                   type="button"
                   className="mobile-filetype-trigger"
