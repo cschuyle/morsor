@@ -793,8 +793,8 @@ public final class MorsorApiCli {
     static String summaryUsage() {
         return """
                 USAGE SUMMARY
-                  morsor-api-cli [OPTIONS] login
-                  morsor-api-cli [OPTIONS] [<baseUrl>] [<action>] [--<key> <value> ...] [naked query text]
+                  morsor-cli [OPTIONS] login
+                  morsor-cli [OPTIONS] [<baseUrl>] [<action>] [--<key> <value> ...] [naked query text]
 
                 HELP
                   -h, --help  Show this summary
@@ -820,11 +820,11 @@ public final class MorsorApiCli {
                     export MORSOR_CLI_TOKEN='...'
 
                 EXAMPLES
-                  ./scripts/morsor-api --help
-                  ./scripts/morsor-api --man
-                  ./scripts/morsor-api alien
-                  ./scripts/morsor-api search --q alien --P 0 --S 10
-                  ./scripts/morsor-api login
+                  morsor-cli --help
+                  morsor-cli --man
+                  morsor-cli alien
+                  morsor-cli search --q alien --P 0 --S 10
+                  morsor-cli login
                 """;
     }
 
@@ -832,9 +832,9 @@ public final class MorsorApiCli {
     static String usage() {
         return """
                 USAGE
-                  morsor-api-cli [OPTIONS] login
-                  morsor-api-cli [OPTIONS] [<baseUrl>] <METHOD> <path> [-- <query>]
-                  morsor-api-cli [OPTIONS] [<baseUrl>] [<action>] [--<key> <value> ...] [naked query text]
+                  morsor-cli [OPTIONS] login
+                  morsor-cli [OPTIONS] [<baseUrl>] <METHOD> <path> [-- <query>]
+                  morsor-cli [OPTIONS] [<baseUrl>] [<action>] [--<key> <value> ...] [naked query text]
 
                 OPTIONS
                   -b, --base URL     Base URL without trailing slash (default: http://localhost:8080)
@@ -856,7 +856,7 @@ public final class MorsorApiCli {
 
                     export MORSOR_CLI_TOKEN='…'
 
-                  Example:  eval "$(./scripts/morsor-api login)"
+                  Example:  eval "$(morsor-cli login)"
 
                 METHOD
                   GET | POST | HEAD
@@ -925,20 +925,20 @@ public final class MorsorApiCli {
 
                 EXAMPLES
 
-                  ./scripts/morsor-api --help
-                  ./scripts/morsor-api http://localhost:8080 login
-                  ./scripts/morsor-api -v -b http://localhost:8080 GET /api/search -- 'query=*&page=0&size=10'
-                  ./scripts/morsor-api alien
-                  ./scripts/morsor-api search --q alien --P 0 --S 10
-                  ./scripts/morsor-api dups --p my-trove --c other-trove --q alien
-                  ./scripts/morsor-api GET /actuator/health
-                  ./scripts/morsor-api https://example.com GET /actuator/health
-                  ./scripts/morsor-api -t "$MORSOR_CLI_TOKEN" GET /api/status
-                  ./scripts/morsor-api https://example.com login
-                  ./scripts/morsor-api login
-                  ./scripts/morsor-api -t "$MORSOR_CLI_TOKEN" GET /api/search -- query=*&page=0&size=10
-                  ./scripts/morsor-api -t "$MORSOR_CLI_TOKEN" POST /api/troves/reload
-                  ./scripts/morsor-api -t "$MORSOR_CLI_TOKEN" GET /api/search/duplicates -- primaryTrove=my-trove&query=*
+                  morsor-cli --help
+                  morsor-cli http://localhost:8080 login
+                  morsor-cli -v -b http://localhost:8080 GET /api/search -- 'query=*&page=0&size=10'
+                  morsor-cli alien
+                  morsor-cli search --q alien --P 0 --S 10
+                  morsor-cli dups --p my-trove --c other-trove --q alien
+                  morsor-cli GET /actuator/health
+                  morsor-cli https://example.com GET /actuator/health
+                  morsor-cli -t "$MORSOR_CLI_TOKEN" GET /api/status
+                  morsor-cli https://example.com login
+                  morsor-cli login
+                  morsor-cli -t "$MORSOR_CLI_TOKEN" GET /api/search -- query=*&page=0&size=10
+                  morsor-cli -t "$MORSOR_CLI_TOKEN" POST /api/troves/reload
+                  morsor-cli -t "$MORSOR_CLI_TOKEN" GET /api/search/duplicates -- primaryTrove=my-trove&query=*
 
                 """;
     }
