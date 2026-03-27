@@ -1,8 +1,18 @@
 # Release notes
 
+*(Tag created when deploy runs.)*
+
 ## Unreleased
 
-*(Tag created when deploy runs.)*
+### Extra fields
+- Added optional extra-field columns in search list view (desktop and mobile), including URL persistence and toolbar/dropdown UX improvements.
+  - Sorting supports `sortBy=extra:<key>`.
+  - Missing/blank/whitespace extra values are treated as nonexistent; rows with no extra-field value stay last when sorting by extra fields.
+
+### Lightbox and tooltip improvements
+- Tooltip/lightbox improvements:
+  - Lightbox shows Extra fields.
+  - Linkified URLs in any text.
 
 ## release-v20260323-1521-f57df91
 
