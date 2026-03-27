@@ -152,29 +152,9 @@ function MobileApp() {
   }, [searchMode, searchResult?.results])
 
   const visibleExtraFieldKeysForGrid = useMemo(
-    () => extraFieldKeysOnPage.filter((k) => extraGridFieldsSelected.has(k)),
-    [extraFieldKeysOnPage, extraGridFieldsSelected]
+    () => [...extraGridFieldsSelected],
+    [extraGridFieldsSelected]
   )
-
-  const extraFieldKeysPageSig = extraFieldKeysOnPage.join('\u0001')
-  useEffect(() => {
-    if (extraFieldKeysOnPage.length === 0) {
-      return
-    }
-    const avail = new Set(extraFieldKeysOnPage)
-    setExtraGridFieldsSelected((prev) => {
-      const next = new Set<string>()
-      prev.forEach((k) => {
-        if (avail.has(k)) {
-          next.add(k)
-        }
-      })
-      if (next.size === prev.size && [...next].every((k) => prev.has(k))) {
-        return prev
-      }
-      return next
-    })
-  }, [extraFieldKeysPageSig])
 
   const mobileOverflowDropdownOpen = fileTypeDropdownOpen || extraFieldDropdownOpen
 
