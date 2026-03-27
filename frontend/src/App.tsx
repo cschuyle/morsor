@@ -123,6 +123,9 @@ function App() {
 
   const extraFieldKeysPageSig = extraFieldKeysOnPage.join('\u0001')
   useEffect(() => {
+    if (extraFieldKeysOnPage.length === 0) {
+      return
+    }
     const avail = new Set(extraFieldKeysOnPage)
     setExtraGridFieldsSelected((prev) => {
       const next = new Set<string>()
@@ -369,6 +372,8 @@ function App() {
       if (Number.isFinite(sizeParam) && sizeParam > 0) {
         setPageSize(sizeParam)
       }
+      const extraFromUrl = searchParams.getAll('extraFields').map((s) => s.trim()).filter(Boolean)
+      setExtraGridFieldsSelected(new Set(extraFromUrl))
     } else if (mode === 'duplicates') {
       const primary = searchParams.get('primary')
       setDupPrimaryTroveId(primary != null ? (urlTroveId(primary, troves) ?? primary) : '')
@@ -417,6 +422,8 @@ function App() {
       const existingPage = searchParams.get('page')
       if (existingPage != null) next.set('page', existingPage)
       next.set('size', String(sizeForMode))
+      const sortedExtra = [...extraGridFieldsSelected].sort((a, b) => a.localeCompare(b))
+      sortedExtra.forEach((k) => next.append('extraFields', k))
     } else if (mode === 'duplicates') {
       const primaryId = dupPrimary ? (urlTroveId(dupPrimary, troves) ?? dupPrimary) : null
       if (primaryId) next.set('primary', primaryId)
@@ -442,12 +449,14 @@ function App() {
     const urlHasFileTypes = searchParams.getAll('fileTypes').length > 0
     const urlQuickMode = normalizeFileTypeQuickMode(searchParams.get('ftq'))
     const urlHasThumbs = searchParams.get('thumbs') === '1'
+    const urlHasExtraFields = searchParams.getAll('extraFields').length > 0
     const searchStateNotSynced =
       (urlHasQuery && (!query || (query ?? '').trim() === '')) ||
       (urlHasTrove && searchSelectedTroveIds.size === 0) ||
       (urlHasFileTypes && fileTypeFilters.size === 0) ||
       (urlQuickMode !== fileTypeQuickMode) ||
-      (urlHasThumbs && !thumbnailOnly)
+      (urlHasThumbs && !thumbnailOnly) ||
+      (urlHasExtraFields && extraGridFieldsSelected.size === 0)
     if (searchMode === 'search' && searchStateNotSynced) return
     const next = buildSearchParams(
       searchMode,
@@ -464,7 +473,7 @@ function App() {
     if (next.toString() !== searchParams.toString()) {
       setSearchParams(next, { replace: true })
     }
-  }, [query, searchMode, searchSelectedTroveIds, primaryTroveId, dupCompareTroveIds, uniqCompareTroveIds, fileTypeFilters, fileTypeQuickMode, thumbnailOnly, boostTroveId, searchResultsViewMode, searchResult?.page, searchResult?.size, pageSize, dupPageSize, uniqPageSize])
+  }, [query, searchMode, searchSelectedTroveIds, primaryTroveId, dupCompareTroveIds, uniqCompareTroveIds, fileTypeFilters, fileTypeQuickMode, thumbnailOnly, boostTroveId, searchResultsViewMode, extraGridFieldsSelected, searchResult?.page, searchResult?.size, pageSize, dupPageSize, uniqPageSize])
 
   // Keep the search page input in sync with the current page (1-based)
   useEffect(() => {
