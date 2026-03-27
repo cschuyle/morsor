@@ -695,9 +695,10 @@ const scoreColumn = {
     const v = info.getValue()
     return typeof v === 'number' ? v.toFixed(2) : '—'
   },
-  size: 80,
-  minSize: 50,
-  maxSize: 150,
+  size: 100,
+  minSize: 70,
+  maxSize: 260,
+  enableResizing: true,
 }
 
 const RAW_SOURCE_NOT_AVAILABLE = 'Raw Source Not Available'
@@ -875,6 +876,7 @@ export function SearchResultsGrid({ data, sortBy = null, sortDir = 'asc', onSort
     },
     onGlobalFilterChange: setGlobalFilter,
     manualSorting: true,
+    enableSortingRemoval: false,
     enableColumnResizing: true,
     columnResizeMode: 'onChange',
     defaultColumn: { minSize: 40, maxSize: 1200 },
