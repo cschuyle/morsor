@@ -14,6 +14,8 @@ import { getApiAuthHeaders } from './apiAuth'
 import { getCsrfToken } from './getCsrfToken'
 import { performLogout } from './performLogout'
 import { queryCache } from './queryCache'
+import type { QueryResultTiming } from './queryResultTiming'
+import { QueryTimingText } from './QueryTimingText'
 import { formatCount, formatCacheBytes } from './formatCount'
 import { groupFileTypes, getGroupNameIfFullySelected, getFullySelectedGroupNames } from './fileTypeGroups'
 import { FileTypeQuickMode, normalizeFileTypeQuickMode } from './fileTypeQuickMode'
@@ -117,7 +119,8 @@ function App() {
   const [galleryDecorate, setGalleryDecorate] = useState(true)
   const [compareProgress, setCompareProgress] = useState({ current: 0, total: 0 })
   const [compareElapsedSec, setCompareElapsedSec] = useState(0)
-  const [lastCompareQueryTimeSec, setLastCompareQueryTimeSec] = useState<number | null>(null)
+  const [compareQueryTiming, setCompareQueryTiming] = useState<QueryResultTiming | null>(null)
+  const [searchQueryTiming, setSearchQueryTiming] = useState<QueryResultTiming | null>(null)
   const [compareRawSourceLightbox, setCompareRawSourceLightbox] = useState<{ title: string; rawSourceItem: string } | null>(null)
   const [reloadTrovesInProgress, setReloadTrovesInProgress] = useState(false)
   const [reloadTrovesProgress, setReloadTrovesProgress] = useState({ current: 0, total: 0 })
@@ -228,6 +231,7 @@ function App() {
     const q = queryRef.current
     if (!q.trim()) {
       setSearchResult({ count: 0, results: [], page: 0, size })
+      setSearchQueryTiming(null)
       return
     }
     const troveIds = troveIdsOverride ?? selectedTroveIds
@@ -258,9 +262,11 @@ function App() {
     }
     const url = `/api/search?${params}`
     abortControllerRef.current?.abort()
-    const cached = queryCache.get(url) as SearchResultData | null | undefined
-    if (cached) {
+    const hit = queryCache.get(url)
+    if (hit) {
+      const cached = hit.data as SearchResultData
       setSearchResult(cached)
+      setSearchQueryTiming({ durationMs: hit.durationMs, receivedAtMs: hit.receivedAtMs })
       if (Array.isArray(cached.availableFileTypes) && cached.availableFileTypes.length > 0) {
         setAllAvailableFileTypes((prev) => {
           const next = new Set(prev)
@@ -270,6 +276,8 @@ function App() {
       }
       return
     }
+    setSearchQueryTiming(null)
+    const searchStartedAt = Date.now()
     const controller = new AbortController()
     abortControllerRef.current = controller
     const requestId = ++searchRequestIdRef.current
@@ -283,7 +291,10 @@ function App() {
       })
       .then((data: SearchResultData) => {
         if (searchRequestIdRef.current !== requestId) return
-        queryCache.set(url, data)
+        const receivedAtMs = Date.now()
+        const durationMs = receivedAtMs - searchStartedAt
+        queryCache.set(url, data, { durationMs, receivedAtMs })
+        setSearchQueryTiming({ durationMs, receivedAtMs })
         setSearchResult(data)
         if (Array.isArray(data.availableFileTypes) && data.availableFileTypes.length > 0) {
           setAllAvailableFileTypes((prev) => {
@@ -858,12 +869,15 @@ function App() {
     compareIdsToSend.forEach((id) => params.append('compareTrove', id))
     const streamUrl = `/api/search/duplicates/stream?${params}`
     const restUrl = `/api/search/duplicates?${params}`
-    const cached = queryCache.get(restUrl) as DuplicatesResultData | null | undefined
-    if (cached) {
+    const dupHit = queryCache.get(restUrl)
+    if (dupHit) {
+      const cached = dupHit.data as DuplicatesResultData
       setDuplicatesResult(cached)
       setDuplicatesPage(pageNum)
+      setCompareQueryTiming({ durationMs: dupHit.durationMs, receivedAtMs: dupHit.receivedAtMs })
       return
     }
+    setCompareQueryTiming(null)
     abortControllerRef.current?.abort()
     const controller = new AbortController()
     abortControllerRef.current = controller
@@ -882,7 +896,10 @@ function App() {
       (current, total) => setCompareProgress({ current, total }),
       (data) => {
         const dup = data as DuplicatesResultData
-        queryCache.set(restUrl, dup)
+        const receivedAtMs = Date.now()
+        const durationMs = compareTimerStartRef.current != null ? receivedAtMs - compareTimerStartRef.current : 0
+        queryCache.set(restUrl, dup, { durationMs, receivedAtMs })
+        setCompareQueryTiming({ durationMs, receivedAtMs })
         setDuplicatesResult(dup)
         setDuplicatesPage(pageNum)
         setCompareProgress({ current: 0, total: 0 })
@@ -896,7 +913,6 @@ function App() {
         compareIntervalRef.current = null
       }
       if (compareTimerStartRef.current != null) {
-        setLastCompareQueryTimeSec(Math.round((Date.now() - compareTimerStartRef.current) / 1000))
         compareTimerStartRef.current = null
       }
       setCompareElapsedSec(0)
@@ -940,12 +956,15 @@ function App() {
     selectedTroveIds.forEach((id) => params.append('compareTrove', id))
     const streamUrl = `/api/search/uniques/stream?${params}`
     const restUrl = `/api/search/uniques?${params}`
-    const cached = queryCache.get(restUrl) as UniquesResultData | null | undefined
-    if (cached) {
+    const uniqHit = queryCache.get(restUrl)
+    if (uniqHit) {
+      const cached = uniqHit.data as UniquesResultData
       setUniquesResult(cached)
       setUniquesPage(pageNum)
+      setCompareQueryTiming({ durationMs: uniqHit.durationMs, receivedAtMs: uniqHit.receivedAtMs })
       return
     }
+    setCompareQueryTiming(null)
     abortControllerRef.current?.abort()
     const controller = new AbortController()
     abortControllerRef.current = controller
@@ -964,7 +983,10 @@ function App() {
       (current, total) => setCompareProgress({ current, total }),
       (data) => {
         const uniq = data as UniquesResultData
-        queryCache.set(restUrl, uniq)
+        const receivedAtMs = Date.now()
+        const durationMs = compareTimerStartRef.current != null ? receivedAtMs - compareTimerStartRef.current : 0
+        queryCache.set(restUrl, uniq, { durationMs, receivedAtMs })
+        setCompareQueryTiming({ durationMs, receivedAtMs })
         setUniquesResult(uniq)
         setUniquesPage(pageNum)
         setCompareProgress({ current: 0, total: 0 })
@@ -978,7 +1000,6 @@ function App() {
         compareIntervalRef.current = null
       }
       if (compareTimerStartRef.current != null) {
-        setLastCompareQueryTimeSec(Math.round((Date.now() - compareTimerStartRef.current) / 1000))
         compareTimerStartRef.current = null
       }
       setCompareElapsedSec(0)
@@ -2319,7 +2340,7 @@ function App() {
               return (
                 <>
                   <p className="search-count search-count-detail">
-                    <><strong>Primary:</strong> {primaryName} · {compareSummary}.{lastCompareQueryTimeSec != null && <> <strong>Duration</strong>: {lastCompareQueryTimeSec}s.</>} </>{formatCount(total)} {isSelfCompareDup ? '' : 'primary '}item{total !== 1 ? 's' : ''} with possible duplicates.
+                    <><strong>Primary:</strong> {primaryName} · {compareSummary}.<QueryTimingText timing={compareQueryTiming} /> </>{formatCount(total)} {isSelfCompareDup ? '' : 'primary '}item{total !== 1 ? 's' : ''} with possible duplicates.
                     {totalPages > 1 && ` Showing ${formatCount(from)}–${formatCount(to)}.`}
                   </p>
                   <div className="search-results-options">
@@ -2443,7 +2464,7 @@ function App() {
               return (
                 <>
                   <p className="search-count search-count-detail">
-                    <><strong>Primary:</strong> {primaryName} · {compareSummary}.{lastCompareQueryTimeSec != null && <> <strong>Duration</strong>: {lastCompareQueryTimeSec}s.</>} </>{formatCount(total)} item{total !== 1 ? 's' : ''}{isSelfCompareUniq ? ' ' : ' in primary '}are either unique or have no obvious match.
+                    <><strong>Primary:</strong> {primaryName} · {compareSummary}.<QueryTimingText timing={compareQueryTiming} /> </>{formatCount(total)} item{total !== 1 ? 's' : ''}{isSelfCompareUniq ? ' ' : ' in primary '}are either unique or have no obvious match.
                     {totalPages > 1 && ` Showing ${formatCount(from)}–${formatCount(to)}.`}
                   </p>
                   <div className="search-results-options">
@@ -2614,6 +2635,7 @@ function App() {
                   <p className="search-count search-count-detail">
                     {formatCount(count)} item{count !== 1 ? 's' : ''} in {formatCount(trovesWithResults)} out of {formatCount(trovesInScope)} {scopeLabel}.
                     {totalPages > 1 && ` Showing ${formatCount(from)}–${formatCount(to)}.`}
+                    <QueryTimingText timing={searchQueryTiming} />
                   </p>
                   <div className="search-results-options">
                     <span className="search-results-options-view-group">
@@ -2898,6 +2920,7 @@ function App() {
                           const data = JSON.parse(line)
                           if (data.type === 'progress') setReloadTrovesProgress({ current: data.current ?? 0, total: data.total ?? 0 })
                           else if (data.type === 'done') {
+                            queryCache.clear()
                             const r = await fetch('/api/troves', { credentials: 'include', headers: { ...getApiAuthHeaders() } })
                             if (r.ok) { const arr = await r.json(); if (Array.isArray(arr)) setTroves(arr) }
                             refreshStatusMessage()

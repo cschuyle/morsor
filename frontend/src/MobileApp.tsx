@@ -7,6 +7,8 @@ import { getApiAuthHeaders } from './apiAuth'
 import { getCsrfToken } from './getCsrfToken'
 import { performLogout } from './performLogout'
 import { queryCache } from './queryCache'
+import type { QueryResultTiming } from './queryResultTiming'
+import { QueryTimingText } from './QueryTimingText'
 import { formatCount } from './formatCount'
 import { groupFileTypes, getGroupNameIfFullySelected, ALL_KNOWN_FILE_TYPES } from './fileTypeGroups'
 import { FileTypeQuickMode, normalizeFileTypeQuickMode } from './fileTypeQuickMode'
@@ -125,7 +127,8 @@ function MobileApp() {
   const [cacheLabel, setCacheLabel] = useState('')
   const [compareProgress, setCompareProgress] = useState({ current: 0, total: 0 })
   const [compareElapsedSec, setCompareElapsedSec] = useState(0)
-  const [lastCompareQueryTimeSec, setLastCompareQueryTimeSec] = useState<number | null>(null)
+  const [compareQueryTiming, setCompareQueryTiming] = useState<QueryResultTiming | null>(null)
+  const [searchQueryTiming, setSearchQueryTiming] = useState<QueryResultTiming | null>(null)
   const [compareRawSourceLightbox, setCompareRawSourceLightbox] = useState<{ title: string; rawSourceItem: string } | null>(null)
   const [reloadTrovesInProgress, setReloadTrovesInProgress] = useState(false)
   const [reloadTrovesProgress, setReloadTrovesProgress] = useState({ current: 0, total: 0 })
@@ -690,6 +693,7 @@ function MobileApp() {
     const q = queryRef.current.trim()
     if (!q) {
       setSearchResult({ count: 0, results: [], page: 0, size })
+      setSearchQueryTiming(null)
       return
     }
     const sortBy = sortByOverride ?? effectiveSortBy
@@ -719,9 +723,11 @@ function MobileApp() {
     }
     const url = `/api/search?${params}`
     abortRef.current?.abort()
-    const cached = queryCache.get(url) as SearchResultData | null | undefined
-    if (cached) {
+    const hit = queryCache.get(url)
+    if (hit) {
+      const cached = hit.data as SearchResultData
       setSearchResult(cached)
+      setSearchQueryTiming({ durationMs: hit.durationMs, receivedAtMs: hit.receivedAtMs })
       if (Array.isArray(cached?.availableFileTypes) && cached.availableFileTypes.length > 0) {
         setAllAvailableFileTypes((prev) => {
           const next = new Set<string>(prev)
@@ -731,6 +737,8 @@ function MobileApp() {
       }
       return
     }
+    setSearchQueryTiming(null)
+    const searchStartedAt = Date.now()
     const controller = new AbortController()
     abortRef.current = controller
     const requestId = ++searchRequestIdRef.current
@@ -742,7 +750,10 @@ function MobileApp() {
       })
       .then((data: SearchResultData) => {
         if (searchRequestIdRef.current !== requestId) return
-        queryCache.set(url, data)
+        const receivedAtMs = Date.now()
+        const durationMs = receivedAtMs - searchStartedAt
+        queryCache.set(url, data, { durationMs, receivedAtMs })
+        setSearchQueryTiming({ durationMs, receivedAtMs })
         setSearchResult(data)
         if (Array.isArray(data?.availableFileTypes) && data.availableFileTypes.length > 0) {
           setAllAvailableFileTypes((prev) => {
@@ -833,12 +844,15 @@ function MobileApp() {
     compareIdsToSend.forEach((id) => params.append('compareTrove', id))
     const streamUrl = `/api/search/duplicates/stream?${params}`
     const restUrl = `/api/search/duplicates?${params}`
-    const cached = queryCache.get(restUrl) as DuplicatesResultData | null | undefined
-    if (cached) {
+    const dupHit = queryCache.get(restUrl)
+    if (dupHit) {
+      const cached = dupHit.data as DuplicatesResultData
       setDuplicatesResult(cached)
       setDuplicatesPage(pageNum)
+      setCompareQueryTiming({ durationMs: dupHit.durationMs, receivedAtMs: dupHit.receivedAtMs })
       return
     }
+    setCompareQueryTiming(null)
     abortRef.current?.abort()
     const controller = new AbortController()
     abortRef.current = controller
@@ -853,7 +867,10 @@ function MobileApp() {
     }, 1000)
     readCompareStream(streamUrl, controller.signal, (current, total) => setCompareProgress({ current, total }), (result) => {
       const data = result as DuplicatesResultData
-      queryCache.set(restUrl, data)
+      const receivedAtMs = Date.now()
+      const durationMs = compareTimerStartRef.current != null ? receivedAtMs - compareTimerStartRef.current : 0
+      queryCache.set(restUrl, data, { durationMs, receivedAtMs })
+      setCompareQueryTiming({ durationMs, receivedAtMs })
       setDuplicatesResult(data)
       setDuplicatesPage(pageNum)
       setCompareProgress({ current: 0, total: 0 })
@@ -864,7 +881,6 @@ function MobileApp() {
         compareIntervalRef.current = null
       }
       if (compareTimerStartRef.current != null) {
-        setLastCompareQueryTimeSec(Math.round((Date.now() - compareTimerStartRef.current) / 1000))
         compareTimerStartRef.current = null
       }
       setCompareElapsedSec(0)
@@ -903,12 +919,15 @@ function MobileApp() {
     compareTroveIds.forEach((id) => params.append('compareTrove', id))
     const streamUrl = `/api/search/uniques/stream?${params}`
     const restUrl = `/api/search/uniques?${params}`
-    const cached = queryCache.get(restUrl) as UniquesResultData | null | undefined
-    if (cached) {
+    const uniqHit = queryCache.get(restUrl)
+    if (uniqHit) {
+      const cached = uniqHit.data as UniquesResultData
       setUniquesResult(cached)
       setUniquesPage(pageNum)
+      setCompareQueryTiming({ durationMs: uniqHit.durationMs, receivedAtMs: uniqHit.receivedAtMs })
       return
     }
+    setCompareQueryTiming(null)
     abortRef.current?.abort()
     const controller = new AbortController()
     abortRef.current = controller
@@ -923,7 +942,10 @@ function MobileApp() {
     }, 1000)
     readCompareStream(streamUrl, controller.signal, (current, total) => setCompareProgress({ current, total }), (result) => {
       const data = result as UniquesResultData
-      queryCache.set(restUrl, data)
+      const receivedAtMs = Date.now()
+      const durationMs = compareTimerStartRef.current != null ? receivedAtMs - compareTimerStartRef.current : 0
+      queryCache.set(restUrl, data, { durationMs, receivedAtMs })
+      setCompareQueryTiming({ durationMs, receivedAtMs })
       setUniquesResult(data)
       setUniquesPage(pageNum)
       setCompareProgress({ current: 0, total: 0 })
@@ -934,7 +956,6 @@ function MobileApp() {
         compareIntervalRef.current = null
       }
       if (compareTimerStartRef.current != null) {
-        setLastCompareQueryTimeSec(Math.round((Date.now() - compareTimerStartRef.current) / 1000))
         compareTimerStartRef.current = null
       }
       setCompareElapsedSec(0)
@@ -1382,16 +1403,24 @@ function MobileApp() {
     (searchMode === 'uniques' && (!uniqPrimaryTroveId || uniqCompareTroveIds.size === 0 || uniqCompareTroveIds.has(uniqPrimaryTroveId)))
   const mobileTroveDropdownLabel = (() => {
     if (searchMode === 'search') {
-      const itemsPart = searchResult != null && count > 0 ? `${formatCount(count)} item${count !== 1 ? 's' : ''} · ` : ''
       const trovePart = selectedTroveIds.size === 0 ? 'All troves. Click to change' : `${formatCount(selectedTroveIds.size)} trove${selectedTroveIds.size !== 1 ? 's' : ''}`
-      const s = itemsPart + trovePart
-      return s.trim() || 'All troves. Click to change'
+      if (searchResult != null && count > 0) {
+        return (
+          <>
+            {formatCount(count)} item{count !== 1 ? 's' : ''}
+            <QueryTimingText timing={searchQueryTiming} />
+            {' · '}
+            {trovePart}
+          </>
+        )
+      }
+      return trovePart.trim() || 'All troves. Click to change'
     }
     if (searchMode === 'duplicates' && duplicatesResult != null) {
       const total = duplicatesResult.total ?? 0
       const selfCompare = compareTroveIds.size === 1 && compareTroveIds.has(primaryTroveId)
       const name = troves.find((t) => t.id === primaryTroveId)?.name ?? primaryTroveId
-      const durationPart = lastCompareQueryTimeSec != null ? <> <strong>Duration</strong>: {lastCompareQueryTimeSec}s.</> : null
+      const durationPart = <QueryTimingText timing={compareQueryTiming} />
       if (selfCompare && total > 0) return <>{name} · Self-compare.{durationPart} {formatCount(total)} item{total !== 1 ? 's' : ''} with possible duplicates.</>
       if (total > 0) return <>{formatCount(total)} dups · {primaryTroveId ? <>{name} · {compareTroveIds.size === 0 ? 'Self-compare' : <>Compare: {formatCount(compareTroveIds.size)}</>}.{durationPart}</> : invalidCompareHint}</>
       return primaryTroveId ? <>{name} · {compareTroveIds.size === 0 ? 'Self-compare' : <>Compare: {formatCount(compareTroveIds.size)}</>}.{durationPart}</> : invalidCompareHint
@@ -1399,7 +1428,7 @@ function MobileApp() {
     if (searchMode === 'uniques' && uniquesResult != null) {
       const total = uniquesResult.total ?? 0
       if (compareTroveIds.size === 1 && compareTroveIds.has(primaryTroveId)) return 'Primary trove cannot be in compare list.'
-      const durationPart = lastCompareQueryTimeSec != null ? <> <strong>Duration</strong>: {lastCompareQueryTimeSec}s.</> : null
+      const durationPart = <QueryTimingText timing={compareQueryTiming} />
       const uniqPart = total > 0 ? `${formatCount(total)} uniques · ` : ''
       const troveName = primaryTroveId ? troves.find((t) => t.id === primaryTroveId)?.name ?? primaryTroveId : ''
       const trovePart = primaryTroveId ? <>{troveName} · Compare: {formatCount(compareTroveIds.size)}.{durationPart}</> : invalidCompareHint
@@ -2724,6 +2753,7 @@ onClick={() => {
                         const data = JSON.parse(line)
                         if (data.type === 'progress') setReloadTrovesProgress({ current: data.current ?? 0, total: data.total ?? 0 })
                         else if (data.type === 'done') {
+                          queryCache.clear()
                           const r = await fetch('/api/troves', { credentials: 'include', headers: { ...getApiAuthHeaders() } })
                           if (r.ok) { const arr = await r.json(); if (Array.isArray(arr)) setTroves(arr) }
                           refreshStatusMessage()
