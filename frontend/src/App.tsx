@@ -1843,6 +1843,12 @@ function App() {
                           aria-expanded={extraFieldDropdownOpen}
                           aria-label="Choose extra fields to show in the list"
                         >
+                          <img
+                            src="/add-column.png"
+                            alt=""
+                            className="search-extra-fields-trigger-icon"
+                            aria-hidden="true"
+                          />
                           {extraGridFieldsSelected.size === 0
                             ? 'Extra fields'
                             : `${extraGridFieldsSelected.size} extra field${extraGridFieldsSelected.size !== 1 ? 's' : ''}`}

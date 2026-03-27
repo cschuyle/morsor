@@ -1811,7 +1811,7 @@ onClick={() => {
                         }
                       >
                         <img
-                          src="/add-field.png"
+                          src="/add-column.png"
                           alt=""
                           className="mobile-extra-fields-trigger-icon"
                           aria-hidden="true"

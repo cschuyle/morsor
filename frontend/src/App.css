@@ -1078,6 +1078,7 @@
   box-sizing: border-box;
   display: inline-flex;
   align-items: center;
+  gap: 0.4rem;
   font-family: inherit;
   font-size: 0.9rem;
   color: #252525;
@@ -1087,6 +1088,14 @@
   cursor: pointer;
   white-space: nowrap;
   text-align: left;
+}
+
+.search-extra-fields-trigger-icon {
+  display: block;
+  width: 1.1rem;
+  height: 1.1rem;
+  object-fit: contain;
+  flex-shrink: 0;
 }
 
 .search-extra-fields-dropdown-trigger:hover {
