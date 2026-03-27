@@ -2,7 +2,7 @@ import { useMemo, useState, useEffect, useRef } from 'react'
 import { Link, useSearchParams, useLocation } from 'react-router-dom'
 import type { SearchResultData, Trove, DuplicatesResultData, UniquesResultData } from './types'
 import type { FileTypeQuickModeValue } from './fileTypeQuickMode'
-import { SearchResultsGrid } from './SearchResultsGrid'
+import { SearchResultsGrid, collectExtraFieldKeysFromRows, formatLittlePrinceFieldLabel } from './SearchResultsGrid'
 import { DuplicateResultsView } from './DuplicateResultsView'
 import { UniquesResultsView } from './UniquesResultsView'
 import { getApiAuthHeaders } from './apiAuth'
@@ -69,6 +69,8 @@ function App() {
   const [thumbnailOnly, setThumbnailOnly] = useState(() => new URLSearchParams(window.location.search).get('thumbs') === '1')
   const [allAvailableFileTypes, setAllAvailableFileTypes] = useState<string[]>([])
   const [fileTypeDropdownOpen, setFileTypeDropdownOpen] = useState(false)
+  const [extraFieldDropdownOpen, setExtraFieldDropdownOpen] = useState(false)
+  const [extraGridFieldsSelected, setExtraGridFieldsSelected] = useState<Set<string>>(() => new Set())
   const [searchResultsViewMode, setSearchResultsViewMode] = useState<'list' | 'gallery'>('list')
   const [galleryDecorate, setGalleryDecorate] = useState(true)
   const [compareProgress, setCompareProgress] = useState({ current: 0, total: 0 })
@@ -96,6 +98,7 @@ function App() {
   const compareScrollContainerRef = useRef<HTMLElement | null>(null)
   const [compareBackToTopCenterX, setCompareBackToTopCenterX] = useState<number | null>(null)
   const fileTypeDropdownRef = useRef<HTMLDivElement | null>(null)
+  const extraFieldDropdownRef = useRef<HTMLDivElement | null>(null)
   const dupPageSizeRef = useRef(dupPageSize)
   const uniqPageSizeRef = useRef(uniqPageSize)
   dupPageSizeRef.current = dupPageSize
@@ -105,6 +108,35 @@ function App() {
   const isStarQuery = (query ?? '').trim() === '*'
   const effectiveSortBy = isStarQuery ? (starSortBy ?? 'title') : (otherSortBy ?? 'score')
   const effectiveSortDir = isStarQuery ? (starSortDir ?? 'asc') : (otherSortDir ?? 'desc')
+
+  const extraFieldKeysOnPage = useMemo(() => {
+    if (searchMode !== 'search' || !Array.isArray(searchResult?.results)) {
+      return [] as string[]
+    }
+    return collectExtraFieldKeysFromRows(searchResult.results)
+  }, [searchMode, searchResult?.results])
+
+  const visibleExtraFieldKeysForGrid = useMemo(
+    () => extraFieldKeysOnPage.filter((k) => extraGridFieldsSelected.has(k)),
+    [extraFieldKeysOnPage, extraGridFieldsSelected]
+  )
+
+  const extraFieldKeysPageSig = extraFieldKeysOnPage.join('\u0001')
+  useEffect(() => {
+    const avail = new Set(extraFieldKeysOnPage)
+    setExtraGridFieldsSelected((prev) => {
+      const next = new Set<string>()
+      prev.forEach((k) => {
+        if (avail.has(k)) {
+          next.add(k)
+        }
+      })
+      if (next.size === prev.size && [...next].every((k) => prev.has(k))) {
+        return prev
+      }
+      return next
+    })
+  }, [extraFieldKeysPageSig])
 
   // Back-to-top for compare results (duplicates/uniques) – mirrors SearchResultsGrid behavior
   useEffect(() => {
@@ -266,6 +298,28 @@ function App() {
     window.addEventListener('keydown', handleEscape)
     return () => window.removeEventListener('keydown', handleEscape)
   }, [fileTypeDropdownOpen])
+
+  useEffect(() => {
+    if (!extraFieldDropdownOpen) return
+    function handleClickOutside(e: MouseEvent) {
+      if (extraFieldDropdownRef.current && !extraFieldDropdownRef.current.contains(e.target as Node)) {
+        setExtraFieldDropdownOpen(false)
+      }
+    }
+    document.addEventListener('click', handleClickOutside)
+    return () => document.removeEventListener('click', handleClickOutside)
+  }, [extraFieldDropdownOpen])
+
+  useEffect(() => {
+    if (!extraFieldDropdownOpen) return
+    function handleEscape(e: KeyboardEvent) {
+      if (e.key === 'Escape') {
+        setExtraFieldDropdownOpen(false)
+      }
+    }
+    window.addEventListener('keydown', handleEscape)
+    return () => window.removeEventListener('keydown', handleEscape)
+  }, [extraFieldDropdownOpen])
 
   useEffect(() => {
     fetch('/api/troves', { credentials: 'include', headers: { ...getApiAuthHeaders() } })
@@ -1529,7 +1583,12 @@ function App() {
                 <button type="submit" disabled={searching} className="search-submit-btn" aria-label="Search" title="Search">
                   {searching ? 'Searching\u2026' : 'Go!'}
                 </button>
-                {searchMode === 'search' && (allAvailableFileTypes.length >= 1 || fileTypeFilters.size > 0) && (() => {
+                {searchMode === 'search' && (() => {
+                  const showMediaDropdown = (allAvailableFileTypes.length >= 1 || fileTypeFilters.size > 0)
+                  const showExtraFieldsPicker = extraFieldKeysOnPage.length > 0
+                  if (!showMediaDropdown && !showExtraFieldsPicker) {
+                    return null
+                  }
                   const urlFileTypes = new Set(searchParams.getAll('fileTypes').filter((f) => f != null && f.trim()).map((f) => (f.trim() === 'URL' ? 'Link' : f.trim())))
                   const fileTypesForLabel = fileTypeFilters.size > 0 ? fileTypeFilters : urlFileTypes
                   const upper = (s) => (s || '').toUpperCase()
@@ -1541,6 +1600,8 @@ function App() {
                   const mehQuickSelected = fileTypeQuickMode === FileTypeQuickMode.Meh
                   const hasThumbFilter = thumbnailOnly
                   return (
+                  <div className="search-form-media-extras-group">
+                  {showMediaDropdown && (
                   <div className="search-filetype-dropdown-wrap" ref={fileTypeDropdownRef}>
                     <div className={`search-filetype-trigger-wrap${!(mehQuickSelected && !hasThumbFilter) ? ' search-filetype-trigger-wrap--filtered search-filetype-trigger-wrap--has-clear' : ''}`}>
                       <button
@@ -1738,6 +1799,68 @@ function App() {
                         })}
                       </div>
                     )}
+                  </div>
+                  )}
+                  {showExtraFieldsPicker && (
+                    <div className="search-extra-fields-dropdown-wrap" ref={extraFieldDropdownRef}>
+                      <div className={`search-extra-fields-trigger-wrap${extraGridFieldsSelected.size > 0 ? ' search-extra-fields-trigger-wrap--active' : ''}`}>
+                        <button
+                          type="button"
+                          className="search-extra-fields-dropdown-trigger"
+                          onClick={() => setExtraFieldDropdownOpen((o) => !o)}
+                          aria-haspopup="listbox"
+                          aria-expanded={extraFieldDropdownOpen}
+                          aria-label="Choose extra fields to show in the list"
+                        >
+                          {extraGridFieldsSelected.size === 0
+                            ? 'Extra fields'
+                            : `${extraGridFieldsSelected.size} extra field${extraGridFieldsSelected.size !== 1 ? 's' : ''}`}
+                        </button>
+                        {extraGridFieldsSelected.size > 0 && (
+                          <button
+                            type="button"
+                            className="search-extra-fields-clear"
+                            title="Clear extra field columns"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              setExtraGridFieldsSelected(new Set())
+                            }}
+                            aria-label="Clear extra field columns"
+                          >
+                            ×
+                          </button>
+                        )}
+                      </div>
+                      {extraFieldDropdownOpen && (
+                        <div
+                          className="search-extra-fields-dropdown-panel"
+                          role="listbox"
+                          aria-label="Extra fields to show as columns"
+                        >
+                          {extraFieldKeysOnPage.map((jsonKey) => (
+                            <label key={jsonKey} className="search-extra-fields-option" title={jsonKey}>
+                              <input
+                                type="checkbox"
+                                checked={extraGridFieldsSelected.has(jsonKey)}
+                                onChange={() => {
+                                  setExtraGridFieldsSelected((prev) => {
+                                    const next = new Set(prev)
+                                    if (next.has(jsonKey)) {
+                                      next.delete(jsonKey)
+                                    } else {
+                                      next.add(jsonKey)
+                                    }
+                                    return next
+                                  })
+                                }}
+                              />
+                              {formatLittlePrinceFieldLabel(jsonKey)}
+                            </label>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
                   </div>
                   )
                 })()}
@@ -2126,6 +2249,7 @@ function App() {
                       afterFilterSlot={gallerySortAfterFilterSlot}
                       showPdfSashInGallery
                       showGalleryDecorations={galleryDecorate}
+                      visibleExtraFieldKeys={visibleExtraFieldKeysForGrid}
                     />
                   </>
                 )
@@ -2329,6 +2453,7 @@ function App() {
                     hideTroveInList={selectedTroveIds.size === 1}
                     showPdfSashInGallery
                     showGalleryDecorations={galleryDecorate}
+                    visibleExtraFieldKeys={visibleExtraFieldKeysForGrid}
                   />
                 </>
               )

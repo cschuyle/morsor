@@ -1220,3 +1220,11 @@
   top: 1.75rem;
   left: -1rem;
 }
+
+.search-grid-extra-cell {
+  display: block;
+  max-width: min(36ch, 100%);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

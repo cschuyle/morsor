@@ -22,6 +22,8 @@ export interface SearchResultsGridProps {
   showPdfSashInGallery?: boolean
   showGalleryDecorations?: boolean
   isMobile?: boolean
+  /** List view only: extra JSON keys (from {@link extraFields}) to show as non-sortable columns. */
+  visibleExtraFieldKeys?: string[] | null
 }
 
 const AMAZON_PLACEHOLDER_THUMB = 'https://m.media-amazon.com/images/I/01RmK+J4pJL._SS135_.gif'
@@ -92,7 +94,7 @@ function formatLittlePrinceExtraValue(value: unknown): string {
 }
 
 /** Human-readable label for a JSON key: hyphens → spaces, camelCase split, title case. */
-function formatLittlePrinceFieldLabel(key: string): string {
+export function formatLittlePrinceFieldLabel(key: string): string {
   const s = key.trim()
   if (!s) {
     return ''
@@ -415,13 +417,31 @@ const textColumns = [
  * Extra field map from a search row: {@link SearchResultRow.extraFields} (current API) or legacy
  * {@code littlePrinceItemExtra} so older responses and the lightbox/tooltips stay in sync.
  */
-function extraFieldsFromRow(row: SearchResultRow | undefined | null): Record<string, unknown> | null {
+export function extraFieldsFromRow(row: SearchResultRow | undefined | null): Record<string, unknown> | null {
   if (!row) {
     return null
   }
   const asRecord = (v: unknown): Record<string, unknown> | null =>
     v != null && typeof v === 'object' && !Array.isArray(v) ? (v as Record<string, unknown>) : null
   return asRecord(row.extraFields) ?? asRecord((row as Record<string, unknown>).littlePrinceItemExtra)
+}
+
+/** Distinct extra-field JSON keys on the current rows, sorted for stable column order. */
+export function collectExtraFieldKeysFromRows(rows: SearchResultRow[] | null | undefined): string[] {
+  if (!Array.isArray(rows) || rows.length === 0) {
+    return []
+  }
+  const keys = new Set<string>()
+  for (const row of rows) {
+    const ex = extraFieldsFromRow(row)
+    if (!ex) {
+      continue
+    }
+    for (const k of Object.keys(ex)) {
+      keys.add(k)
+    }
+  }
+  return [...keys].sort((a, b) => a.localeCompare(b))
 }
 
 /** Extra map for lightbox / tooltips (supports legacy field on the payload). */
@@ -662,7 +682,7 @@ export function rawSourceDisplay(rawSourceItem: unknown): string {
   return (rawSourceItem != null && rawSourceItem !== '') ? String(rawSourceItem) : RAW_SOURCE_NOT_AVAILABLE
 }
 
-export function SearchResultsGrid({ data, sortBy = null, sortDir = 'asc', onSortChange, showScoreColumn = false, afterFilterSlot = null, viewMode = 'list', hideTroveInGallery = false, hideTroveInList = false, showPdfSashInGallery = false, showGalleryDecorations = true, isMobile = false }: SearchResultsGridProps) {
+export function SearchResultsGrid({ data, sortBy = null, sortDir = 'asc', onSortChange, showScoreColumn = false, afterFilterSlot = null, viewMode = 'list', hideTroveInGallery = false, hideTroveInList = false, showPdfSashInGallery = false, showGalleryDecorations = true, isMobile = false, visibleExtraFieldKeys = null }: SearchResultsGridProps) {
   const [globalFilter, setGlobalFilter] = useState('')
   const [lightbox, setLightbox] = useState<LightboxPayload | null>(null)
   const [rawSourceLightbox, setRawSourceLightbox] = useState<{ title: string; rawSourceItem: string } | null>(null)
@@ -773,11 +793,36 @@ export function SearchResultsGrid({ data, sortBy = null, sortDir = 'asc', onSort
     () => (hideTroveInList ? textColumns.filter((c) => c.id !== 'trove') : textColumns),
     [hideTroveInList]
   )
+  const extraFieldColumns = useMemo(() => {
+    if (isMobile || viewMode !== 'list' || !visibleExtraFieldKeys || visibleExtraFieldKeys.length === 0) {
+      return []
+    }
+    return visibleExtraFieldKeys.map((jsonKey) => ({
+      id: `extra:${jsonKey}`,
+      accessorFn: (row: SearchResultRow) => {
+        const ex = extraFieldsFromRow(row)
+        return ex?.[jsonKey]
+      },
+      header: formatLittlePrinceFieldLabel(jsonKey),
+      enableSorting: false,
+      cell: (info: { getValue: () => unknown }) => {
+        const v = info.getValue()
+        const text = formatLittlePrinceExtraValue(v)
+        if (!text) {
+          return ''
+        }
+        return <span className="search-grid-extra-cell" title={text}>{text}</span>
+      },
+      size: 140,
+      minSize: 48,
+      maxSize: 520,
+    }))
+  }, [isMobile, viewMode, visibleExtraFieldKeys])
   const baseColumns = useMemo(
     () => [thumbnailColumnDef((payload) => {
       setLightbox(payload)
-    }, isMobile, setRawSourceLightbox, hasThumbnails, lpExtraHoverHandlers), ...listTextColumns],
-    [hasThumbnails, isMobile, listTextColumns, lpExtraHoverHandlers]
+    }, isMobile, setRawSourceLightbox, hasThumbnails, lpExtraHoverHandlers), ...listTextColumns, ...extraFieldColumns],
+    [hasThumbnails, isMobile, listTextColumns, lpExtraHoverHandlers, extraFieldColumns]
   )
   const columns = useMemo(
     () => (showScoreColumn ? [...baseColumns, scoreColumn] : baseColumns),
