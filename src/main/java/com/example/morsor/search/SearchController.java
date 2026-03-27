@@ -463,7 +463,7 @@ public class SearchController {
         };
     }
 
-    /** String form of one extra field for sorting; null when missing (sorts last). */
+    /** String form of one extra field for sorting; blank/whitespace is treated as missing (sorts last). */
     private static String extraFieldValueForSort(SearchResult r, String jsonKey) {
         Map<String, Object> ex = r.extraFields();
         if (ex == null) {
@@ -473,7 +473,11 @@ public class SearchController {
         if (v == null) {
             return null;
         }
-        return String.valueOf(v);
+        String s = String.valueOf(v);
+        if (s.isBlank()) {
+            return null;
+        }
+        return s;
     }
 
     /** True if the result has a real thumbnail (non-blank, not the Amazon placeholder, and does not contain "/no_image"). Rows with real thumbnails sort before pop-out-only rows (asc = real first, pop-out last). */

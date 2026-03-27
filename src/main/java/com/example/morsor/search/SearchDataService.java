@@ -223,12 +223,17 @@ public class SearchDataService {
         }
         StringBuilder sb = new StringBuilder();
         for (Object v : extraFields.values()) {
-            if (v != null) {
-                if (sb.length() > 0) {
-                    sb.append(' ');
-                }
-                sb.append(String.valueOf(v));
+            if (v == null) {
+                continue;
             }
+            String s = String.valueOf(v);
+            if (s.isBlank()) {
+                continue;
+            }
+            if (sb.length() > 0) {
+                sb.append(' ');
+            }
+            sb.append(s);
         }
         return sb.toString();
     }
