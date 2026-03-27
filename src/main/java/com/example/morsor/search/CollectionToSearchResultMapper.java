@@ -16,13 +16,19 @@ import java.util.stream.StreamSupport;
 
 /**
  * Maps collection JSON into {@link SearchResult} for search. Supports:
- * <ul>
- *   <li>Items format: {@code { "id", "name", "shortName", "items": [ { "littlePrinceItem": { ... } }, ... ] }}</li>
- *   <li>Items format (movie/screening): {@code { "id", "name", "shortName", "items": [ { "movie": { "title", "year", "director" } }, ... ] }}</li>
- *   <li>Items format (domains): {@code { "id", "name", "shortName", "items": [ { "domain": { "domain-name", "title", ... } }, ... ] }}</li>
- *   <li>Titles format: {@code { "id", "name", "shortName", "titles": [ "Title 1", "Title 2", ... ] }}</li>
- *   <li>Array of collections (either format): {@code [ { ... }, ... ]}</li>
- * </ul>
+ *
+ * Little Prince Items format:
+ * { "id", "name", "shortName", "items": [ { "littlePrinceItem": { ... } }, ... ] }}
+ *
+ * Movie/Screening Items format:
+ * { "id", "name", "shortName", "items": [ { "movie": { "title", "year", "director" } }, ... ] }}
+ *
+ * Domains Items format:
+ * { "id", "name", "shortName", "items": [ { "domain": { "domain-name", "title", ... } }, ... ] }}
+ *
+ * Titles format:
+ * { "id", "name", "shortName", "titles": [ "Title 1", "Title 2", ... ] }
+ *
  */
 public final class CollectionToSearchResultMapper {
     private static final String AMAZON_PLACEHOLDER_THUMB = "https://m.media-amazon.com/images/I/01RmK+J4pJL._SS135_.gif";
