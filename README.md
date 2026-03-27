@@ -213,13 +213,17 @@ docker compose up -d
 ```
 
 
-## Create schema and a user (once)
-   ```bash
-   # Load the auth tables (run once, or re-run after updates — uses IF NOT EXISTS)
-   PGPASSWORD=morsor psql -h localhost -U morsor -d morsor -f src/main/resources/schema.sql
-   # Includes `saved_queries` for per-user queries saved from the History page.
+## Database schema (Flyway)
 
-   # Create a user (and optionally an API token)
+Migrations live under `src/main/resources/db/migration/h2+postgres/` (one script set for H2 dev and PostgreSQL).
+
+- **New empty Postgres:** start the app with the `postgres` profile; Flyway applies `db/migration/h2+postgres/V1__auth_baseline.sql` then `V2__saved_queries.sql` (and later versions) on startup—the same scripts as H2 dev.
+- **Existing Postgres** that already has auth tables but no `flyway_schema_history`: `application-postgres.properties` sets `spring.flyway.baseline-on-migrate=true` and `spring.flyway.baseline-version=1` so the first run baselines at V1 (skips re-creating users/tokens) and applies **V2** if `saved_queries` is still missing.
+- **Manual SQL** (without starting the app): run those two files in order in `psql` (see `src/main/resources/schema.sql`).
+
+## Create a user (Postgres, once)
+
+   ```bash
    python3 scripts/create-user.py
    # Paste the printed SQL into psql, or run: PGPASSWORD=morsor psql -h localhost -U morsor -d morsor and paste.
    ```
@@ -267,10 +271,10 @@ To use a different dev token, add to .env.local in the frontend:
 
 Env var `SPRING_PROFILES_ACTIVE` is a comma-delimited list of profiles to activate. Default is **dev**
 
-- Spring profile **dev** (default): H2, classpath troves, DevDataSeeder runs (dev user + API token).
+- Spring profile **dev** (default): H2, classpath troves, Flyway applies `db/migration/h2+postgres`, DevDataSeeder inserts dev user + API token.
   - No env vars required
 
-- Spring profile **postgres**: Postgres, no dev seeding (no H2, no seeded user/token).
+- Spring profile **postgres**: Postgres, same Flyway scripts (`h2+postgres`), no dev seeding (no seeded user/token).
   - Env vars: `SPRING_DATASOURCE_PASSWORD`
 
 - Spring profile **s3troves**: Trove data loaded from S3; set `MOOCHO_BUCKET_NAME`. Use with `dev` (H2) or `postgres` (Postgres), e.g. `postgres,s3troves`.
