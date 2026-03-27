@@ -30,6 +30,7 @@ Add your preferences below. For example:
     - Search requests from the UI
     - UI rendering in general
     - Sign-in / login (`Login.tsx`, CSRF, Spring Security form login): also read **Login page (often needs a second try)** below.
+    - Build tool: this repo uses **Gradle** (`./gradlew`). Do not try Maven commands or look for a `pom.xml`.
 
 - **Release process ("Do a release"):** When the user asks to do a release, follow this sequence:
     1. Ensure the working tree is clean (everything committed). If not, stop and ask them to commit or stash.
