@@ -794,7 +794,7 @@ export function SearchResultsGrid({ data, sortBy = null, sortDir = 'asc', onSort
     [hideTroveInList]
   )
   const extraFieldColumns = useMemo(() => {
-    if (isMobile || viewMode !== 'list' || !visibleExtraFieldKeys || visibleExtraFieldKeys.length === 0) {
+    if (viewMode !== 'list' || !visibleExtraFieldKeys || visibleExtraFieldKeys.length === 0) {
       return []
     }
     return visibleExtraFieldKeys.map((jsonKey) => ({
@@ -817,7 +817,7 @@ export function SearchResultsGrid({ data, sortBy = null, sortDir = 'asc', onSort
       minSize: 48,
       maxSize: 520,
     }))
-  }, [isMobile, viewMode, visibleExtraFieldKeys])
+  }, [viewMode, visibleExtraFieldKeys])
   const baseColumns = useMemo(
     () => [thumbnailColumnDef((payload) => {
       setLightbox(payload)

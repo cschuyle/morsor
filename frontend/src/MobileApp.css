@@ -191,6 +191,7 @@
 
 .mobile-search-form {
   display: flex;
+  flex-wrap: wrap;
   gap: 0.5rem;
   margin-bottom: 0.65rem;
 }
@@ -2396,4 +2397,206 @@
 .reload-troves-cancel-btn:hover {
   background: #a00;
   border-color: #800;
+}
+
+/* Extra fields picker (mobile route does not load App.css) */
+.sidebar-separator {
+  margin: 0;
+  border: none;
+  border-top: 1px solid #ddd;
+}
+
+/* Troves row: to the right of list/gallery view toggle */
+.mobile-extra-fields-dropdown-wrap--toolbar {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  align-self: center;
+}
+
+.mobile-extra-fields-dropdown-wrap--toolbar .search-extra-fields-trigger-wrap {
+  height: 2.6rem;
+  min-height: 2.6rem;
+  border-radius: 6px;
+}
+
+.mobile-extra-fields-dropdown-wrap--toolbar .search-extra-fields-dropdown-trigger {
+  justify-content: center;
+  padding-left: 0.45rem;
+  padding-right: 0.45rem;
+}
+
+.mobile-extra-fields-trigger-icon {
+  display: block;
+  width: 1.35rem;
+  height: 1.35rem;
+  object-fit: contain;
+}
+
+.search-extra-fields-dropdown-wrap {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.search-extra-fields-trigger-wrap {
+  position: relative;
+  display: flex;
+  align-items: stretch;
+  min-height: 2.25rem;
+  height: 2.25rem;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  overflow: hidden;
+  background: #fff;
+}
+
+.search-extra-fields-trigger-wrap:has(.search-extra-fields-clear) .search-extra-fields-dropdown-trigger {
+  padding-right: 2.25rem;
+}
+
+.search-extra-fields-trigger-wrap--active {
+  background: #ff8800;
+  border-color: #ff8800;
+}
+
+.search-extra-fields-trigger-wrap--active .search-extra-fields-dropdown-trigger {
+  background: #ff8800;
+  color: #213547;
+}
+
+.search-extra-fields-dropdown-trigger {
+  flex: 1;
+  min-width: 0;
+  padding: 0 0.75rem;
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  font-family: inherit;
+  font-size: 0.9rem;
+  color: #252525;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  cursor: pointer;
+  white-space: nowrap;
+  text-align: left;
+}
+
+.search-extra-fields-dropdown-trigger:hover {
+  background: #ede8ff;
+}
+
+/* Active trigger: keep orange on hover (matches mobile filetype active pattern; avoids “stuck hover” on touch) */
+.mobile-app .search-extra-fields-trigger-wrap--active .search-extra-fields-dropdown-trigger:hover {
+  background: #ff8800;
+}
+
+.search-extra-fields-trigger-wrap--active .search-extra-fields-clear:hover {
+  background: transparent;
+}
+
+.search-extra-fields-clear {
+  position: absolute;
+  top: 50%;
+  right: 0.25rem;
+  transform: translateY(-50%);
+  width: 1.75rem;
+  height: 1.75rem;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.1rem;
+  line-height: 1;
+  border: none;
+  background: transparent;
+  color: #666;
+  cursor: pointer;
+  border-radius: 4px;
+}
+
+.search-extra-fields-clear:hover {
+  background: #e0d4f7;
+}
+
+.search-extra-fields-dropdown-panel {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  left: auto;
+  margin-top: 0.2rem;
+  min-width: min(18rem, 90vw);
+  max-width: min(24rem, 94vw);
+  max-height: min(70vh, 22rem);
+  overflow: auto;
+  z-index: 1200;
+  padding: 0;
+  background: #fff;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+}
+
+.search-extra-fields-dropdown-panel > :last-child {
+  margin-bottom: 0.35rem;
+}
+
+.search-extra-fields-panel-header {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  padding: 0.35rem 0.5rem 0.4rem;
+  border-bottom: 1px solid #eee;
+  position: sticky;
+  top: 0;
+  background: #fff;
+  z-index: 1;
+}
+
+.search-extra-fields-panel-clear-btn {
+  font-family: inherit;
+  font-size: 0.85rem;
+  color: #252525;
+  padding: 0.25rem 0.65rem;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  background: #f8f8f8;
+  cursor: pointer;
+}
+
+.search-extra-fields-panel-clear-btn:hover:not(:disabled) {
+  background: #ede8ff;
+  border-color: #aaaaff;
+}
+
+.search-extra-fields-panel-clear-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.search-extra-fields-option {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.25rem 0.75rem;
+  cursor: pointer;
+  font-size: 0.9rem;
+  color: #555;
+}
+
+.search-extra-fields-option:hover {
+  background: #ede8ff;
+}
+
+.search-extra-fields-option input {
+  flex-shrink: 0;
+}
+
+.search-extra-fields-separator {
+  margin: 0;
+  padding: 0;
+}
+
+.search-extra-fields-separator .sidebar-separator {
+  margin: 0.25rem 0.75rem;
 }
