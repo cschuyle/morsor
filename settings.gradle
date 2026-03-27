@@ -1,1 +1,3 @@
 rootProject.name = 'morsor'
+include 'morsor-api-cli'
+project(':morsor-api-cli').projectDir = file('tools/morsor-api-cli')
