@@ -51,7 +51,7 @@ public final class MorsorApiCli {
         boolean baseFromOption = false;
         String bearerToken = null;
         String bodyFile = null;
-        String outputMode = "json";
+        String outputMode = "text";
         boolean showHeaders = false;
         boolean debug = false;
 
@@ -469,10 +469,10 @@ public final class MorsorApiCli {
     private static String normalizeOutputMode(String raw) {
         String v = raw == null ? "" : raw.trim().toLowerCase(Locale.ROOT);
         return switch (v) {
-            case "json" -> "json";
+            case "json", "j" -> "json";
             case "text", "txt", "t" -> "text";
             default -> {
-                die("invalid output mode: " + raw + " (expected json, text, txt, or t)");
+                die("invalid output mode: " + raw + " (expected json/j or text/txt/t)");
                 yield "json";
             }
         };
@@ -799,7 +799,7 @@ public final class MorsorApiCli {
                 HELP
                   -h, --help  Show this summary
                   --man        Show full manual
-                  -o, --output json|text|txt  Response output format (default: json)
+                  -o, --output json|text|txt  Response output format (default: txt)
 
                 ACTIONS
                   troves                -> GET /api/troves
@@ -841,7 +841,7 @@ public final class MorsorApiCli {
                                      (same as optional leading <baseUrl> http:// or https:// …; do not use both)
                   -t, --token TOKEN  Authorization: Bearer <TOKEN> (API token; most /api routes require auth)
                                      If omitted for localhost/127.0.0.1, defaults to dev token "dev-token"
-                  -o, --output MODE  Output format: json (default) or text/txt
+                  -o, --output MODE  Output format: text/txt (default) or json
                                      text prints tab-delimited: title, troveId, score(2dp)
                   -H, --header LINE  Extra header "Name: value" (repeatable)
                   -d, --data FILE    POST body from FILE (POST only; default Content-Type: application/json)
