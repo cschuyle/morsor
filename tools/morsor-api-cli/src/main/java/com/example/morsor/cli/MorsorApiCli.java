@@ -35,6 +35,10 @@ public final class MorsorApiCli {
             "\"title\"\\s*:\\s*\"((?:\\\\.|[^\"\\\\])*)\".*?\"troveId\"\\s*:\\s*\"((?:\\\\.|[^\"\\\\])*)\".*?\"score\"\\s*:\\s*([-+]?\\d+(?:\\.\\d+)?(?:[eE][-+]?\\d+)?)",
             Pattern.DOTALL
     );
+    private static final Pattern TROVE_TEXT_ROW_JSON = Pattern.compile(
+            "\"id\"\\s*:\\s*\"((?:\\\\.|[^\"\\\\])*)\".*?\"name\"\\s*:\\s*\"((?:\\\\.|[^\"\\\\])*)\".*?\"count\"\\s*:\\s*(\\d+)",
+            Pattern.DOTALL
+    );
 
     private MorsorApiCli() {}
 
@@ -276,7 +280,7 @@ public final class MorsorApiCli {
                 System.err.println(response.statusCode() + " " + response.uri());
             }
             if ("text".equals(outputMode)) {
-                printTextRowsFromJson(response.body());
+                printTextRowsFromJson(response.body(), path);
             } else {
                 System.out.print(response.body());
                 if (!response.body().isEmpty() && !response.body().endsWith("\n")) {
@@ -474,7 +478,15 @@ public final class MorsorApiCli {
         };
     }
 
-    private static void printTextRowsFromJson(String json) {
+    private static void printTextRowsFromJson(String json, String path) {
+        if ("/api/troves".equals(path)) {
+            printTroveTextRowsFromJson(json);
+            return;
+        }
+        printSearchTextRowsFromJson(json);
+    }
+
+    private static void printSearchTextRowsFromJson(String json) {
         if (json == null || json.isBlank()) {
             return;
         }
@@ -493,6 +505,31 @@ public final class MorsorApiCli {
         for (TextRow row : rows) {
             String paddedTrove = padRight(row.troveId, maxTroveLen);
             System.out.println(String.format(Locale.ROOT, "%.2f", row.score) + "\t" + paddedTrove + "\t" + row.title);
+        }
+    }
+
+    private static void printTroveTextRowsFromJson(String json) {
+        if (json == null || json.isBlank()) {
+            return;
+        }
+        Matcher m = TROVE_TEXT_ROW_JSON.matcher(json);
+        List<TroveTextRow> rows = new ArrayList<>();
+        int maxIdLen = 0;
+        int maxCountLen = 0;
+        while (m.find()) {
+            String id = unescapeJsonString(m.group(1));
+            String name = unescapeJsonString(m.group(2));
+            String count = m.group(3);
+            rows.add(new TroveTextRow(id, count, name));
+            if (id.length() > maxIdLen) {
+                maxIdLen = id.length();
+            }
+            if (count.length() > maxCountLen) {
+                maxCountLen = count.length();
+            }
+        }
+        for (TroveTextRow row : rows) {
+            System.out.println(padRight(row.id, maxIdLen) + "\t" + padRight(row.count, maxCountLen) + "\t" + row.name);
         }
     }
 
@@ -522,6 +559,18 @@ public final class MorsorApiCli {
             this.score = score;
             this.troveId = troveId;
             this.title = title;
+        }
+    }
+
+    private static final class TroveTextRow {
+        final String id;
+        final String count;
+        final String name;
+
+        TroveTextRow(String id, String count, String name) {
+            this.id = id;
+            this.count = count;
+            this.name = name;
         }
     }
 
