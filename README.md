@@ -40,16 +40,42 @@ There is a distance of 1 between Mordor and Morsor in two pretty basic measureme
 - Conversely, find unique items within a trove, with respect to other troves.
     - Example: Same troves as the previous example. Find movies which I like but which I can't get on Kanopy. Then I can rent or buy those movies instead of getting them for free on Kanopy.
 
-## Where do I get the data?
+## Components
 
-That's another story. Short answer: scripts and manual slogging.
+- Server
+- Web app
+- CLI
+- Data
+
+  - Speaking of the last bit - _where_ and _how_ do I get me some data?
+
+    That's another story. Short answer: scripts and manual slogging. Long answer will come when people start to want it.
 
 ## Requirements for local development or running
 
 - Java 21
 - Node (npm)
 
-## How to run
+## CLI (`morsor-cli`)
+
+The project includes a command-line client for common API actions.
+
+### Build and run from repo
+
+```bash
+./gradlew :morsor-cli:jar
+./scripts/morsor-cli --help
+```
+
+### Install globally
+
+```bash
+./scripts/install-morsor-cli /usr/local/bin
+# then:
+morsor-cli --help
+```
+
+## Web app: How to run
 
 ### Option 1. Using the canned data:
 
@@ -75,6 +101,7 @@ npm run test
 Watch mode (re-run on file changes): `npm run test:watch`. Run a single test file: `npm run test -- src/RequireAuth.test.jsx`.
 
 **Tests with canned data:** To run frontend tests against the same data shape as the dev backend (e.g. Little Prince trove, "The Little Prince, in Ancient Greek"), use the fixture-based mocks. Fixtures live in `frontend/src/fixtures/` (troves, search response, health). In tests, call `mockFetchWithCannedData()` and stub `fetch` with it so requests return that data without starting the backend. See `App.cannedData.test.jsx` and `mockFetchWithCannedData.js`. Trove JSON for the backend lives in **`fixtures/data/`** at the repo root; run `./gradlew bootRun` from the project root so the app loads from `file:./fixtures/data/*.json`. Override with `moocho.data.location` if needed.
+
 
 ## Option 2. You can use AWS S3 as a data store:
 
@@ -169,7 +196,6 @@ Example:
 ```bash
 MOOCHO_REGISTRY=myregistry.io/me/morsor MOOCHO_VERSION=1.2.3 MOOCHO_ARCHITECTURE=linux/amd64 ./deploy-container-to-registry.sh
 ```
-
 
 # Working with Postgres locally
 
