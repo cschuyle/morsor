@@ -534,7 +534,7 @@
 }
 
 .sidebar-trove-filter-clear:hover {
-  background: #e0e0ff;
+  background: #ede8ff;
   color: #333;
 }
 
@@ -609,7 +609,7 @@
 }
 
 .trove-picker-tab:hover:not(.trove-picker-tab--active) {
-  background: #e0e0ff;
+  background: #ede8ff;
   color: #222;
 }
 
@@ -643,7 +643,7 @@
 }
 
 .trove-picker-clear:hover {
-  background: #e0e0ff;
+  background: #ede8ff;
   border-color: #c9b8e8;
   color: #222;
 }
@@ -750,7 +750,7 @@
 }
 
 .trove-only-link:hover {
-  background: #e0e0ff;
+  background: #ede8ff;
 }
 
 .trove-only-link:disabled {
@@ -781,7 +781,7 @@
 }
 
 .trove-checkbox:hover {
-  background: #e0e0ff;
+  background: #ede8ff;
 }
 
 .trove-item--selected .trove-checkbox:hover {
@@ -948,7 +948,7 @@
   border-radius: 4px;
 }
 .search-query-clear:hover {
-  background: #e0e0ff;
+  background: #ede8ff;
   color: #333;
 }
 .search-query-input::placeholder {
@@ -982,7 +982,7 @@
   border-radius: 0;
 }
 .search-query-btn:hover {
-  background: #e0e0ff;
+  background: #ede8ff;
 }
 .search-query-btn:first-child {
   font-weight: 600;
@@ -1018,7 +1018,7 @@
   display: block;
 }
 .search-submit-btn:hover {
-  background: #e0e0ff;
+  background: #ede8ff;
 }
 
 .search-filetype-dropdown-wrap {
@@ -1076,7 +1076,7 @@
 }
 
 .search-filetype-dropdown-trigger:hover {
-  background: #e0e0ff;
+  background: #ede8ff;
 }
 
 .search-filetype-trigger-inline-icon {
@@ -1107,7 +1107,7 @@
 }
 
 .search-filetype-clear:hover {
-  background: #e0e0ff;
+  background: #ede8ff;
 }
 
 .search-filetype-dropdown-panel {
@@ -1158,7 +1158,7 @@
 }
 
 .search-filetype-quick-btn:hover:not(.search-filetype-quick-btn--active) {
-  background: #e0e0ff;
+  background: #ede8ff;
   border-color: #aaaaff;
 }
 
@@ -1306,7 +1306,7 @@
 }
 
 .search-filetype-option:hover {
-  background: #e0e0ff;
+  background: #ede8ff;
 }
 
 .search-filetype-option input {
@@ -1432,7 +1432,7 @@
 }
 
 .gallery-sort-dir-btn:hover {
-  background: #ede5f5;
+  background: #ede8ff;
 }
 
 .gallery-sort-divider {
@@ -1568,7 +1568,7 @@
 }
 
 .view-mode-btn:hover {
-  background: #e0e0ff;
+  background: #ede8ff;
   border-color: #aaaaff;
 }
 
@@ -1627,7 +1627,7 @@
 }
 
 .gallery-sort-select:hover {
-  background: #ede5f5;
+  background: #ede8ff;
   border-color: #ddd0eb;
 }
 
@@ -1654,7 +1654,7 @@
   border-radius: 4px;
 }
 .pagination-btn:hover:not(:disabled) {
-  background: #e0e0ff;
+  background: #ede8ff;
 }
 
 .pagination-info {
@@ -1761,7 +1761,7 @@
 }
 
 .duplicate-results-table th.sortable:hover {
-  background: #e0e0ff;
+  background: #ede8ff;
 }
 
 .duplicate-results-table .sort-indicator {
@@ -2094,7 +2094,7 @@
 }
 
 .search-mode-toggle button:hover:not(.active) {
-  background: #e0e0ff;
+  background: #ede8ff;
   color: #333;
 }
 
@@ -2249,7 +2249,7 @@
 }
 
 .primary-trove-option:hover {
-  background: #e0e0ff;
+  background: #ede8ff;
 }
 
 .primary-trove-option--selected {

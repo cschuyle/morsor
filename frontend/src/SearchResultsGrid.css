@@ -93,7 +93,7 @@
 }
 
 .grid-filter-clear:hover {
-  background: #e0e0ff;
+  background: #ede8ff;
   color: #333;
 }
 
@@ -141,7 +141,7 @@
 }
 
 .grid-table th.sortable:hover {
-  background: #e0e0ff;
+  background: #ede8ff;
 }
 
 .grid-table tbody td {
@@ -154,7 +154,7 @@
 }
 
 .grid-table tbody tr:hover td {
-  background: #e0e0ff;
+  background: #ede8ff;
 }
 
 .grid-table tbody tr.grid-row-double-clickable {
