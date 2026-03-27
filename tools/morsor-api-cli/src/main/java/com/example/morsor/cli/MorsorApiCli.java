@@ -31,18 +31,23 @@ public final class MorsorApiCli {
 
     private static final String DEV_DEFAULT_TOKEN = "dev-token";
     private static final Pattern TOKEN_JSON = Pattern.compile("\"token\"\\s*:\\s*\"([^\"]+)\"");
+    private static final Pattern TEXT_ROW_JSON = Pattern.compile(
+            "\"title\"\\s*:\\s*\"((?:\\\\.|[^\"\\\\])*)\".*?\"troveId\"\\s*:\\s*\"((?:\\\\.|[^\"\\\\])*)\".*?\"score\"\\s*:\\s*([-+]?\\d+(?:\\.\\d+)?(?:[eE][-+]?\\d+)?)",
+            Pattern.DOTALL
+    );
 
     private MorsorApiCli() {}
 
     public static void main(String[] args) {
         if (args.length == 0) {
-            printUsageAndExit(0);
+            printSummaryUsageAndExit(0);
         }
         List<String> extraHeaders = new ArrayList<>();
         String base = "http://localhost:8080";
         boolean baseFromOption = false;
         String bearerToken = null;
         String bodyFile = null;
+        String outputMode = "json";
         boolean showHeaders = false;
         boolean debug = false;
 
@@ -85,6 +90,14 @@ public final class MorsorApiCli {
                     die("missing value for " + a);
                 }
                 bodyFile = args[++i];
+                i++;
+                continue;
+            }
+            if (a.equals("-o") || a.equals("--output")) {
+                if (i + 1 >= args.length) {
+                    die("missing value for " + a);
+                }
+                outputMode = normalizeOutputMode(args[++i]);
                 i++;
                 continue;
             }
@@ -259,12 +272,16 @@ public final class MorsorApiCli {
                     }
                 });
                 System.out.println();
-            } else {
+            } else if (debug) {
                 System.err.println(response.statusCode() + " " + response.uri());
             }
-            System.out.print(response.body());
-            if (!response.body().isEmpty() && !response.body().endsWith("\n")) {
-                System.out.println();
+            if ("text".equals(outputMode)) {
+                printTextRowsFromJson(response.body());
+            } else {
+                System.out.print(response.body());
+                if (!response.body().isEmpty() && !response.body().endsWith("\n")) {
+                    System.out.println();
+                }
             }
             if (response.statusCode() >= 400) {
                 System.exit(1);
@@ -443,6 +460,69 @@ public final class MorsorApiCli {
             return s.substring(0, s.length() - 1);
         }
         return s;
+    }
+
+    private static String normalizeOutputMode(String raw) {
+        String v = raw == null ? "" : raw.trim().toLowerCase(Locale.ROOT);
+        return switch (v) {
+            case "json" -> "json";
+            case "text", "txt", "t" -> "text";
+            default -> {
+                die("invalid output mode: " + raw + " (expected json, text, txt, or t)");
+                yield "json";
+            }
+        };
+    }
+
+    private static void printTextRowsFromJson(String json) {
+        if (json == null || json.isBlank()) {
+            return;
+        }
+        Matcher m = TEXT_ROW_JSON.matcher(json);
+        List<TextRow> rows = new ArrayList<>();
+        int maxTroveLen = 0;
+        while (m.find()) {
+            String title = unescapeJsonString(m.group(1));
+            String troveId = unescapeJsonString(m.group(2));
+            double score = Double.parseDouble(m.group(3));
+            rows.add(new TextRow(score, troveId, title));
+            if (troveId.length() > maxTroveLen) {
+                maxTroveLen = troveId.length();
+            }
+        }
+        for (TextRow row : rows) {
+            String paddedTrove = padRight(row.troveId, maxTroveLen);
+            System.out.println(String.format(Locale.ROOT, "%.2f", row.score) + "\t" + paddedTrove + "\t" + row.title);
+        }
+    }
+
+    private static String unescapeJsonString(String s) {
+        String out = s;
+        out = out.replace("\\\"", "\"");
+        out = out.replace("\\\\", "\\");
+        out = out.replace("\\n", "\n");
+        out = out.replace("\\r", "\r");
+        out = out.replace("\\t", "\t");
+        return out;
+    }
+
+    private static String padRight(String s, int len) {
+        if (s.length() >= len) {
+            return s;
+        }
+        return s + " ".repeat(len - s.length());
+    }
+
+    private static final class TextRow {
+        final double score;
+        final String troveId;
+        final String title;
+
+        TextRow(double score, String troveId, String title) {
+            this.score = score;
+            this.troveId = troveId;
+            this.title = title;
+        }
     }
 
     private static boolean isHttpMethod(String s) {
@@ -670,6 +750,7 @@ public final class MorsorApiCli {
                 HELP
                   -h, --help  Show this summary
                   --man        Show full manual
+                  -o, --output json|text|txt  Response output format (default: json)
 
                 ACTIONS
                   troves                -> GET /api/troves
@@ -711,6 +792,8 @@ public final class MorsorApiCli {
                                      (same as optional leading <baseUrl> http:// or https:// …; do not use both)
                   -t, --token TOKEN  Authorization: Bearer <TOKEN> (API token; most /api routes require auth)
                                      If omitted for localhost/127.0.0.1, defaults to dev token "dev-token"
+                  -o, --output MODE  Output format: json (default) or text/txt
+                                     text prints tab-delimited: title, troveId, score(2dp)
                   -H, --header LINE  Extra header "Name: value" (repeatable)
                   -d, --data FILE    POST body from FILE (POST only; default Content-Type: application/json)
                   -i, --include-headers  Print response status line and headers before body
