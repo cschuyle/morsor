@@ -5,6 +5,7 @@ import java.net.CookieManager;
 import java.net.CookiePolicy;
 import java.net.HttpCookie;
 import java.net.URI;
+import java.net.URLDecoder;
 import java.net.URLEncoder;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -261,6 +262,7 @@ public final class MorsorApiCli {
 
         HttpRequest request = rb.build();
         if (debug) {
+            printEffectiveQueryControls(request.uri());
             printRequestDebug(request);
         }
         try {
@@ -780,6 +782,51 @@ public final class MorsorApiCli {
         return sb.toString();
     }
 
+    private static void printEffectiveQueryControls(URI uri) {
+        String rawQuery = uri.getRawQuery();
+        if (rawQuery == null || rawQuery.isBlank()) {
+            return;
+        }
+        String sortBy = null;
+        String sortDir = null;
+        String page = null;
+        String size = null;
+        for (String pair : rawQuery.split("&")) {
+            if (pair.isEmpty()) {
+                continue;
+            }
+            int eq = pair.indexOf('=');
+            String rawKey = eq >= 0 ? pair.substring(0, eq) : pair;
+            String rawVal = eq >= 0 ? pair.substring(eq + 1) : "";
+            String key = URLDecoder.decode(rawKey, StandardCharsets.UTF_8);
+            String val = URLDecoder.decode(rawVal, StandardCharsets.UTF_8);
+            switch (key) {
+                case "sortBy" -> sortBy = val;
+                case "sortDir" -> sortDir = val;
+                case "page" -> page = val;
+                case "size" -> size = val;
+                default -> {
+                }
+            }
+        }
+        List<String> parts = new ArrayList<>();
+        if (sortBy != null && !sortBy.isBlank()) {
+            parts.add("sortBy=" + sortBy);
+        }
+        if (sortDir != null && !sortDir.isBlank()) {
+            parts.add("sortDir=" + sortDir);
+        }
+        if (page != null && !page.isBlank()) {
+            parts.add("page=" + page);
+        }
+        if (size != null && !size.isBlank()) {
+            parts.add("size=" + size);
+        }
+        if (!parts.isEmpty()) {
+            System.err.println("[debug] effective query controls: " + String.join(", ", parts));
+        }
+    }
+
     private static boolean isLikelyLocalDevBase(String base) {
         try {
             URI uri = URI.create(base);
@@ -856,6 +903,7 @@ public final class MorsorApiCli {
                 EXAMPLES
                   morsor-cli alien
                   morsor-cli search -q alien -P 0 -S 10
+                  morsor-cli alien -S 25 -d asc
                 """;
     }
 

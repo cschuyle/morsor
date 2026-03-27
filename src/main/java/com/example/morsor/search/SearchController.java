@@ -115,7 +115,7 @@ public class SearchController {
             @RequestParam(required = false, defaultValue = "0") int page,
             @RequestParam(required = false, defaultValue = "500") int size,
             @RequestParam(required = false) String sortBy,
-            @RequestParam(required = false, defaultValue = "asc") String sortDir) {
+            @RequestParam(required = false) String sortDir) {
         page = Math.max(0, page);
         size = Math.min(MAX_PAGE_SIZE, Math.max(1, size));
         String boostVal = boostTrove != null && !boostTrove.isBlank() ? boostTrove.trim() : "";
@@ -128,13 +128,17 @@ public class SearchController {
         List<SearchResultWithScore> all = scored.stream()
                 .map(ss -> new SearchResultWithScore(ss.result(), isWildcard ? null : ss.score()))
                 .toList();
-        boolean descending = "desc".equalsIgnoreCase(sortDir != null ? sortDir : "asc");
-        if (sortBy != null && !sortBy.isBlank()) {
+        String sortByVal = sortBy != null && !sortBy.isBlank() ? sortBy.trim() : null;
+        String sortDirVal = sortDir != null && !sortDir.isBlank() ? sortDir.trim() : null;
+        boolean sortRequested = sortByVal != null || sortDirVal != null;
+        boolean descending = "desc".equalsIgnoreCase(sortDirVal != null ? sortDirVal : "asc");
+        if (sortRequested) {
+            String effectiveSortBy = sortByVal != null ? sortByVal : "score";
             Comparator<SearchResultWithScore> cmp;
-            if (sortBy.regionMatches(true, 0, EXTRA_SORT_PREFIX, 0, EXTRA_SORT_PREFIX.length())) {
-                cmp = comparatorForExtraFieldSort(sortBy, descending);
+            if (effectiveSortBy.regionMatches(true, 0, EXTRA_SORT_PREFIX, 0, EXTRA_SORT_PREFIX.length())) {
+                cmp = comparatorForExtraFieldSort(effectiveSortBy, descending);
             } else {
-                cmp = comparatorForWithScore(sortBy);
+                cmp = comparatorForWithScore(effectiveSortBy);
                 if (cmp != null && descending) {
                     cmp = cmp.reversed();
                 }
