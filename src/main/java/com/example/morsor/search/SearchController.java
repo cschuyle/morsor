@@ -439,7 +439,17 @@ public class SearchController {
         };
     }
 
+    private static final String EXTRA_SORT_PREFIX = "extra:";
+
     private static Comparator<SearchResultWithScore> comparatorForWithScore(String sortBy) {
+        if (sortBy != null && sortBy.regionMatches(true, 0, EXTRA_SORT_PREFIX, 0, EXTRA_SORT_PREFIX.length())) {
+            String jsonKey = sortBy.substring(EXTRA_SORT_PREFIX.length()).trim();
+            if (!jsonKey.isEmpty()) {
+                return Comparator.comparing(
+                        r -> extraFieldValueForSort(r.result(), jsonKey),
+                        Comparator.nullsLast(String.CASE_INSENSITIVE_ORDER));
+            }
+        }
         return switch (sortBy.toLowerCase()) {
             case "title" -> Comparator.comparing(
                     r -> r.result().title() != null ? r.result().title().toLowerCase() : "");
@@ -451,6 +461,19 @@ public class SearchController {
             case "thumb" -> Comparator.comparing(SearchController::hasRealThumbnail).reversed();
             default -> null;
         };
+    }
+
+    /** String form of one extra field for sorting; null when missing (sorts last). */
+    private static String extraFieldValueForSort(SearchResult r, String jsonKey) {
+        Map<String, Object> ex = r.extraFields();
+        if (ex == null) {
+            return null;
+        }
+        Object v = ex.get(jsonKey);
+        if (v == null) {
+            return null;
+        }
+        return String.valueOf(v);
     }
 
     /** True if the result has a real thumbnail (non-blank, not the Amazon placeholder, and does not contain "/no_image"). Rows with real thumbnails sort before pop-out-only rows (asc = real first, pop-out last). */

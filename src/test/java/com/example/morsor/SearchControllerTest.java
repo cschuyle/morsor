@@ -15,9 +15,12 @@ import org.springframework.http.HttpMethod;
 import org.springframework.http.ResponseEntity;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.web.client.RestTemplate;
+import org.springframework.web.util.UriComponentsBuilder;
 
+import java.net.URI;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.TreeSet;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -128,6 +131,67 @@ class SearchControllerTest {
         assertThat(groupKeys)
                 .as("Each duplicate group must appear only once (no symmetric duplicate rows)")
                 .doesNotHaveDuplicates();
+    }
+
+    @Test
+    void searchMatchesExtraFieldValuesAndSortsByExtraKey() {
+        URI matchUri = UriComponentsBuilder.fromUriString("http://localhost:" + port + "/api/search")
+                .queryParam("trove", "little-prince")
+                .queryParam("query", "Daniele")
+                .build()
+                .toUri();
+        ResponseEntity<SearchResponse> matchResponse = restTemplate.exchange(
+                matchUri,
+                HttpMethod.GET,
+                null,
+                new ParameterizedTypeReference<SearchResponse>() {}
+        );
+        assertThat(matchResponse.getStatusCode().is2xxSuccessful()).isTrue();
+        SearchResponse matchBody = matchResponse.getBody();
+        assertThat(matchBody).isNotNull();
+        assertThat(matchBody.results())
+                .as("Query should match text stored in extraFields (e.g. author)")
+                .isNotEmpty();
+        boolean anyExtraHasDaniele = matchBody.results().stream()
+                .map(r -> r.result() != null ? r.result().extraFields() : null)
+                .filter(Objects::nonNull)
+                .anyMatch(ex -> ex.values().stream()
+                        .filter(Objects::nonNull)
+                        .map(Object::toString)
+                        .anyMatch(s -> s.contains("Daniele")));
+        assertThat(anyExtraHasDaniele).isTrue();
+
+        URI sortUri = UriComponentsBuilder.fromUriString("http://localhost:" + port + "/api/search")
+                .queryParam("trove", "little-prince")
+                .queryParam("query", "*")
+                .queryParam("sortBy", "extra:author")
+                .queryParam("sortDir", "asc")
+                .queryParam("size", "500")
+                .build()
+                .toUri();
+        ResponseEntity<SearchResponse> sortResponse = restTemplate.exchange(
+                sortUri,
+                HttpMethod.GET,
+                null,
+                new ParameterizedTypeReference<SearchResponse>() {}
+        );
+        assertThat(sortResponse.getStatusCode().is2xxSuccessful()).isTrue();
+        SearchResponse sortBody = sortResponse.getBody();
+        assertThat(sortBody).isNotNull();
+        List<String> authors = sortBody.results().stream()
+                .map(r -> {
+                    Map<String, Object> ex = r.result() != null ? r.result().extraFields() : null;
+                    if (ex == null) {
+                        return null;
+                    }
+                    Object a = ex.get("author");
+                    return a != null ? a.toString() : null;
+                })
+                .filter(Objects::nonNull)
+                .toList();
+        assertThat(authors.size()).isGreaterThan(1);
+        List<String> sortedCopy = authors.stream().sorted(String.CASE_INSENSITIVE_ORDER).toList();
+        assertThat(authors).isEqualTo(sortedCopy);
     }
 
     @Test

@@ -203,6 +203,36 @@ public class SearchDataService {
         return false;
     }
 
+    /**
+     * Full-text body for indexing and non-Lucene matching: title, snippet, and concatenated non-null
+     * {@link SearchResult#extraFields()} values (same coverage as title/snippet for search).
+     */
+    private static String searchableBodyText(SearchResult r) {
+        String title = r.title() != null ? r.title() : "";
+        String snippet = r.snippet() != null ? r.snippet() : "";
+        String extra = extraFieldValuesForSearch(r.extraFields());
+        if (extra.isEmpty()) {
+            return (title + " " + snippet).trim();
+        }
+        return (title + " " + snippet + " " + extra).trim();
+    }
+
+    private static String extraFieldValuesForSearch(Map<String, Object> extraFields) {
+        if (extraFields == null || extraFields.isEmpty()) {
+            return "";
+        }
+        StringBuilder sb = new StringBuilder();
+        for (Object v : extraFields.values()) {
+            if (v != null) {
+                if (sb.length() > 0) {
+                    sb.append(' ');
+                }
+                sb.append(String.valueOf(v));
+            }
+        }
+        return sb.toString();
+    }
+
     /** Build Lucene index from the given list and set luceneDirectory/luceneSearcher. Used so reload can build from new data before replacing allResults. */
     private void buildLuceneIndex(List<SearchResult> from) {
         if (from == null || from.isEmpty()) {
@@ -222,7 +252,8 @@ public class SearchDataService {
                     Document doc = new Document();
                     String title = r.title() != null ? r.title() : "";
                     String snippet = r.snippet() != null ? r.snippet() : "";
-                    doc.add(new TextField(contentField, title + " " + snippet, Field.Store.NO));
+                    String indexedText = searchableBodyText(r);
+                    doc.add(new TextField(contentField, indexedText, Field.Store.NO));
                     doc.add(new StringField(troveIdField, r.troveId() != null ? r.troveId() : "", Field.Store.NO));
                     doc.add(new StoredField(idxField, i));
                     writer.addDocument(doc);
@@ -438,7 +469,7 @@ public class SearchDataService {
                     }
                     List<ScoredSearchResult> out = stream
                             .filter(r -> {
-                                String text = (r.title() != null ? r.title() : "") + " " + (r.snippet() != null ? r.snippet() : "");
+                                String text = searchableBodyText(r);
                                 return pattern.matcher(text).find();
                             })
                             .map(r -> new ScoredSearchResult(r, 1.0))
@@ -528,9 +559,10 @@ public class SearchDataService {
         if (!troveIdSet.isEmpty()) {
             stream = stream.filter(r -> r.troveId() != null && troveIdSet.contains(r.troveId()));
         }
-        stream = stream.filter(r ->
-                (r.title() != null && r.title().toLowerCase().contains(queryLower))
-                        || (r.snippet() != null && r.snippet().toLowerCase().contains(queryLower)));
+        stream = stream.filter(r -> {
+            String body = searchableBodyText(r).toLowerCase();
+            return body.contains(queryLower);
+        });
         return stream.toList();
     }
 

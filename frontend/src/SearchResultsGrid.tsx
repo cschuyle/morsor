@@ -22,7 +22,7 @@ export interface SearchResultsGridProps {
   showPdfSashInGallery?: boolean
   showGalleryDecorations?: boolean
   isMobile?: boolean
-  /** List view only: extra JSON keys (from {@link extraFields}) to show as non-sortable columns. */
+  /** List view only: extra JSON keys (from {@link extraFields}) as columns; sorting uses API sortBy "extra:" + key. */
   visibleExtraFieldKeys?: string[] | null
 }
 
@@ -828,7 +828,7 @@ export function SearchResultsGrid({ data, sortBy = null, sortDir = 'asc', onSort
         return ex?.[jsonKey]
       },
       header: formatLittlePrinceFieldLabel(jsonKey),
-      enableSorting: false,
+      enableSorting: !!onSortChange,
       cell: (info: { getValue: () => unknown }) => {
         const v = info.getValue()
         const text = formatLittlePrinceExtraValue(v)
@@ -841,7 +841,7 @@ export function SearchResultsGrid({ data, sortBy = null, sortDir = 'asc', onSort
       minSize: 48,
       maxSize: 520,
     }))
-  }, [viewMode, visibleExtraFieldKeys])
+  }, [viewMode, visibleExtraFieldKeys, onSortChange])
   const baseColumns = useMemo(
     () => [thumbnailColumnDef((payload) => {
       setLightbox(payload)
