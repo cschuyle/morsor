@@ -882,8 +882,12 @@
 }
 
 .search-section form.search-form {
-  margin: 0 auto 1rem;
+  margin: 0 0 1rem;
   text-align: left;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
 }
 .search-form-row {
   display: flex;
@@ -891,7 +895,8 @@
   gap: 0.75rem;
   flex-wrap: nowrap;
   width: 100%;
-  max-width: 900px;
+  max-width: 100%;
+  min-width: 0;
   box-sizing: border-box;
 }
 .search-query-wrap {
@@ -1057,12 +1062,13 @@
 }
 
 .search-extra-fields-trigger-wrap--active {
-  background: #ede8ff;
-  border-color: #c4b5e8;
+  background: #ff8800;
+  border-color: #ff8800;
 }
 
 .search-extra-fields-trigger-wrap--active .search-extra-fields-dropdown-trigger {
-  background: transparent;
+  background: #ff8800;
+  color: #213547;
 }
 
 .search-extra-fields-dropdown-trigger {
@@ -1088,7 +1094,11 @@
 }
 
 .search-extra-fields-trigger-wrap--active .search-extra-fields-dropdown-trigger:hover {
-  background: #e0d4f7;
+  background: #e67a00;
+}
+
+.search-extra-fields-trigger-wrap--active .search-extra-fields-clear:hover {
+  background: #e67a00;
 }
 
 .search-extra-fields-clear {
@@ -1126,11 +1136,48 @@
   max-height: min(70vh, 22rem);
   overflow: auto;
   z-index: 1200;
-  padding: 0.4rem 0;
+  padding: 0;
   background: #fff;
   border: 1px solid #ccc;
   border-radius: 6px;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+}
+
+.search-extra-fields-dropdown-panel > :last-child {
+  margin-bottom: 0.35rem;
+}
+
+.search-extra-fields-panel-header {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  padding: 0.35rem 0.5rem 0.4rem;
+  border-bottom: 1px solid #eee;
+  position: sticky;
+  top: 0;
+  background: #fff;
+  z-index: 1;
+}
+
+.search-extra-fields-panel-clear-btn {
+  font-family: inherit;
+  font-size: 0.85rem;
+  color: #252525;
+  padding: 0.25rem 0.65rem;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  background: #f8f8f8;
+  cursor: pointer;
+}
+
+.search-extra-fields-panel-clear-btn:hover:not(:disabled) {
+  background: #ede8ff;
+  border-color: #aaaaff;
+}
+
+.search-extra-fields-panel-clear-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
 }
 
 .search-extra-fields-option {
@@ -1149,6 +1196,15 @@
 
 .search-extra-fields-option input {
   flex-shrink: 0;
+}
+
+.search-extra-fields-separator {
+  margin: 0;
+  padding: 0;
+}
+
+.search-extra-fields-separator .sidebar-separator {
+  margin: 0.25rem 0.75rem;
 }
 
 .search-filetype-trigger-wrap {

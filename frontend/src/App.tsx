@@ -1599,6 +1599,28 @@ function App() {
                   const anyQuickSelected = fileTypeQuickMode === FileTypeQuickMode.Any
                   const mehQuickSelected = fileTypeQuickMode === FileTypeQuickMode.Meh
                   const hasThumbFilter = thumbnailOnly
+                  const extraFieldKeysSelectedInPanel = extraFieldKeysOnPage.filter((k) => extraGridFieldsSelected.has(k))
+                  const extraFieldKeysNotSelectedInPanel = extraFieldKeysOnPage.filter((k) => !extraGridFieldsSelected.has(k))
+                  const renderExtraFieldOption = (jsonKey: string) => (
+                    <label key={jsonKey} className="search-extra-fields-option" title={jsonKey}>
+                      <input
+                        type="checkbox"
+                        checked={extraGridFieldsSelected.has(jsonKey)}
+                        onChange={() => {
+                          setExtraGridFieldsSelected((prev) => {
+                            const next = new Set(prev)
+                            if (next.has(jsonKey)) {
+                              next.delete(jsonKey)
+                            } else {
+                              next.add(jsonKey)
+                            }
+                            return next
+                          })
+                        }}
+                      />
+                      {formatLittlePrinceFieldLabel(jsonKey)}
+                    </label>
+                  )
                   return (
                   <div className="search-form-media-extras-group">
                   {showMediaDropdown && (
@@ -1837,26 +1859,24 @@ function App() {
                           role="listbox"
                           aria-label="Extra fields to show as columns"
                         >
-                          {extraFieldKeysOnPage.map((jsonKey) => (
-                            <label key={jsonKey} className="search-extra-fields-option" title={jsonKey}>
-                              <input
-                                type="checkbox"
-                                checked={extraGridFieldsSelected.has(jsonKey)}
-                                onChange={() => {
-                                  setExtraGridFieldsSelected((prev) => {
-                                    const next = new Set(prev)
-                                    if (next.has(jsonKey)) {
-                                      next.delete(jsonKey)
-                                    } else {
-                                      next.add(jsonKey)
-                                    }
-                                    return next
-                                  })
-                                }}
-                              />
-                              {formatLittlePrinceFieldLabel(jsonKey)}
-                            </label>
-                          ))}
+                          <div className="search-extra-fields-panel-header">
+                            <button
+                              type="button"
+                              className="search-extra-fields-panel-clear-btn"
+                              disabled={extraGridFieldsSelected.size === 0}
+                              onClick={() => setExtraGridFieldsSelected(new Set())}
+                              aria-label="Clear all selected extra field columns"
+                            >
+                              Clear
+                            </button>
+                          </div>
+                          {extraFieldKeysSelectedInPanel.map(renderExtraFieldOption)}
+                          {extraFieldKeysSelectedInPanel.length > 0 && extraFieldKeysNotSelectedInPanel.length > 0 && (
+                            <div className="search-extra-fields-separator" aria-hidden="true">
+                              <hr className="sidebar-separator" />
+                            </div>
+                          )}
+                          {extraFieldKeysNotSelectedInPanel.map(renderExtraFieldOption)}
                         </div>
                       )}
                     </div>
