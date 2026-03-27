@@ -10,7 +10,7 @@ java {
 }
 
 jar {
-    archiveBaseName = 'morsor-api-cli'
+    archiveBaseName = 'morsor-cli'
     manifest {
         attributes(
                 'Main-Class': 'com.example.morsor.cli.MorsorApiCli',

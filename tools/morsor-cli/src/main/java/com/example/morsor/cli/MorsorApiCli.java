@@ -776,7 +776,7 @@ public final class MorsorApiCli {
     }
 
     private static void die(String msg) {
-        System.err.println("morsor-api-cli: " + msg);
+        System.err.println("morsor-cli: " + msg);
         System.exit(2);
     }
 
