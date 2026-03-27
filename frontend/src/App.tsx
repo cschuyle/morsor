@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect, useRef } from 'react'
+import { useMemo, useState, useEffect, useRef, useLayoutEffect } from 'react'
 import { Link, useSearchParams, useLocation } from 'react-router-dom'
 import type { SearchResultData, Trove, DuplicatesResultData, UniquesResultData } from './types'
 import type { FileTypeQuickModeValue } from './fileTypeQuickMode'
@@ -18,6 +18,7 @@ import { formatCount, formatCacheBytes } from './formatCount'
 import { groupFileTypes, getGroupNameIfFullySelected, getFullySelectedGroupNames } from './fileTypeGroups'
 import { FileTypeQuickMode, normalizeFileTypeQuickMode } from './fileTypeQuickMode'
 import { isCompareToSelfVisible } from './compareToSelfVisible'
+import { deserializeTabUrl, serializeTabUrl } from './tabUrlParams'
 import './App.css'
 
 function App() {
@@ -27,7 +28,9 @@ function App() {
   const [searchSelectedTroveIds, setSearchSelectedTroveIds] = useState<Set<string>>(() => new Set())
   const [dupCompareTroveIds, setDupCompareTroveIds] = useState<Set<string>>(() => new Set())
   const [uniqCompareTroveIds, setUniqCompareTroveIds] = useState<Set<string>>(() => new Set())
-  const [query, setQuery] = useState('')
+  const [searchQuery, setSearchQuery] = useState('')
+  const [dupQuery, setDupQuery] = useState('')
+  const [uniqQuery, setUniqQuery] = useState('')
   const [searchResult, setSearchResult] = useState<SearchResultData | null>(null)
   const [searchError, setSearchError] = useState<string | null>(null)
   const [searching, setSearching] = useState(false)
@@ -85,7 +88,7 @@ function App() {
   const [compareRawSourceLightbox, setCompareRawSourceLightbox] = useState<{ title: string; rawSourceItem: string } | null>(null)
   const [reloadTrovesInProgress, setReloadTrovesInProgress] = useState(false)
   const [reloadTrovesProgress, setReloadTrovesProgress] = useState({ current: 0, total: 0 })
-  const queryRef = useRef(query)
+  const queryRef = useRef('')
   const skipCheckboxSearchRef = useRef(true)
   const skipFileTypeSearchRef = useRef(false)
   const skipViewModeSearchRef = useRef(false)
@@ -110,8 +113,10 @@ function App() {
   dupPageSizeRef.current = dupPageSize
   uniqPageSizeRef.current = uniqPageSize
   const PAGE_SIZE_OPTIONS = [10, 25, 100, 500, 1000, 5000, 10000]
-  queryRef.current = query
-  const isStarQuery = (query ?? '').trim() === '*'
+  useLayoutEffect(() => {
+    queryRef.current = searchMode === 'search' ? searchQuery : searchMode === 'duplicates' ? dupQuery : uniqQuery
+  }, [searchMode, searchQuery, dupQuery, uniqQuery])
+  const isStarQuery = (searchQuery ?? '').trim() === '*'
   const effectiveSortBy = isStarQuery ? (starSortBy ?? 'title') : (otherSortBy ?? 'score')
   const effectiveSortDir = isStarQuery ? (starSortDir ?? 'asc') : (otherSortDir ?? 'desc')
 
@@ -333,57 +338,44 @@ function App() {
     return t ? t.id : value
   }
 
-  // Restore query and trove selection from URL (bookmark / back button).
-  // Resolve trove names to ids when troves are loaded so state and URL use ids.
+  // Restore per-tab state from URL (namespaced keys + legacy fallbacks). Trove names → ids when troves load.
   useEffect(() => {
-    const q = searchParams.get('q')
-    setQuery(q != null ? q : '')
-    const ftAll = searchParams.getAll('fileTypes')
-    setFileTypeFilters(new Set(ftAll.filter((f) => f != null && f.trim()).map((f) => (f.trim() === 'URL' ? 'Link' : f.trim()))))
-    setFileTypeQuickMode(normalizeFileTypeQuickMode(searchParams.get('ftq')))
-    setThumbnailOnly(searchParams.get('thumbs') === '1')
-    const mode = searchParams.get('mode')
-    if (mode !== 'duplicates' && mode !== 'uniques') {
-      const troveIds = searchParams.getAll('trove').map((v) => urlTroveId(v, troves) ?? v).filter(Boolean)
-      setSearchSelectedTroveIds(new Set(troveIds))
-      const boost = searchParams.get('boost')
-      setBoostTroveId(boost != null && boost !== '' ? (urlTroveId(boost, troves) ?? boost) : null)
-      const view = searchParams.get('view')
-      setSearchResultsViewMode(view === 'gallery' ? 'gallery' : 'list')
-      if (view === 'gallery') {
-        const urlQ = (q ?? '').trim()
-        if (urlQ === '*') {
-          setStarSortBy('title')
-          setStarSortDir('asc')
-        } else if (urlQ) {
-          setOtherSortBy('score')
-          setOtherSortDir('desc')
-        }
+    const d = deserializeTabUrl(searchParams, troves, urlTroveId)
+    setSearchQuery(d.searchQuery)
+    setDupQuery(d.dupQuery)
+    setUniqQuery(d.uniqQuery)
+    setSearchSelectedTroveIds(new Set(d.searchTroveIds))
+    setDupPrimaryTroveId(d.dupPrimary)
+    setDupCompareTroveIds(new Set(d.dupCompare))
+    setUniqPrimaryTroveId(d.uniqPrimary)
+    setUniqCompareTroveIds(new Set(d.uniqCompare))
+    setFileTypeFilters(new Set(d.fileTypeFilters))
+    setFileTypeQuickMode(d.fileTypeQuickMode)
+    setThumbnailOnly(d.thumbnailOnly)
+    setBoostTroveId(d.boostTroveId)
+    setSearchResultsViewMode(d.searchView)
+    setExtraGridFieldsSelected(new Set(d.extraGridFields))
+    if (d.pageSize != null) setPageSize(d.pageSize)
+    if (d.dupPageSize != null) setDupPageSize(d.dupPageSize)
+    if (d.uniqPageSize != null) setUniqPageSize(d.uniqPageSize)
+    setDuplicatesSortBy(d.duplicatesSortBy)
+    setDuplicatesSortDir(d.duplicatesSortDir)
+    setUniquesSortBy(d.uniquesSortBy)
+    setUniquesSortDir(d.uniquesSortDir)
+    if (d.searchView === 'gallery') {
+      const urlQ = (d.searchQuery ?? '').trim()
+      if (urlQ === '*') {
+        setStarSortBy('title')
+        setStarSortDir('asc')
+      } else if (urlQ) {
+        setOtherSortBy('score')
+        setOtherSortDir('desc')
       }
-      const sizeParam = Number(searchParams.get('size'))
-      if (Number.isFinite(sizeParam) && sizeParam > 0) {
-        setPageSize(sizeParam)
-      }
-      const extraFromUrl = searchParams.getAll('extraFields').map((s) => s.trim()).filter(Boolean)
-      setExtraGridFieldsSelected(new Set(extraFromUrl))
-    } else if (mode === 'duplicates') {
-      const primary = searchParams.get('primary')
-      setDupPrimaryTroveId(primary != null ? (urlTroveId(primary, troves) ?? primary) : '')
-      setDupCompareTroveIds(new Set(searchParams.getAll('compare').map((v) => urlTroveId(v, troves) ?? v).filter(Boolean)))
-      const dupSizeParam = Number(searchParams.get('size'))
-      if (Number.isFinite(dupSizeParam) && dupSizeParam > 0) setDupPageSize(dupSizeParam)
-    } else {
-      const primary = searchParams.get('primary')
-      setUniqPrimaryTroveId(primary != null ? (urlTroveId(primary, troves) ?? primary) : '')
-      setUniqCompareTroveIds(new Set(searchParams.getAll('compare').map((v) => urlTroveId(v, troves) ?? v).filter(Boolean)))
-      const uniqSizeParam = Number(searchParams.get('size'))
-      if (Number.isFinite(uniqSizeParam) && uniqSizeParam > 0) setUniqPageSize(uniqSizeParam)
     }
   }, [searchParams, troves])
 
   function buildSearchParams(
     mode: string,
-    q: string,
     searchTroves: Set<string>,
     dupPrimary: string,
     dupCompare: Set<string>,
@@ -391,64 +383,60 @@ function App() {
     uniqCompare: Set<string>,
     fileTypesSet: Set<string> | null = null,
     boostTrove: string | null = null,
-    view: string | null = null,
+    view: 'list' | 'gallery' | null = null,
     thumbnailOnlyOverride?: boolean,
-    quickModeOverride?: FileTypeQuickModeValue,
-    sizeForMode: number = mode === 'duplicates' ? dupPageSize : mode === 'uniques' ? uniqPageSize : pageSize
+    quickModeOverride?: FileTypeQuickModeValue
   ): URLSearchParams {
-    const next = new URLSearchParams()
-    if (mode !== 'search') next.set('mode', mode)
-    const qTrim = (q ?? '').trim()
-    if (qTrim) next.set('q', qTrim)
-    if (mode === 'search') {
-      Array.from(searchTroves).map((id) => urlTroveId(id, troves) ?? id).filter(Boolean).forEach((id) => next.append('trove', id))
-      const boostId = boostTrove ? (urlTroveId(boostTrove, troves) ?? boostTrove) : null
-      if (boostId) next.set('boost', boostId)
-      const ft = fileTypesSet ?? fileTypeFilters
-      if (ft && ft.size > 0) ft.forEach((f) => next.append('fileTypes', f))
-      const useQuickMode = quickModeOverride === undefined ? fileTypeQuickMode : quickModeOverride
-      next.set('ftq', useQuickMode)
-      const useThumbnailOnly = thumbnailOnlyOverride === undefined ? thumbnailOnly : thumbnailOnlyOverride
-      if (useThumbnailOnly) next.set('thumbs', '1')
-      next.set('view', view === 'gallery' ? 'gallery' : 'list')
-      const existingPage = searchParams.get('page')
-      if (existingPage != null) next.set('page', existingPage)
-      next.set('size', String(sizeForMode))
-      const sortedExtra = [...extraGridFieldsSelected].sort((a, b) => a.localeCompare(b))
-      sortedExtra.forEach((k) => next.append('extraFields', k))
-    } else if (mode === 'duplicates') {
-      const primaryId = dupPrimary ? (urlTroveId(dupPrimary, troves) ?? dupPrimary) : null
-      if (primaryId) next.set('primary', primaryId)
-      Array.from(dupCompare).map((id) => urlTroveId(id, troves) ?? id).filter(Boolean).forEach((id) => next.append('compare', id))
-      next.set('size', String(sizeForMode))
-      // Keep search-tab page in the URL while on dups/uniques so returning to Search refetches the same page.
-      const searchPageOneBased =
-        searchResult != null && typeof searchResult.page === 'number'
-          ? String(searchResult.page + 1)
-          : searchParams.get('page')
-      if (searchPageOneBased != null && searchPageOneBased !== '' && Number(searchPageOneBased) > 0) {
-        next.set('page', searchPageOneBased)
-      }
-    } else {
-      const primaryId = uniqPrimary ? (urlTroveId(uniqPrimary, troves) ?? uniqPrimary) : null
-      if (primaryId) next.set('primary', primaryId)
-      Array.from(uniqCompare).map((id) => urlTroveId(id, troves) ?? id).filter(Boolean).forEach((id) => next.append('compare', id))
-      next.set('size', String(sizeForMode))
-      const searchPageOneBased =
-        searchResult != null && typeof searchResult.page === 'number'
-          ? String(searchResult.page + 1)
-          : searchParams.get('page')
-      if (searchPageOneBased != null && searchPageOneBased !== '' && Number(searchPageOneBased) > 0) {
-        next.set('page', searchPageOneBased)
-      }
-    }
-    return next
+    const activeMode = mode === 'duplicates' ? 'duplicates' : mode === 'uniques' ? 'uniques' : 'search'
+    const searchViewResolved = view === 'gallery' ? 'gallery' : view === 'list' ? 'list' : searchResultsViewMode
+    const ft = fileTypesSet ?? fileTypeFilters
+    const useQuickMode = quickModeOverride === undefined ? fileTypeQuickMode : quickModeOverride
+    const useThumbnailOnly = thumbnailOnlyOverride === undefined ? thumbnailOnly : thumbnailOnlyOverride
+    const boostResolved = boostTrove === undefined ? boostTroveId : boostTrove
+    return serializeTabUrl({
+      activeMode,
+      searchQuery,
+      dupQuery,
+      uniqQuery,
+      searchTroveIds: searchTroves,
+      dupPrimary,
+      dupCompare,
+      uniqPrimary,
+      uniqCompare,
+      fileTypeFilters: ft,
+      fileTypeQuickMode: useQuickMode,
+      thumbnailOnly: useThumbnailOnly,
+      boostTroveId: boostResolved,
+      searchView: searchViewResolved,
+      extraGridFields: extraGridFieldsSelected,
+      pageSize,
+      dupPageSize,
+      uniqPageSize,
+      searchPage0Based: searchResult?.page,
+      dupPage0Based: duplicatesResult?.page,
+      uniqPage0Based: uniquesResult?.page,
+      duplicatesSortBy,
+      duplicatesSortDir,
+      uniquesSortBy,
+      uniquesSortDir,
+      troves,
+      urlTroveId,
+    })
   }
 
-  // Persist current tab, query, trove selection, view, and search pagination to URL (bookmarkable).
-  // Skip overwriting when the URL has params we haven't applied yet (pasted URL, desktop↔mobile toggle).
+  // Persist all tabs’ state to the URL (bookmarkable). Skip when URL is ahead of React (paste, desktop↔mobile).
   useEffect(() => {
-    const urlHasPrimaryOrCompare = searchParams.get('primary') || searchParams.getAll('compare').length > 0
+    const urlHasDupPick =
+      searchParams.get('dprimary') ||
+      searchParams.getAll('dcompare').length > 0 ||
+      (searchParams.get('mode') === 'duplicates' &&
+        (searchParams.get('primary') || searchParams.getAll('compare').length > 0))
+    const urlHasUniqPick =
+      searchParams.get('uprimary') ||
+      searchParams.getAll('ucompare').length > 0 ||
+      (searchParams.get('mode') === 'uniques' &&
+        (searchParams.get('primary') || searchParams.getAll('compare').length > 0))
+    const urlHasPrimaryOrCompare = urlHasDupPick || urlHasUniqPick
     const stateHasNone = !primaryTroveId && (searchMode === 'duplicates' ? !dupCompareTroveIds.size : !uniqCompareTroveIds.size)
     if (urlHasPrimaryOrCompare && stateHasNone) return
     const urlHasQuery = searchParams.get('q') != null && searchParams.get('q') !== ''
@@ -458,7 +446,7 @@ function App() {
     const urlHasThumbs = searchParams.get('thumbs') === '1'
     const urlHasExtraFields = searchParams.getAll('extraFields').length > 0
     const searchStateNotSynced =
-      (urlHasQuery && (!query || (query ?? '').trim() === '')) ||
+      (urlHasQuery && (!searchQuery || (searchQuery ?? '').trim() === '')) ||
       (urlHasTrove && searchSelectedTroveIds.size === 0) ||
       (urlHasFileTypes && fileTypeFilters.size === 0) ||
       (urlQuickMode !== fileTypeQuickMode) ||
@@ -467,7 +455,6 @@ function App() {
     if (searchMode === 'search' && searchStateNotSynced) return
     const next = buildSearchParams(
       searchMode,
-      query,
       searchSelectedTroveIds,
       dupPrimaryTroveId,
       dupCompareTroveIds,
@@ -480,7 +467,33 @@ function App() {
     if (next.toString() !== searchParams.toString()) {
       setSearchParams(next, { replace: true })
     }
-  }, [query, searchMode, searchSelectedTroveIds, primaryTroveId, dupCompareTroveIds, uniqCompareTroveIds, fileTypeFilters, fileTypeQuickMode, thumbnailOnly, boostTroveId, searchResultsViewMode, extraGridFieldsSelected, searchResult?.page, searchResult?.size, pageSize, dupPageSize, uniqPageSize])
+  }, [
+    searchQuery,
+    dupQuery,
+    uniqQuery,
+    searchMode,
+    searchSelectedTroveIds,
+    primaryTroveId,
+    dupCompareTroveIds,
+    uniqCompareTroveIds,
+    fileTypeFilters,
+    fileTypeQuickMode,
+    thumbnailOnly,
+    boostTroveId,
+    searchResultsViewMode,
+    extraGridFieldsSelected,
+    searchResult?.page,
+    searchResult?.size,
+    duplicatesResult?.page,
+    uniquesResult?.page,
+    pageSize,
+    dupPageSize,
+    uniqPageSize,
+    duplicatesSortBy,
+    duplicatesSortDir,
+    uniquesSortBy,
+    uniquesSortDir,
+  ])
 
   // Keep the search page input in sync with the current page (1-based)
   useEffect(() => {
@@ -566,7 +579,6 @@ function App() {
     setBoostTroveId(null)
     setSearchParams(buildSearchParams(
       searchMode,
-      query,
       searchMode === 'search' ? new Set() : searchSelectedTroveIds,
       dupPrimaryTroveId,
       searchMode === 'duplicates' ? new Set() : dupCompareTroveIds,
@@ -586,18 +598,24 @@ function App() {
     if (searchMode !== 'search') return
     setFreezeTroveListOrder(true)
     setBoostTroveId((prev) => (prev === troveId ? null : troveId))
-    if (!query.trim()) {
+    if (!searchQuery.trim()) {
       queryRef.current = '*'
-      setQuery('*')
+      setSearchQuery('*')
     }
   }
 
   function handleTargetClick(troveId) {
     setFreezeTroveListOrder(true)
     selectOnlyTrove(troveId)
-    if (!query.trim()) {
+    if (searchMode === 'search' && !searchQuery.trim()) {
       queryRef.current = '*'
-      setQuery('*')
+      setSearchQuery('*')
+    } else if (searchMode === 'duplicates' && !dupQuery.trim()) {
+      queryRef.current = '*'
+      setDupQuery('*')
+    } else if (searchMode === 'uniques' && !uniqQuery.trim()) {
+      queryRef.current = '*'
+      setUniqQuery('*')
     }
     if (searchMode === 'search') fetchSearch(0, null, new Set([troveId]))
   }
@@ -828,7 +846,7 @@ function App() {
       fetchUniques(0)
       return
     }
-    if (!query.trim()) {
+    if (!searchQuery.trim()) {
       setSearchResult({ count: 0, results: [], page: 0, size: pageSize })
       return
     }
@@ -841,7 +859,7 @@ function App() {
   function handlePageSizeChange(e) {
     const newSize = Number(e.target.value)
     setPageSize(newSize)
-    if (searchResult != null && query.trim()) fetchSearch(0, newSize)
+    if (searchResult != null && searchQuery.trim()) fetchSearch(0, newSize)
     const nextParams = new URLSearchParams(searchParams)
     nextParams.set('size', String(newSize))
     nextParams.set('page', '1')
@@ -852,7 +870,8 @@ function App() {
     setDupPageSize(newSize)
     if (duplicatesResult != null && primaryTroveId.trim()) fetchDuplicates(0, newSize)
     const nextParams = new URLSearchParams(searchParams)
-    nextParams.set('size', String(newSize))
+    nextParams.set('dsize', String(newSize))
+    nextParams.set('dpage', '1')
     setSearchParams(nextParams, { replace: true })
   }
   function handleUniqPageSizeChange(e) {
@@ -860,7 +879,8 @@ function App() {
     setUniqPageSize(newSize)
     if (uniquesResult != null && primaryTroveId.trim() && selectedTroveIds.size > 0) fetchUniques(0, null, null, newSize)
     const nextParams = new URLSearchParams(searchParams)
-    nextParams.set('size', String(newSize))
+    nextParams.set('usize', String(newSize))
+    nextParams.set('upage', '1')
     setSearchParams(nextParams, { replace: true })
   }
 
@@ -1488,7 +1508,7 @@ function App() {
                 aria-selected={searchMode === 'search'}
                 className={searchMode === 'search' ? 'active' : ''}
                 onClick={() => {
-                  setSearchParams(buildSearchParams('search', query, searchSelectedTroveIds, dupPrimaryTroveId, dupCompareTroveIds, uniqPrimaryTroveId, uniqCompareTroveIds, fileTypeFilters, boostTroveId, searchResultsViewMode), { replace: true })
+                  setSearchParams(buildSearchParams('search', searchSelectedTroveIds, dupPrimaryTroveId, dupCompareTroveIds, uniqPrimaryTroveId, uniqCompareTroveIds, fileTypeFilters, boostTroveId, searchResultsViewMode), { replace: true })
                 }}
               >
                 Search
@@ -1503,9 +1523,9 @@ function App() {
                   if (dupEmpty && (uniqPrimaryTroveId || uniqCompareTroveIds.size)) {
                     setDupPrimaryTroveId(uniqPrimaryTroveId)
                     setDupCompareTroveIds(new Set(uniqCompareTroveIds))
-                    setSearchParams(buildSearchParams('duplicates', query, searchSelectedTroveIds, uniqPrimaryTroveId, uniqCompareTroveIds, uniqPrimaryTroveId, uniqCompareTroveIds), { replace: true })
+                    setSearchParams(buildSearchParams('duplicates', searchSelectedTroveIds, uniqPrimaryTroveId, uniqCompareTroveIds, uniqPrimaryTroveId, uniqCompareTroveIds), { replace: true })
                   } else {
-                    setSearchParams(buildSearchParams('duplicates', query, searchSelectedTroveIds, dupPrimaryTroveId, dupCompareTroveIds, uniqPrimaryTroveId, uniqCompareTroveIds), { replace: true })
+                    setSearchParams(buildSearchParams('duplicates', searchSelectedTroveIds, dupPrimaryTroveId, dupCompareTroveIds, uniqPrimaryTroveId, uniqCompareTroveIds), { replace: true })
                   }
                 }}
               >
@@ -1522,9 +1542,9 @@ function App() {
                   if (uniqEmpty && (dupPrimaryTroveId || dupCompareTroveIds.size) && !dupSelfCompare) {
                     setUniqPrimaryTroveId(dupPrimaryTroveId)
                     setUniqCompareTroveIds(new Set(dupCompareTroveIds))
-                    setSearchParams(buildSearchParams('uniques', query, searchSelectedTroveIds, dupPrimaryTroveId, dupCompareTroveIds, dupPrimaryTroveId, dupCompareTroveIds), { replace: true })
+                    setSearchParams(buildSearchParams('uniques', searchSelectedTroveIds, dupPrimaryTroveId, dupCompareTroveIds, dupPrimaryTroveId, dupCompareTroveIds), { replace: true })
                   } else {
-                    setSearchParams(buildSearchParams('uniques', query, searchSelectedTroveIds, dupPrimaryTroveId, dupCompareTroveIds, uniqPrimaryTroveId, uniqCompareTroveIds), { replace: true })
+                    setSearchParams(buildSearchParams('uniques', searchSelectedTroveIds, dupPrimaryTroveId, dupCompareTroveIds, uniqPrimaryTroveId, uniqCompareTroveIds), { replace: true })
                   }
                 }}
               >
@@ -1537,24 +1557,53 @@ function App() {
                   <div className="search-query-input-wrap">
                     <input
                       type="text"
-                      value={query}
-                      onChange={(e) => { setQuery(e.target.value); setFreezeTroveListOrder(false) }}
-                      onKeyDown={(e) => { if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); setQuery(''); queryRef.current = ''; setSearchResult({ count: 0, results: [], page: 0, size: pageSize }) } }}
+                      value={searchMode === 'search' ? searchQuery : searchMode === 'duplicates' ? dupQuery : uniqQuery}
+                      onChange={(e) => {
+                        const v = e.target.value
+                        if (searchMode === 'search') setSearchQuery(v)
+                        else if (searchMode === 'duplicates') setDupQuery(v)
+                        else setUniqQuery(v)
+                        setFreezeTroveListOrder(false)
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key !== 'Escape') return
+                        e.preventDefault()
+                        e.stopPropagation()
+                        queryRef.current = ''
+                        if (searchMode === 'search') {
+                          setSearchQuery('')
+                          setSearchResult({ count: 0, results: [], page: 0, size: pageSize })
+                        } else if (searchMode === 'duplicates') {
+                          setDupQuery('')
+                          setDuplicatesResult({ total: 0, page: 0, size: dupPageSize, rows: [] })
+                        } else {
+                          setUniqQuery('')
+                          setUniquesResult({ total: 0, page: 0, size: uniqPageSize, results: [] })
+                        }
+                      }}
                       placeholder="e.g. Greek, Prince, Albanian, Alien — or * for all"
                       className="search-query-input"
                       aria-label="Query"
                     />
-                    {query && (
+                    {(searchMode === 'search' ? searchQuery : searchMode === 'duplicates' ? dupQuery : uniqQuery) && (
                       <button
                         type="button"
                         className="search-query-clear"
                         onClick={() => {
-                          setQuery('')
                           queryRef.current = ''
                           setFreezeTroveListOrder(false)
-                          setSearchResult({ count: 0, results: [], page: 0, size: pageSize })
-                          setDuplicatesResult(null)
-                          setUniquesResult(null)
+                          if (searchMode === 'search') {
+                            setSearchQuery('')
+                            setSearchResult({ count: 0, results: [], page: 0, size: pageSize })
+                            setDuplicatesResult(null)
+                            setUniquesResult(null)
+                          } else if (searchMode === 'duplicates') {
+                            setDupQuery('')
+                            setDuplicatesResult({ total: 0, page: 0, size: dupPageSize, rows: [] })
+                          } else {
+                            setUniqQuery('')
+                            setUniquesResult({ total: 0, page: 0, size: uniqPageSize, results: [] })
+                          }
                         }}
                         aria-label="Clear query"
                       >
@@ -1568,8 +1617,10 @@ function App() {
                       className="search-query-btn"
                       title="Search all (*)"
                       onClick={() => {
-                        setQuery('*')
                         queryRef.current = '*'
+                        if (searchMode === 'search') setSearchQuery('*')
+                        else if (searchMode === 'duplicates') setDupQuery('*')
+                        else setUniqQuery('*')
                         setFreezeTroveListOrder(false)
                         if (searchMode === 'duplicates') {
                           if (primaryTroveId.trim()) {
@@ -1691,7 +1742,7 @@ function App() {
                             setThumbnailOnly(false)
                             setFileTypeQuickMode(FileTypeQuickMode.Meh)
                             setFileTypeFilters(new Set())
-                            setSearchParams(buildSearchParams('search', query, searchSelectedTroveIds, dupPrimaryTroveId, dupCompareTroveIds, uniqPrimaryTroveId, uniqCompareTroveIds, new Set(), boostTroveId, searchResultsViewMode, false, FileTypeQuickMode.Meh), { replace: true })
+                            setSearchParams(buildSearchParams('search', searchSelectedTroveIds, dupPrimaryTroveId, dupCompareTroveIds, uniqPrimaryTroveId, uniqCompareTroveIds, new Set(), boostTroveId, searchResultsViewMode, false, FileTypeQuickMode.Meh), { replace: true })
                             fetchSearch(0, null, null, null, null, new Set())
                           }}
                           aria-label="Clear file type filter"
@@ -1714,7 +1765,7 @@ function App() {
                               e.preventDefault()
                               const nextThumbs = !thumbnailOnly
                               setThumbnailOnly(nextThumbs)
-                              setSearchParams(buildSearchParams('search', query, searchSelectedTroveIds, dupPrimaryTroveId, dupCompareTroveIds, uniqPrimaryTroveId, uniqCompareTroveIds, null, boostTroveId, searchResultsViewMode, nextThumbs, fileTypeQuickMode), { replace: true })
+                              setSearchParams(buildSearchParams('search', searchSelectedTroveIds, dupPrimaryTroveId, dupCompareTroveIds, uniqPrimaryTroveId, uniqCompareTroveIds, null, boostTroveId, searchResultsViewMode, nextThumbs, fileTypeQuickMode), { replace: true })
                             }}
                             title="Must have a thumbnail image"
                             aria-label="Must have a thumbnail image"
@@ -1733,7 +1784,7 @@ function App() {
                               const next = new Set(allAvailableFileTypes)
                               setFileTypeQuickMode(FileTypeQuickMode.Any)
                               setFileTypeFilters(next)
-                              setSearchParams(buildSearchParams('search', query, searchSelectedTroveIds, dupPrimaryTroveId, dupCompareTroveIds, uniqPrimaryTroveId, uniqCompareTroveIds, next, boostTroveId, searchResultsViewMode, undefined, FileTypeQuickMode.Any), { replace: true })
+                              setSearchParams(buildSearchParams('search', searchSelectedTroveIds, dupPrimaryTroveId, dupCompareTroveIds, uniqPrimaryTroveId, uniqCompareTroveIds, next, boostTroveId, searchResultsViewMode, undefined, FileTypeQuickMode.Any), { replace: true })
                               fetchSearch(0, null, null, null, null, next)
                             }}
                           >
@@ -1751,7 +1802,7 @@ function App() {
                               const next = new Set<string>()
                               setFileTypeQuickMode(FileTypeQuickMode.Meh)
                               setFileTypeFilters(next)
-                              setSearchParams(buildSearchParams('search', query, searchSelectedTroveIds, dupPrimaryTroveId, dupCompareTroveIds, uniqPrimaryTroveId, uniqCompareTroveIds, next, boostTroveId, searchResultsViewMode, undefined, FileTypeQuickMode.Meh), { replace: true })
+                              setSearchParams(buildSearchParams('search', searchSelectedTroveIds, dupPrimaryTroveId, dupCompareTroveIds, uniqPrimaryTroveId, uniqCompareTroveIds, next, boostTroveId, searchResultsViewMode, undefined, FileTypeQuickMode.Meh), { replace: true })
                               fetchSearch(0, null, null, null, null, next)
                             }}
                           >
@@ -1778,7 +1829,7 @@ function App() {
                                       else types.forEach((t) => next.add(t))
                                       if (anyQuickSelected) setFileTypeQuickMode(FileTypeQuickMode.Meh)
                                       setFileTypeFilters(next)
-                                      setSearchParams(buildSearchParams('search', query, searchSelectedTroveIds, dupPrimaryTroveId, dupCompareTroveIds, uniqPrimaryTroveId, uniqCompareTroveIds, next, boostTroveId, searchResultsViewMode, undefined, anyQuickSelected ? FileTypeQuickMode.Meh : fileTypeQuickMode), { replace: true })
+                                      setSearchParams(buildSearchParams('search', searchSelectedTroveIds, dupPrimaryTroveId, dupCompareTroveIds, uniqPrimaryTroveId, uniqCompareTroveIds, next, boostTroveId, searchResultsViewMode, undefined, anyQuickSelected ? FileTypeQuickMode.Meh : fileTypeQuickMode), { replace: true })
                                       fetchSearch(0, null, null, null, null, next)
                                     }}
                                   />
@@ -1802,7 +1853,7 @@ function App() {
                                     })
                                     if (anyQuickSelected) setFileTypeQuickMode(FileTypeQuickMode.Meh)
                                     setFileTypeFilters(next)
-                                    setSearchParams(buildSearchParams('search', query, searchSelectedTroveIds, dupPrimaryTroveId, dupCompareTroveIds, uniqPrimaryTroveId, uniqCompareTroveIds, next, boostTroveId, searchResultsViewMode, undefined, anyQuickSelected ? FileTypeQuickMode.Meh : fileTypeQuickMode), { replace: true })
+                                    setSearchParams(buildSearchParams('search', searchSelectedTroveIds, dupPrimaryTroveId, dupCompareTroveIds, uniqPrimaryTroveId, uniqCompareTroveIds, next, boostTroveId, searchResultsViewMode, undefined, anyQuickSelected ? FileTypeQuickMode.Meh : fileTypeQuickMode), { replace: true })
                                     fetchSearch(0, null, null, null, null, next)
                                   }}
                                 >
@@ -1823,7 +1874,7 @@ function App() {
                                     else next.add(ft)
                                     if (anyQuickSelected) setFileTypeQuickMode(FileTypeQuickMode.Meh)
                                     setFileTypeFilters(next)
-                                    setSearchParams(buildSearchParams('search', query, searchSelectedTroveIds, dupPrimaryTroveId, dupCompareTroveIds, uniqPrimaryTroveId, uniqCompareTroveIds, next, boostTroveId, searchResultsViewMode, undefined, anyQuickSelected ? FileTypeQuickMode.Meh : fileTypeQuickMode), { replace: true })
+                                    setSearchParams(buildSearchParams('search', searchSelectedTroveIds, dupPrimaryTroveId, dupCompareTroveIds, uniqPrimaryTroveId, uniqCompareTroveIds, next, boostTroveId, searchResultsViewMode, undefined, anyQuickSelected ? FileTypeQuickMode.Meh : fileTypeQuickMode), { replace: true })
                                     fetchSearch(0, null, null, null, null, next)
                                   }}
                                 />
@@ -2307,7 +2358,7 @@ function App() {
             </div>
             {searchMode === 'search' && searchResult != null && (() => {
               const results = Array.isArray(searchResult.results) ? searchResult.results : []
-              const hasQuery = query.trim() !== ''
+              const hasQuery = searchQuery.trim() !== ''
               if (!hasQuery) {
                 return (
                   <>
@@ -2319,7 +2370,7 @@ function App() {
                       sortBy={effectiveSortBy}
                       sortDir={effectiveSortDir}
                       onSortChange={handleGridSortChange}
-                      showScoreColumn={query.trim() !== '*'}
+                      showScoreColumn={searchQuery.trim() !== '*'}
                       viewMode={searchResultsViewMode}
                       afterFilterSlot={gallerySortAfterFilterSlot}
                       showPdfSashInGallery
@@ -2521,7 +2572,7 @@ function App() {
                     sortBy={effectiveSortBy}
                     sortDir={effectiveSortDir}
                     onSortChange={handleGridSortChange}
-                    showScoreColumn={query.trim() !== '*'}
+                    showScoreColumn={searchQuery.trim() !== '*'}
                     viewMode={searchResultsViewMode}
                     afterFilterSlot={gallerySortAfterFilterSlot}
                     hideTroveInGallery={selectedTroveIds.size === 1}
