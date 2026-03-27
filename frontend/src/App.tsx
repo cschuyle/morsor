@@ -145,7 +145,7 @@ function App() {
   const uniqPageSizeRef = useRef(uniqPageSize)
   dupPageSizeRef.current = dupPageSize
   uniqPageSizeRef.current = uniqPageSize
-  const PAGE_SIZE_OPTIONS = [10, 25, 100, 500, 1000, 5000, 10000]
+  const PAGE_SIZE_OPTIONS = [10, 25, 50, 100, 500, 1000, 5000, 10000]
   useLayoutEffect(() => {
     queryRef.current = searchMode === 'search' ? searchQuery : searchMode === 'duplicates' ? dupQuery : uniqQuery
   }, [searchMode, searchQuery, dupQuery, uniqQuery])
