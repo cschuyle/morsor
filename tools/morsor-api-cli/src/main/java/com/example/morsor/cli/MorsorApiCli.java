@@ -49,8 +49,11 @@ public final class MorsorApiCli {
         int i = 0;
         while (i < args.length) {
             String a = args[i];
-            if (a.equals("-h") || a.equals("--man") || a.equals("--help") || a.equals("help")) {
+            if (a.equals("--man")) {
                 printUsageAndExit(0);
+            }
+            if (a.equals("-h") || a.equals("--help") || a.equals("help")) {
+                printSummaryUsageAndExit(0);
             }
             if (a.equals("-b") || a.equals("--base")) {
                 if (i + 1 >= args.length) {
@@ -468,8 +471,11 @@ public final class MorsorApiCli {
         int i = startIdx;
         while (i < args.length) {
             String a = args[i];
-            if (a.equals("--man") || a.equals("--help") || a.equals("-h") || a.equals("help")) {
+            if (a.equals("--man")) {
                 printUsageAndExit(0);
+            }
+            if (a.equals("--help") || a.equals("-h") || a.equals("help")) {
+                printSummaryUsageAndExit(0);
             }
             if (a.equals("--")) {
                 i++;
@@ -650,6 +656,48 @@ public final class MorsorApiCli {
         System.exit(code);
     }
 
+    private static void printSummaryUsageAndExit(int code) {
+        System.out.print(summaryUsage());
+        System.exit(code);
+    }
+
+    static String summaryUsage() {
+        return """
+                USAGE SUMMARY
+                  morsor-api-cli [OPTIONS] login
+                  morsor-api-cli [OPTIONS] [<baseUrl>] [<action>] [--<key> <value> ...] [naked query text]
+
+                HELP
+                  -h, --help  Show this summary
+                  --man        Show full manual
+
+                ACTIONS
+                  troves                -> GET /api/troves
+                  status                -> GET /api/status
+                  search                -> GET /api/search
+                  dups | duplicates | dupliicates -> GET /api/search/duplicates
+                  unique | uniques      -> GET /api/search/uniques
+                  default (no action): search
+
+                SHORTHAND PARAMS
+                  --KEY VALUE   or   --KEY=VALUE
+                  --q query, --p primaryTrove, --c compareTrove, --P page, --S size,
+                  --s sortBy, --d sortDir, --t trove (comma-separated values supported)
+                  Naked params are treated as query text.
+
+                LOGIN
+                  Prompts for username/password and prints:
+                    export MORSOR_CLI_TOKEN='...'
+
+                EXAMPLES
+                  ./scripts/morsor-api --help
+                  ./scripts/morsor-api --man
+                  ./scripts/morsor-api alien
+                  ./scripts/morsor-api search --q alien --P 0 --S 10
+                  ./scripts/morsor-api login
+                """;
+    }
+
     /** Full USAGE text: all backend routes and observability. */
     static String usage() {
         return """
@@ -667,7 +715,8 @@ public final class MorsorApiCli {
                   -d, --data FILE    POST body from FILE (POST only; default Content-Type: application/json)
                   -i, --include-headers  Print response status line and headers before body
                   -v, --debug        Print request and response diagnostics to stderr
-                  -h, --man, --help  Show this message
+                  -h, --help        Show short summary
+                  --man             Show full manual
 
                 login
                   Prompts for username and password (password is not echoed). Performs form login against
