@@ -108,6 +108,18 @@ export function formatLittlePrinceFieldLabel(key: string): string {
     .join(' ')
 }
 
+/** Case-insensitive match on JSON key or formatted label (extra-fields dropdown filter). */
+export function extraFieldKeyMatchesFilter(jsonKey: string, query: string): boolean {
+  const q = query.trim().toLowerCase()
+  if (!q) {
+    return true
+  }
+  if (jsonKey.toLowerCase().includes(q)) {
+    return true
+  }
+  return formatLittlePrinceFieldLabel(jsonKey).toLowerCase().includes(q)
+}
+
 /** One row in the Little Prince extra hover tooltip (includes original JSON key for catalog links). */
 type LittlePrinceExtraLine = { label: string; content: string; jsonKey: string }
 

@@ -2,7 +2,12 @@ import { useMemo, useState, useEffect, useRef } from 'react'
 import { Link, useSearchParams, useLocation } from 'react-router-dom'
 import type { SearchResultData, Trove, DuplicatesResultData, UniquesResultData } from './types'
 import type { FileTypeQuickModeValue } from './fileTypeQuickMode'
-import { SearchResultsGrid, collectExtraFieldKeysFromRows, formatLittlePrinceFieldLabel } from './SearchResultsGrid'
+import {
+  SearchResultsGrid,
+  collectExtraFieldKeysFromRows,
+  extraFieldKeyMatchesFilter,
+  formatLittlePrinceFieldLabel,
+} from './SearchResultsGrid'
 import { DuplicateResultsView } from './DuplicateResultsView'
 import { UniquesResultsView } from './UniquesResultsView'
 import { getApiAuthHeaders } from './apiAuth'
@@ -70,6 +75,7 @@ function App() {
   const [allAvailableFileTypes, setAllAvailableFileTypes] = useState<string[]>([])
   const [fileTypeDropdownOpen, setFileTypeDropdownOpen] = useState(false)
   const [extraFieldDropdownOpen, setExtraFieldDropdownOpen] = useState(false)
+  const [extraFieldDropdownFilter, setExtraFieldDropdownFilter] = useState('')
   const [extraGridFieldsSelected, setExtraGridFieldsSelected] = useState<Set<string>>(() => new Set())
   const [searchResultsViewMode, setSearchResultsViewMode] = useState<'list' | 'gallery'>('list')
   const [galleryDecorate, setGalleryDecorate] = useState(true)
@@ -322,6 +328,12 @@ function App() {
     }
     window.addEventListener('keydown', handleEscape)
     return () => window.removeEventListener('keydown', handleEscape)
+  }, [extraFieldDropdownOpen])
+
+  useEffect(() => {
+    if (!extraFieldDropdownOpen) {
+      setExtraFieldDropdownFilter('')
+    }
   }, [extraFieldDropdownOpen])
 
   useEffect(() => {
@@ -1610,6 +1622,12 @@ function App() {
                   const hasThumbFilter = thumbnailOnly
                   const extraFieldKeysSelectedInPanel = extraFieldKeysOnPage.filter((k) => extraGridFieldsSelected.has(k))
                   const extraFieldKeysNotSelectedInPanel = extraFieldKeysOnPage.filter((k) => !extraGridFieldsSelected.has(k))
+                  const extraFieldKeysSelectedFiltered = extraFieldKeysSelectedInPanel.filter((k) =>
+                    extraFieldKeyMatchesFilter(k, extraFieldDropdownFilter)
+                  )
+                  const extraFieldKeysNotSelectedFiltered = extraFieldKeysNotSelectedInPanel.filter((k) =>
+                    extraFieldKeyMatchesFilter(k, extraFieldDropdownFilter)
+                  )
                   const renderExtraFieldOption = (jsonKey: string) => (
                     <label key={jsonKey} className="search-extra-fields-option" title={jsonKey}>
                       <input
@@ -1833,7 +1851,12 @@ function App() {
                   </div>
                   )}
                   {showExtraFieldsPicker && (
-                    <div className="search-extra-fields-dropdown-wrap" ref={extraFieldDropdownRef}>
+                    <div
+                      className="search-extra-fields-dropdown-wrap"
+                      ref={extraFieldDropdownRef}
+                      onMouseDown={(e) => e.stopPropagation()}
+                      onClick={(e) => e.stopPropagation()}
+                    >
                       <div className={`search-extra-fields-trigger-wrap${extraGridFieldsSelected.size > 0 ? ' search-extra-fields-trigger-wrap--active' : ''}`}>
                         <button
                           type="button"
@@ -1853,20 +1876,6 @@ function App() {
                             ? 'Extra fields'
                             : `${extraGridFieldsSelected.size} extra field${extraGridFieldsSelected.size !== 1 ? 's' : ''}`}
                         </button>
-                        {extraGridFieldsSelected.size > 0 && (
-                          <button
-                            type="button"
-                            className="search-extra-fields-clear"
-                            title="Clear extra field columns"
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              setExtraGridFieldsSelected(new Set())
-                            }}
-                            aria-label="Clear extra field columns"
-                          >
-                            ×
-                          </button>
-                        )}
                       </div>
                       {extraFieldDropdownOpen && (
                         <div
@@ -1875,23 +1884,53 @@ function App() {
                           aria-label="Extra fields to show as columns"
                         >
                           <div className="search-extra-fields-panel-header">
+                            <div className="search-extra-fields-panel-filter-wrap">
+                              <input
+                                type="search"
+                                className="search-extra-fields-panel-filter"
+                                value={extraFieldDropdownFilter}
+                                onChange={(e) => setExtraFieldDropdownFilter(e.target.value)}
+                                onKeyDown={(e) => e.stopPropagation()}
+                                placeholder="Filter…"
+                                aria-label="Filter extra fields list"
+                              />
+                              {extraFieldDropdownFilter.trim() !== '' && (
+                                <button
+                                  type="button"
+                                  className="search-extra-fields-panel-filter-clear"
+                                  title="Clear filter"
+                                  aria-label="Clear filter"
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    setExtraFieldDropdownFilter('')
+                                  }}
+                                >
+                                  ×
+                                </button>
+                              )}
+                            </div>
                             <button
                               type="button"
                               className="search-extra-fields-panel-clear-btn"
                               disabled={extraGridFieldsSelected.size === 0}
-                              onClick={() => setExtraGridFieldsSelected(new Set())}
+                              onClick={() => {
+                                if (extraGridFieldsSelected.size === 0) {
+                                  return
+                                }
+                                setExtraGridFieldsSelected(new Set())
+                              }}
                               aria-label="Clear all selected extra field columns"
                             >
                               Clear
                             </button>
                           </div>
-                          {extraFieldKeysSelectedInPanel.map(renderExtraFieldOption)}
-                          {extraFieldKeysSelectedInPanel.length > 0 && extraFieldKeysNotSelectedInPanel.length > 0 && (
+                          {extraFieldKeysSelectedFiltered.map(renderExtraFieldOption)}
+                          {extraFieldKeysSelectedFiltered.length > 0 && extraFieldKeysNotSelectedFiltered.length > 0 && (
                             <div className="search-extra-fields-separator" aria-hidden="true">
                               <hr className="sidebar-separator" />
                             </div>
                           )}
-                          {extraFieldKeysNotSelectedInPanel.map(renderExtraFieldOption)}
+                          {extraFieldKeysNotSelectedFiltered.map(renderExtraFieldOption)}
                         </div>
                       )}
                     </div>

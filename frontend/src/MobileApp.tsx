@@ -10,7 +10,12 @@ import { queryCache } from './queryCache'
 import { formatCount } from './formatCount'
 import { groupFileTypes, getGroupNameIfFullySelected, ALL_KNOWN_FILE_TYPES } from './fileTypeGroups'
 import { FileTypeQuickMode, normalizeFileTypeQuickMode } from './fileTypeQuickMode'
-import { SearchResultsGrid, collectExtraFieldKeysFromRows, formatLittlePrinceFieldLabel } from './SearchResultsGrid'
+import {
+  SearchResultsGrid,
+  collectExtraFieldKeysFromRows,
+  extraFieldKeyMatchesFilter,
+  formatLittlePrinceFieldLabel,
+} from './SearchResultsGrid'
 import { DuplicateResultsView } from './DuplicateResultsView'
 import { UniquesResultsView } from './UniquesResultsView'
 import { isCompareToSelfVisible } from './compareToSelfVisible'
@@ -97,6 +102,7 @@ function MobileApp() {
   const [searchResultsViewMode, setSearchResultsViewMode] = useState<'list' | 'gallery'>('list')
   const [extraGridFieldsSelected, setExtraGridFieldsSelected] = useState<Set<string>>(() => new Set())
   const [extraFieldDropdownOpen, setExtraFieldDropdownOpen] = useState(false)
+  const [extraFieldDropdownFilter, setExtraFieldDropdownFilter] = useState('')
   const [galleryDecorate, setGalleryDecorate] = useState(true)
   const [copiedUrlFlare, setCopiedUrlFlare] = useState(false)
   const [shareIconFlash, setShareIconFlash] = useState(false)
@@ -419,6 +425,12 @@ function MobileApp() {
     }
     window.addEventListener('keydown', handleEscape)
     return () => window.removeEventListener('keydown', handleEscape)
+  }, [extraFieldDropdownOpen])
+
+  useEffect(() => {
+    if (!extraFieldDropdownOpen) {
+      setExtraFieldDropdownFilter('')
+    }
   }, [extraFieldDropdownOpen])
 
   useEffect(() => {
@@ -1775,6 +1787,12 @@ onClick={() => {
               {extraFieldKeysOnPage.length > 0 && (() => {
                 const extraFieldKeysSelectedInPanel = extraFieldKeysOnPage.filter((k) => extraGridFieldsSelected.has(k))
                 const extraFieldKeysNotSelectedInPanel = extraFieldKeysOnPage.filter((k) => !extraGridFieldsSelected.has(k))
+                const extraFieldKeysSelectedFiltered = extraFieldKeysSelectedInPanel.filter((k) =>
+                  extraFieldKeyMatchesFilter(k, extraFieldDropdownFilter)
+                )
+                const extraFieldKeysNotSelectedFiltered = extraFieldKeysNotSelectedInPanel.filter((k) =>
+                  extraFieldKeyMatchesFilter(k, extraFieldDropdownFilter)
+                )
                 const renderExtraFieldOption = (jsonKey: string) => (
                   <label key={jsonKey} className="search-extra-fields-option" title={jsonKey}>
                     <input
@@ -1796,7 +1814,12 @@ onClick={() => {
                   </label>
                 )
                 return (
-                  <div className="search-extra-fields-dropdown-wrap mobile-extra-fields-dropdown-wrap--toolbar" ref={extraFieldDropdownRef}>
+                  <div
+                    className="search-extra-fields-dropdown-wrap mobile-extra-fields-dropdown-wrap--toolbar"
+                    ref={extraFieldDropdownRef}
+                    onMouseDown={(e) => e.stopPropagation()}
+                    onClick={(e) => e.stopPropagation()}
+                  >
                     <div className={`search-extra-fields-trigger-wrap${extraGridFieldsSelected.size > 0 ? ' search-extra-fields-trigger-wrap--active' : ''}`}>
                       <button
                         type="button"
@@ -1825,23 +1848,53 @@ onClick={() => {
                         aria-label="Extra fields to show as columns"
                       >
                         <div className="search-extra-fields-panel-header">
+                          <div className="search-extra-fields-panel-filter-wrap">
+                            <input
+                              type="search"
+                              className="search-extra-fields-panel-filter"
+                              value={extraFieldDropdownFilter}
+                              onChange={(e) => setExtraFieldDropdownFilter(e.target.value)}
+                              onKeyDown={(e) => e.stopPropagation()}
+                              placeholder="Filter…"
+                              aria-label="Filter extra fields list"
+                            />
+                            {extraFieldDropdownFilter.trim() !== '' && (
+                              <button
+                                type="button"
+                                className="search-extra-fields-panel-filter-clear"
+                                title="Clear filter"
+                                aria-label="Clear filter"
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  setExtraFieldDropdownFilter('')
+                                }}
+                              >
+                                ×
+                              </button>
+                            )}
+                          </div>
                           <button
                             type="button"
                             className="search-extra-fields-panel-clear-btn"
                             disabled={extraGridFieldsSelected.size === 0}
-                            onClick={() => setExtraGridFieldsSelected(new Set())}
+                            onClick={() => {
+                              if (extraGridFieldsSelected.size === 0) {
+                                return
+                              }
+                              setExtraGridFieldsSelected(new Set())
+                            }}
                             aria-label="Clear all selected extra field columns"
                           >
                             Clear
                           </button>
                         </div>
-                        {extraFieldKeysSelectedInPanel.map(renderExtraFieldOption)}
-                        {extraFieldKeysSelectedInPanel.length > 0 && extraFieldKeysNotSelectedInPanel.length > 0 && (
+                        {extraFieldKeysSelectedFiltered.map(renderExtraFieldOption)}
+                        {extraFieldKeysSelectedFiltered.length > 0 && extraFieldKeysNotSelectedFiltered.length > 0 && (
                           <div className="search-extra-fields-separator" aria-hidden="true">
                             <hr className="sidebar-separator" />
                           </div>
                         )}
-                        {extraFieldKeysNotSelectedInPanel.map(renderExtraFieldOption)}
+                        {extraFieldKeysNotSelectedFiltered.map(renderExtraFieldOption)}
                       </div>
                     )}
                   </div>

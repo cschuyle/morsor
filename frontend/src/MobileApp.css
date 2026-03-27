@@ -2450,10 +2450,6 @@
   background: #fff;
 }
 
-.search-extra-fields-trigger-wrap:has(.search-extra-fields-clear) .search-extra-fields-dropdown-trigger {
-  padding-right: 2.25rem;
-}
-
 .search-extra-fields-trigger-wrap--active {
   background: #ff8800;
   border-color: #ff8800;
@@ -2491,34 +2487,6 @@
   background: #ff8800;
 }
 
-.search-extra-fields-trigger-wrap--active .search-extra-fields-clear:hover {
-  background: transparent;
-}
-
-.search-extra-fields-clear {
-  position: absolute;
-  top: 50%;
-  right: 0.25rem;
-  transform: translateY(-50%);
-  width: 1.75rem;
-  height: 1.75rem;
-  padding: 0;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 1.1rem;
-  line-height: 1;
-  border: none;
-  background: transparent;
-  color: #666;
-  cursor: pointer;
-  border-radius: 4px;
-}
-
-.search-extra-fields-clear:hover {
-  background: #e0d4f7;
-}
-
 .search-extra-fields-dropdown-panel {
   position: absolute;
   top: 100%;
@@ -2543,14 +2511,78 @@
 
 .search-extra-fields-panel-header {
   display: flex;
-  justify-content: flex-end;
   align-items: center;
+  gap: 0.5rem;
   padding: 0.35rem 0.5rem 0.4rem;
   border-bottom: 1px solid #eee;
   position: sticky;
   top: 0;
   background: #fff;
   z-index: 1;
+}
+
+.search-extra-fields-panel-filter-wrap {
+  flex: 1;
+  min-width: 0;
+  position: relative;
+  display: flex;
+  align-items: stretch;
+}
+
+.search-extra-fields-panel-filter {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  padding: 0.25rem 0.5rem;
+  font-family: inherit;
+  font-size: 0.85rem;
+  color: #252525;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  background: #fff;
+}
+
+.search-extra-fields-panel-filter-wrap:has(.search-extra-fields-panel-filter-clear) .search-extra-fields-panel-filter {
+  padding-right: 1.75rem;
+}
+
+.search-extra-fields-panel-filter::placeholder {
+  color: #888;
+}
+
+.search-extra-fields-panel-filter:focus {
+  outline: 2px solid #6633cc;
+  outline-offset: 1px;
+  border-color: #aaaaff;
+}
+
+.search-extra-fields-panel-filter-clear {
+  position: absolute;
+  right: 0.15rem;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 1.5rem;
+  height: 1.5rem;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.1rem;
+  line-height: 1;
+  border: none;
+  background: transparent;
+  color: #666;
+  cursor: pointer;
+  border-radius: 4px;
+}
+
+.search-extra-fields-panel-filter-clear:hover {
+  background: #ede8ff;
+  color: #333;
+}
+
+.search-extra-fields-panel-header .search-extra-fields-panel-clear-btn {
+  flex-shrink: 0;
 }
 
 .search-extra-fields-panel-clear-btn {
@@ -2572,6 +2604,8 @@
 .search-extra-fields-panel-clear-btn:disabled {
   opacity: 0.45;
   cursor: not-allowed;
+  pointer-events: none;
+  color: #888;
 }
 
 .search-extra-fields-option {
