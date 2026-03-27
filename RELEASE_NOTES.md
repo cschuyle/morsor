@@ -2,7 +2,16 @@
 
 ## Unreleased
 
-*(Tag created when deploy runs.)*
+### CLI (`morsor-cli`)
+- Added morsor CLI:
+  - interactive `login` (username/password prompt, hidden password) and token export output
+  - actions (`search`, `dups`, `uniques`, `troves`, `status`) with default action = `search`
+  - output in text or json
+  - install script for the CLI executable (and accompanying Java jar)
+
+### Backend search sorting
+- Fixed `/api/search` so `sortDir` is honored even when `sortBy` is omitted:
+  - if `sortDir` is provided without `sortBy`, sorting now defaults to `score`.
 
 ## release-v20260326-2140-a75bcfa
 
