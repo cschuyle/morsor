@@ -1672,7 +1672,16 @@ function App() {
                                     return <>Only {label} + {' '}<img src="/thumb-thumbnail.png" alt="" className="search-filetype-trigger-inline-icon" aria-hidden="true" /></>
                                   })())
                           : (fileTypesForLabel.size === 0
-                              ? 'Select media'
+                              ? (
+                                  <>
+                                    <span className="search-filetype-trigger-icons" aria-hidden="true">
+                                      <img src="/pdf.svg" alt="" />
+                                      <img src="/video.svg" alt="" />
+                                      <img src="/audio.png" alt="" />
+                                    </span>
+                                    <span className="search-filetype-trigger-media-label">Media</span>
+                                  </>
+                                )
                               : allSelected
                                 ? 'Any media'
                                 : (() => {
