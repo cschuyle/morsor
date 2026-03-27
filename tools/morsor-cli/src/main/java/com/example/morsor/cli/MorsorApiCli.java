@@ -54,10 +54,10 @@ public final class MorsorApiCli {
         String outputMode = "text";
         boolean showHeaders = false;
         boolean debug = false;
-
-        int i = 0;
-        while (i < args.length) {
-            String a = args[i];
+        List<String> positional = new ArrayList<>();
+        int idx = 0;
+        while (idx < args.length) {
+            String a = args[idx];
             if (a.equals("--man")) {
                 printUsageAndExit(0);
             }
@@ -65,64 +65,71 @@ public final class MorsorApiCli {
                 printSummaryUsageAndExit(0);
             }
             if (a.equals("-b") || a.equals("--base")) {
-                if (i + 1 >= args.length) {
+                if (idx + 1 >= args.length) {
                     die("missing value for " + a);
                 }
-                base = stripTrailingSlash(args[++i]);
+                base = stripTrailingSlash(args[++idx]);
                 baseFromOption = true;
-                i++;
+                idx++;
                 continue;
             }
             if (a.equals("-t") || a.equals("--token")) {
-                if (i + 1 >= args.length) {
+                if (idx + 1 >= args.length) {
                     die("missing value for " + a);
                 }
-                bearerToken = args[++i];
-                i++;
+                bearerToken = args[++idx];
+                idx++;
                 continue;
             }
             if (a.equals("-H") || a.equals("--header")) {
-                if (i + 1 >= args.length) {
+                if (idx + 1 >= args.length) {
                     die("missing value for " + a);
                 }
-                extraHeaders.add(args[++i]);
-                i++;
+                extraHeaders.add(args[++idx]);
+                idx++;
                 continue;
             }
             if (a.equals("-d") || a.equals("--data")) {
-                if (i + 1 >= args.length) {
+                if (idx + 1 >= args.length) {
                     die("missing value for " + a);
                 }
-                bodyFile = args[++i];
-                i++;
+                bodyFile = args[++idx];
+                idx++;
                 continue;
             }
             if (a.equals("-o") || a.equals("--output")) {
-                if (i + 1 >= args.length) {
+                if (idx + 1 >= args.length) {
                     die("missing value for " + a);
                 }
-                outputMode = normalizeOutputMode(args[++i]);
-                i++;
+                outputMode = normalizeOutputMode(args[++idx]);
+                idx++;
                 continue;
             }
             if (a.equals("-i") || a.equals("--include-headers")) {
                 showHeaders = true;
-                i++;
+                idx++;
                 continue;
             }
             if (a.equals("-v") || a.equals("--debug")) {
                 debug = true;
-                i++;
+                idx++;
                 continue;
             }
-            if (a.startsWith("-")) {
-                // Command-level shorthand flags like --q/--p begin here.
+            if (a.equals("--")) {
+                positional.add(a);
+                idx++;
+                while (idx < args.length) {
+                    positional.add(args[idx++]);
+                }
                 break;
             }
-            break;
+            positional.add(a);
+            idx++;
         }
-        if (i < args.length) {
-            String maybeBase = args[i];
+
+        int i = 0;
+        if (i < positional.size()) {
+            String maybeBase = positional.get(i);
             if (maybeBase.startsWith("http://") || maybeBase.startsWith("https://")) {
                 if (baseFromOption) {
                     die("use either -b/--base or a leading base URL, not both");
@@ -131,12 +138,12 @@ public final class MorsorApiCli {
                 i++;
             }
         }
-        if (i >= args.length) {
+        if (i >= positional.size()) {
             printUsageAndExit(0);
         }
 
-        if (args[i].equalsIgnoreCase("login")) {
-            if (i + 1 < args.length) {
+        if (positional.get(i).equalsIgnoreCase("login")) {
+            if (i + 1 < positional.size()) {
                 die("login takes no arguments (use -b for base URL)");
             }
             if (bodyFile != null) {
@@ -159,13 +166,13 @@ public final class MorsorApiCli {
         String path;
         String query = "";
 
-        String first = args[i];
+        String first = positional.get(i);
         if (isHttpMethod(first)) {
-            method = args[i++].toUpperCase(Locale.ROOT);
-            if (i >= args.length) {
+            method = positional.get(i++).toUpperCase(Locale.ROOT);
+            if (i >= positional.size()) {
                 die("missing path");
             }
-            path = args[i++];
+            path = positional.get(i++);
             if (path.startsWith("http://") || path.startsWith("https://")) {
                 die("path must be relative (e.g. /api/status), not a full URL");
             }
@@ -173,15 +180,15 @@ public final class MorsorApiCli {
                 path = "/" + path;
             }
 
-            if (i < args.length) {
-                if (args[i].equals("--")) {
+            if (i < positional.size()) {
+                if (positional.get(i).equals("--")) {
                     i++;
                     StringBuilder sb = new StringBuilder();
-                    while (i < args.length) {
+                    while (i < positional.size()) {
                         if (sb.length() > 0) {
                             sb.append('&');
                         }
-                        sb.append(args[i++]);
+                        sb.append(positional.get(i++));
                     }
                     query = sb.toString();
                 } else {
@@ -198,7 +205,7 @@ public final class MorsorApiCli {
                 method = "GET";
                 path = "/api/search";
             }
-            query = parseShorthandQuery(args, i);
+            query = parseShorthandQuery(positional.toArray(new String[0]), i);
         }
 
         if (bodyFile != null && !method.equals("POST")) {
