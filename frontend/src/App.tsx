@@ -421,11 +421,26 @@ function App() {
       if (primaryId) next.set('primary', primaryId)
       Array.from(dupCompare).map((id) => urlTroveId(id, troves) ?? id).filter(Boolean).forEach((id) => next.append('compare', id))
       next.set('size', String(sizeForMode))
+      // Keep search-tab page in the URL while on dups/uniques so returning to Search refetches the same page.
+      const searchPageOneBased =
+        searchResult != null && typeof searchResult.page === 'number'
+          ? String(searchResult.page + 1)
+          : searchParams.get('page')
+      if (searchPageOneBased != null && searchPageOneBased !== '' && Number(searchPageOneBased) > 0) {
+        next.set('page', searchPageOneBased)
+      }
     } else {
       const primaryId = uniqPrimary ? (urlTroveId(uniqPrimary, troves) ?? uniqPrimary) : null
       if (primaryId) next.set('primary', primaryId)
       Array.from(uniqCompare).map((id) => urlTroveId(id, troves) ?? id).filter(Boolean).forEach((id) => next.append('compare', id))
       next.set('size', String(sizeForMode))
+      const searchPageOneBased =
+        searchResult != null && typeof searchResult.page === 'number'
+          ? String(searchResult.page + 1)
+          : searchParams.get('page')
+      if (searchPageOneBased != null && searchPageOneBased !== '' && Number(searchPageOneBased) > 0) {
+        next.set('page', searchPageOneBased)
+      }
     }
     return next
   }
@@ -1474,8 +1489,6 @@ function App() {
                 className={searchMode === 'search' ? 'active' : ''}
                 onClick={() => {
                   setSearchParams(buildSearchParams('search', query, searchSelectedTroveIds, dupPrimaryTroveId, dupCompareTroveIds, uniqPrimaryTroveId, uniqCompareTroveIds, fileTypeFilters, boostTroveId, searchResultsViewMode), { replace: true })
-                  setDuplicatesResult(null)
-                  setUniquesResult(null)
                 }}
               >
                 Search
@@ -1494,8 +1507,6 @@ function App() {
                   } else {
                     setSearchParams(buildSearchParams('duplicates', query, searchSelectedTroveIds, dupPrimaryTroveId, dupCompareTroveIds, uniqPrimaryTroveId, uniqCompareTroveIds), { replace: true })
                   }
-                  setSearchResult(null)
-                  setUniquesResult(null)
                 }}
               >
                 Find duplicates
@@ -1515,8 +1526,6 @@ function App() {
                   } else {
                     setSearchParams(buildSearchParams('uniques', query, searchSelectedTroveIds, dupPrimaryTroveId, dupCompareTroveIds, uniqPrimaryTroveId, uniqCompareTroveIds), { replace: true })
                   }
-                  setSearchResult(null)
-                  setDuplicatesResult(null)
                 }}
               >
                 Find uniques
@@ -1944,7 +1953,10 @@ function App() {
               </p>
             ) : null}
             <div ref={compareSectionRef}>
-            {(searchMode === 'duplicates' || searchMode === 'uniques') && duplicatesResult == null && uniquesResult == null && !searching && (
+            {(searchMode === 'duplicates' || searchMode === 'uniques') &&
+              !searching &&
+              ((searchMode === 'duplicates' && duplicatesResult == null) ||
+                (searchMode === 'uniques' && uniquesResult == null)) && (
               <p className="search-count search-count-detail">
                 Select <strong>Primary</strong> & <strong>Comparison</strong> troves
               </p>
