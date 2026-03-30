@@ -2493,7 +2493,7 @@ function App() {
                     {totalPages > 1 && ` Showing ${formatCount(from)}–${formatCount(to)}.`}
                   </p>
                   <div className="search-results-options">
-                    <label className="page-size-label">
+                    <label className="page-size-label pagination-group-well">
                       Size
                       <select
                         value={dupPageSize}
@@ -2512,9 +2512,12 @@ function App() {
                     const { start, end, pageNumbers } = paginationPageWindow(pageNum, totalPages, 5)
                     return (
                       <nav className="pagination" aria-label="Duplicate results pages">
-                        <span className="pagination-info">
-                          Page {formatCount(pageNum + 1)} of {formatCount(totalPages)}
+                        <span className="pagination-group-well pagination-group-well--page">
+                          <span className="pagination-info">
+                            Page {formatCount(pageNum + 1)} of {formatCount(totalPages)}
+                          </span>
                         </span>
+                        <span className="pagination-group-well pagination-group-well--pages">
                         <button
                           type="button"
                           className="pagination-btn"
@@ -2578,6 +2581,7 @@ function App() {
                         >
                           →
                         </button>
+                        </span>
                       </nav>
                     )
                   })()}
@@ -2631,9 +2635,12 @@ function App() {
                     const { start, end, pageNumbers } = paginationPageWindow(pageNum, totalPages, 5)
                     return (
                       <nav className="pagination" aria-label="Uniques results pages">
-                        <span className="pagination-info">
-                          Page {formatCount(pageNum + 1)} of {formatCount(totalPages)}
+                        <span className="pagination-group-well pagination-group-well--page">
+                          <span className="pagination-info">
+                            Page {formatCount(pageNum + 1)} of {formatCount(totalPages)}
+                          </span>
                         </span>
+                        <span className="pagination-group-well pagination-group-well--pages">
                         <button
                           type="button"
                           className="pagination-btn"
@@ -2697,6 +2704,7 @@ function App() {
                         >
                           →
                         </button>
+                        </span>
                       </nav>
                     )
                   })()}
@@ -2777,7 +2785,7 @@ function App() {
                     <QueryTimingText timing={searchQueryTiming} />
                   </p>
                   <div className="search-results-options">
-                    <span className="search-results-options-view-group">
+                    <span className="search-results-options-view-group pagination-group-well">
                       <span className="view-mode-toggle" role="group" aria-label="Results view">
                         <span className="view-mode-label">View</span>
                         <button
@@ -2840,18 +2848,21 @@ function App() {
                       const { start, end, pageNumbers } = paginationPageWindow(pageNum, totalPages, 5)
                       return (
                         <nav className="pagination" aria-label="Search results pages">
-                          <span className="pagination-info">
-                            Page{' '}
-                            <input
-                              type="text"
-                              className="pagination-page-input"
-                              value={searchPageInput}
-                              onChange={(e) => setSearchPageInput(e.target.value)}
-                              onKeyDown={(e) => handleSearchPageInputKeyDown(e, totalPages, pageNum)}
-                              aria-label="Current page"
-                            />{' '}
-                            of {formatCount(totalPages)}
+                          <span className="pagination-group-well pagination-group-well--page">
+                            <span className="pagination-info">
+                              Page{' '}
+                              <input
+                                type="text"
+                                className="pagination-page-input"
+                                value={searchPageInput}
+                                onChange={(e) => setSearchPageInput(e.target.value)}
+                                onKeyDown={(e) => handleSearchPageInputKeyDown(e, totalPages, pageNum)}
+                                aria-label="Current page"
+                              />{' '}
+                              of {formatCount(totalPages)}
+                            </span>
                           </span>
+                          <span className="pagination-group-well pagination-group-well--pages">
                           <button
                             type="button"
                             className="pagination-btn"
@@ -2915,10 +2926,11 @@ function App() {
                           >
                             →
                           </button>
+                          </span>
                         </nav>
                       )
                     })()}
-                    <label className="page-size-label">
+                    <label className="page-size-label pagination-group-well">
                       {totalPages > 1 ? 'Size' : 'Page size'}
                       <select
                         value={pageSize}

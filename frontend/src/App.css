@@ -18,7 +18,7 @@
   max-height: calc(100vh - 4rem);
   overflow: hidden;
   box-sizing: border-box;
-  background-color: #4b5260;
+  background-color: #5c657a;
 }
 
 @media (max-width: 1920px) {
@@ -101,7 +101,7 @@
   margin-bottom: 0;
   margin-top: 0;
   line-height: 1.15;
-  background: linear-gradient(to bottom, #000 0%, #000 58%, #2d3139 85%, #4b5260 100%);
+  background: linear-gradient(to bottom, #12151c 0%, #12151c 58%, #3a4250 85%, #5c657a 100%);
   color: #7c4ed6;
 }
 
@@ -153,7 +153,7 @@
 .desktop-app .app-footer {
   padding: 0.4rem 0 0.15rem;
   margin-top: 0;
-  background: linear-gradient(to top, #000 0%, #000 58%, #2d3139 85%, #4b5260 100%);
+  background: linear-gradient(to top, #12151c 0%, #12151c 58%, #3a4250 85%, #5c657a 100%);
 }
 
 .desktop-app .app-footer a,
@@ -405,7 +405,7 @@
   width: 320px;
   min-width: 320px;
   padding: 1.5rem 1.75rem 1.5rem 1.5rem;
-  background: #1a1a1a;
+  background: #262626;
   border: 2px solid #ffaa44;
   position: sticky;
   top: 1rem;
@@ -837,7 +837,7 @@
 
 .card {
   padding: 2em;
-  background: #1a1a1a;
+  background: #262626;
   border: 2px solid #ffaa44;
   border-radius: 8px;
   color: #e0e0e0;
@@ -864,6 +864,8 @@
 
 .search-section.card {
   padding-top: 1.25rem;
+  /* Lighter panel than default .card / sidebar; wells (.pagination-group-well) stay dark. */
+  background: #383840;
 }
 
 .search-section-title {
@@ -1714,6 +1716,10 @@
   max-width: 100%;
   min-width: 0;
   box-sizing: border-box;
+  /* Same plane as .search-section.card; wells provide the only darker inset.
+     No horizontal padding so well edges align with .search-results-grid below. */
+  padding: 0.45rem 0;
+  background-color: transparent;
 }
 
 .search-results-options-view-group {
@@ -1735,6 +1741,37 @@
   overflow-x: auto;
 }
 
+/*
+ * Pagination group wells — OSF/Motif-style sunken groove (Xm shadowThickness bevel).
+ * Sunken: dark top & left edges, light bottom & right; flat interior; rounded corners.
+ */
+.search-results-options .pagination-group-well {
+  box-sizing: border-box;
+  padding: 0.35rem 0.65rem;
+  border-radius: 10px;
+  background-color: #1a1a1f;
+  border: 2px solid;
+  border-color: #050505 #6e6e6e #6e6e6e #050505;
+  box-shadow:
+    inset 1px 1px 0 #000,
+    inset -1px -1px 0 #585858;
+}
+
+.search-results-options .pagination .pagination-group-well {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.search-results-options .pagination .pagination-group-well--pages {
+  gap: 0.35rem;
+  min-width: 0;
+}
+
+.search-results-options .pagination .pagination-group-well--page {
+  margin-inline-end: 0.75rem;
+}
+
 /* Tighter than base .pagination (1rem): compact gap between page info, arrows, and number run. */
 .search-results-options .pagination {
   display: inline-flex;
@@ -1745,8 +1782,30 @@
 
 .search-results-options .pagination-info {
   white-space: nowrap;
-  /* Space between “Page … of …” (group 1) and ← … → (group 2); does not change gap among arrows/nums. */
-  margin-inline-end: 0.75rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.1rem;
+}
+
+/* Match view / page-size row height (2rem); arrows, nums, and page input stay square 2×2rem. */
+.search-results-options .pagination-btn {
+  height: 2rem;
+  width: 2rem;
+  min-width: 2rem;
+  min-height: 2rem;
+  padding: 0;
+  font-size: 0.85rem;
+}
+
+.search-results-options .pagination-page-input {
+  height: 2rem;
+  width: 2rem;
+  min-width: 2rem;
+  box-sizing: border-box;
+  padding: 0;
+  margin: 0 0.08rem;
+  font-size: 0.75rem;
+  line-height: 1;
 }
 
 /* Duplicates / uniques: Size (group 3) is before nav; extra space before Page…+arrows (groups 1+2). */
@@ -1759,9 +1818,9 @@
  * Padding alone had no visible effect: .pagination-num min-width: 2.25rem fixes each cell width.
  */
 .search-results-options .pagination-nums .pagination-num {
-  min-width: 1.6875rem;
-  padding-left: 0.1875rem;
-  padding-right: 0.1875rem;
+  width: 2rem;
+  min-width: 2rem;
+  padding: 0;
 }
 
 .gallery-decorate-wrap {
