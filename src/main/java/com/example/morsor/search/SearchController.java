@@ -111,6 +111,7 @@ public class SearchController {
             @RequestParam(required = false) String boostTrove,
             @RequestParam(required = false, defaultValue = "") String query,
             @RequestParam(required = false) String fileTypes,
+            @RequestParam(required = false) String requireFileTypes,
             @RequestParam(required = false, defaultValue = "false") boolean thumbs,
             @RequestParam(required = false, defaultValue = "0") int page,
             @RequestParam(required = false, defaultValue = "500") int size,
@@ -147,18 +148,35 @@ public class SearchController {
                 all = all.stream().sorted(cmp).toList();
             }
         }
-        // Multiple selected file types: disjunction (OR) — keep items that have at least one file of any selected type.
-        // Accept comma-separated (e.g. fileTypes=MP3,PDF) so all values are reliably received.
+        // Selected file types: by default disjunction (OR). Types listed in requireFileTypes must also match (AND).
+        // Accept comma-separated (e.g. fileTypes=MP3,PDF&requireFileTypes=PDF) so all values are reliably received.
         List<String> fileTypesFilter = fileTypes != null && !fileTypes.isBlank()
                 ? java.util.Arrays.stream(fileTypes.split(","))
                         .map(String::trim)
                         .filter(s -> !s.isBlank())
                         .toList()
                 : List.of();
+        List<String> requireParsed = requireFileTypes != null && !requireFileTypes.isBlank()
+                ? java.util.Arrays.stream(requireFileTypes.split(","))
+                        .map(String::trim)
+                        .filter(s -> !s.isBlank())
+                        .toList()
+                : List.of();
         if (!fileTypesFilter.isEmpty()) {
-            Set<String> extSet = fileTypesFilter.stream().map(String::toUpperCase).collect(Collectors.toSet());
+            Set<String> sUpper = fileTypesFilter.stream().map(String::toUpperCase).collect(Collectors.toSet());
+            Set<String> rUpper = requireParsed.stream().map(String::toUpperCase).filter(sUpper::contains).collect(Collectors.toSet());
+            Set<String> optionalUpper = sUpper.stream().filter(t -> !rUpper.contains(t)).collect(Collectors.toSet());
             all = all.stream()
-                    .filter(r -> FileTypeCounts.hasFileWithAnyExtension(r.result(), extSet))
+                    .filter(r -> {
+                        SearchResult res = r.result();
+                        if (!rUpper.isEmpty() && !FileTypeCounts.hasFileWithAllExtensions(res, rUpper)) {
+                            return false;
+                        }
+                        if (optionalUpper.isEmpty()) {
+                            return true;
+                        }
+                        return FileTypeCounts.hasFileWithAnyExtension(res, optionalUpper);
+                    })
                     .toList();
         }
         if (thumbs) {

@@ -11,6 +11,8 @@ export type SearchTabSession = {
   searchSelectedTroveIds: string[]
   pageSize: number
   fileTypeFilters: string[]
+  /** Subset of {@link fileTypeFilters}: types that must be present (AND); rest of selection is OR. */
+  requiredFileTypes?: string[]
   fileTypeQuickMode: FileTypeQuickModeValue
   thumbnailOnly: boolean
   boostTroveId: string | null

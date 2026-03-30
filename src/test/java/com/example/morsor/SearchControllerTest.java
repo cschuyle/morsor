@@ -1,5 +1,6 @@
 package com.example.morsor;
 
+import com.example.morsor.search.FileTypeCounts;
 import com.example.morsor.search.DuplicateMatchRow;
 import com.example.morsor.search.DuplicatesResponse;
 import com.example.morsor.search.SearchResponse;
@@ -195,6 +196,41 @@ class SearchControllerTest {
         assertThat(authors.size()).isGreaterThan(1);
         List<String> sortedCopy = authors.stream().sorted(String.CASE_INSENSITIVE_ORDER).toList();
         assertThat(authors).isEqualTo(sortedCopy);
+    }
+
+    @Test
+    void searchRequireFileTypesAddsAndOnTopOfOrSelection() {
+        URI orOnly = UriComponentsBuilder.fromUriString("http://localhost:" + port + "/api/search")
+                .queryParam("trove", "favorites")
+                .queryParam("query", "*")
+                .queryParam("fileTypes", "PDF,MP3")
+                .queryParam("size", "500")
+                .build()
+                .toUri();
+        URI withRequire = UriComponentsBuilder.fromUriString("http://localhost:" + port + "/api/search")
+                .queryParam("trove", "favorites")
+                .queryParam("query", "*")
+                .queryParam("fileTypes", "PDF,MP3")
+                .queryParam("requireFileTypes", "PDF")
+                .queryParam("size", "500")
+                .build()
+                .toUri();
+        ResponseEntity<SearchResponse> orRes = restTemplate.exchange(
+                orOnly, HttpMethod.GET, null, new ParameterizedTypeReference<SearchResponse>() {});
+        ResponseEntity<SearchResponse> reqRes = restTemplate.exchange(
+                withRequire, HttpMethod.GET, null, new ParameterizedTypeReference<SearchResponse>() {});
+        assertThat(orRes.getStatusCode().is2xxSuccessful()).isTrue();
+        assertThat(reqRes.getStatusCode().is2xxSuccessful()).isTrue();
+        SearchResponse orBody = orRes.getBody();
+        SearchResponse reqBody = reqRes.getBody();
+        assertThat(orBody).isNotNull();
+        assertThat(reqBody).isNotNull();
+        assertThat(reqBody.count()).isLessThanOrEqualTo(orBody.count());
+        for (SearchResultWithScore rw : reqBody.results()) {
+            assertThat(FileTypeCounts.hasFileWithAnyExtension(rw.result(), java.util.Set.of("PDF")))
+                    .as("Each result must include PDF when requireFileTypes=PDF")
+                    .isTrue();
+        }
     }
 
     @Test

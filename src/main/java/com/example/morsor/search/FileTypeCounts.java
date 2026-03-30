@@ -60,6 +60,24 @@ public final class FileTypeCounts {
         return false;
     }
 
+    /** True if the result has every extension in {@code extensions} (or itemUrl when Link/URL is in the set). */
+    public static boolean hasFileWithAllExtensions(SearchResult result, Set<String> extensions) {
+        if (extensions == null || extensions.isEmpty()) {
+            return true;
+        }
+        for (String extRaw : extensions) {
+            if (extRaw == null || extRaw.isBlank()) {
+                continue;
+            }
+            String ext = extRaw.toUpperCase();
+            Set<String> one = Set.of(ext);
+            if (!hasFileWithAnyExtension(result, one)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
     public static String extractExtension(String url) {
         if (url == null) {
             return null;

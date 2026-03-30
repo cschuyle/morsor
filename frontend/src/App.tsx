@@ -23,11 +23,18 @@ import { searchHistoryLabels, duplicatesHistoryLabels, uniquesHistoryLabels } fr
 import type { QueryResultTiming } from './queryResultTiming'
 import { QueryTimingText } from './QueryTimingText'
 import { formatCount, formatCacheBytes } from './formatCount'
-import { groupFileTypes, getGroupNameIfFullySelected, getFullySelectedGroupNames } from './fileTypeGroups'
+import {
+  ALL_KNOWN_FILE_TYPES,
+  groupFileTypes,
+  getGroupNameIfFullySelected,
+  getFullySelectedGroupNames,
+} from './fileTypeGroups'
 import { FileTypeQuickMode, normalizeFileTypeQuickMode } from './fileTypeQuickMode'
+import { fileTypeSetHas, normalizeFileTypeToken, pruneRequiredFileTypes } from './fileTypeRequireUtils'
 import { isCompareToSelfVisible } from './compareToSelfVisible'
 import {
   deserializeActiveTabFromUrl,
+  parseFileTypesQueryValues,
   serializeActiveTabToUrl,
   serializeUrlFromTabSessions,
   type TabMode,
@@ -113,7 +120,11 @@ function App() {
   const [searchPageInput, setSearchPageInput] = useState('')
   const [fileTypeFilters, setFileTypeFilters] = useState<Set<string>>(() => {
     const ftAll = new URLSearchParams(window.location.search).getAll('fileTypes')
-    return new Set(ftAll.filter((f) => f != null && f.trim()).map((f) => (f.trim() === 'URL' ? 'Link' : f.trim())))
+    return new Set(parseFileTypesQueryValues(ftAll))
+  })
+  const [requiredFileTypes, setRequiredFileTypes] = useState<Set<string>>(() => {
+    const p = new URLSearchParams(window.location.search)
+    return new Set(parseFileTypesQueryValues(p.getAll('requireFileTypes')))
   })
   const [fileTypeQuickMode, setFileTypeQuickMode] = useState<FileTypeQuickModeValue>(() => normalizeFileTypeQuickMode(new URLSearchParams(window.location.search).get('ftq')))
   const [thumbnailOnly, setThumbnailOnly] = useState(() => new URLSearchParams(window.location.search).get('thumbs') === '1')
@@ -248,7 +259,8 @@ function App() {
     troveIdsOverride: Set<string> | null = null,
     sortByOverride: string | null = null,
     sortDirOverride: 'asc' | 'desc' | null = null,
-    fileTypesOverride?: Set<string>
+    fileTypesOverride?: Set<string>,
+    requiredFileTypesOverride?: Set<string>
   ) {
     const size = sizeOverride ?? pageSize
     const q = queryRef.current
@@ -272,7 +284,12 @@ function App() {
         : fetchIsStarQuery
           ? starSortDir ?? 'asc'
           : otherSortDir ?? 'desc'
-    const fileTypesToUse = fileTypesOverride !== undefined ? fileTypesOverride : fileTypeFilters
+    const fileTypesToUseRaw = fileTypesOverride !== undefined ? fileTypesOverride : fileTypeFilters
+    const fileTypesToUse = new Set([...fileTypesToUseRaw].map(normalizeFileTypeToken))
+    const requiredToUse = requiredFileTypesOverride !== undefined ? requiredFileTypesOverride : requiredFileTypes
+    const requiredEffective = new Set(
+      [...requiredToUse].map(normalizeFileTypeToken).filter((t) => fileTypesToUse.has(t))
+    )
     const params = new URLSearchParams({
       query: qt,
       page: String(pageNum),
@@ -280,7 +297,8 @@ function App() {
     })
     troveIds.forEach((id) => params.append('trove', id))
     if (boostTroveId) params.set('boostTrove', boostTroveId)
-    if (fileTypesToUse && fileTypesToUse.size > 0) params.set('fileTypes', [...fileTypesToUse].sort().join(','))
+    if (fileTypesToUse.size > 0) params.set('fileTypes', [...fileTypesToUse].sort().join(','))
+    if (requiredEffective.size > 0) params.set('requireFileTypes', [...requiredEffective].sort().join(','))
     if (thumbnailOnly) params.set('thumbs', '1')
     if (sortByOverride !== undefined || sortDirOverride !== undefined) {
       if (fetchIsStarQuery) {
@@ -305,7 +323,7 @@ function App() {
       if (Array.isArray(cached.availableFileTypes) && cached.availableFileTypes.length > 0) {
         setAllAvailableFileTypes((prev) => {
           const next = new Set(prev)
-          cached.availableFileTypes!.forEach((t) => next.add(t === 'URL' ? 'Link' : t))
+          cached.availableFileTypes!.forEach((t) => next.add(normalizeFileTypeToken(t)))
           return [...next].sort()
         })
       }
@@ -357,7 +375,7 @@ function App() {
         if (Array.isArray(data.availableFileTypes) && data.availableFileTypes.length > 0) {
           setAllAvailableFileTypes((prev) => {
             const next = new Set(prev)
-            data.availableFileTypes!.forEach((t) => next.add(t === 'URL' ? 'Link' : t))
+            data.availableFileTypes!.forEach((t) => next.add(normalizeFileTypeToken(t)))
             return [...next].sort()
           })
         }
@@ -476,6 +494,7 @@ function App() {
         searchSelectedTroveIds: [...searchSelectedTroveIds],
         pageSize,
         fileTypeFilters: [...fileTypeFilters],
+        requiredFileTypes: [...requiredFileTypes],
         fileTypeQuickMode,
         thumbnailOnly,
         boostTroveId,
@@ -516,7 +535,8 @@ function App() {
     setSearchQuery(x.searchQuery)
     setSearchSelectedTroveIds(new Set(x.searchSelectedTroveIds))
     setPageSize(x.pageSize)
-    setFileTypeFilters(new Set(x.fileTypeFilters))
+    setFileTypeFilters(new Set(x.fileTypeFilters.map(normalizeFileTypeToken)))
+    setRequiredFileTypes(new Set((x.requiredFileTypes ?? []).map(normalizeFileTypeToken)))
     setFileTypeQuickMode(x.fileTypeQuickMode)
     setThumbnailOnly(x.thumbnailOnly)
     setBoostTroveId(x.boostTroveId)
@@ -559,7 +579,8 @@ function App() {
       setSearchQuery(u.searchQuery)
       setSearchSelectedTroveIds(new Set(u.searchTroveIds))
       if (u.pageSize != null) setPageSize(u.pageSize)
-      setFileTypeFilters(new Set(u.fileTypeFilters))
+      setFileTypeFilters(new Set(u.fileTypeFilters.map(normalizeFileTypeToken)))
+      setRequiredFileTypes(new Set(u.requireFileTypes.map(normalizeFileTypeToken)))
       setFileTypeQuickMode(u.fileTypeQuickMode)
       setThumbnailOnly(u.thumbnailOnly)
       setBoostTroveId(u.boostTroveId)
@@ -612,6 +633,7 @@ function App() {
       mode?: TabMode
       searchTroveIds?: Set<string>
       fileTypeFilters?: Set<string>
+      requiredFileTypes?: Set<string>
       boostTroveId?: string | null
       searchView?: 'list' | 'gallery'
       thumbnailOnly?: boolean
@@ -631,6 +653,7 @@ function App() {
   ): URLSearchParams {
     const mode = overrides.mode ?? searchMode
     const ft = overrides.fileTypeFilters ?? fileTypeFilters
+    const rft = overrides.requiredFileTypes !== undefined ? overrides.requiredFileTypes : requiredFileTypes
     const sq = (searchQuery ?? '').trim()
     const isStar = sq === '*'
     const effBy = mode === 'search' ? (isStar ? (starSortBy ?? 'title') : (otherSortBy ?? 'score')) : effectiveSortBy
@@ -643,6 +666,7 @@ function App() {
       searchPage0Based:
         overrides.searchPage0BasedOverride !== undefined ? overrides.searchPage0BasedOverride : searchResult?.page,
       fileTypeFilters: ft,
+      requiredFileTypes: rft,
       fileTypeQuickMode: overrides.fileTypeQuickMode ?? fileTypeQuickMode,
       thumbnailOnly: overrides.thumbnailOnly ?? thumbnailOnly,
       boostTroveId: overrides.boostTroveId !== undefined ? overrides.boostTroveId : boostTroveId,
@@ -683,7 +707,8 @@ function App() {
     boostTrove: string | null = null,
     view: 'list' | 'gallery' | null = null,
     thumbnailOnlyOverride?: boolean,
-    quickModeOverride?: FileTypeQuickModeValue
+    quickModeOverride?: FileTypeQuickModeValue,
+    requiredFileTypesOverride?: Set<string>
   ): URLSearchParams {
     const m = (mode === 'duplicates' || mode === 'uniques' ? mode : 'search') as TabMode
     return buildAppUrlParams({
@@ -694,6 +719,7 @@ function App() {
       uniqPrimary,
       uniqCompare,
       fileTypeFilters: fileTypesSet ?? undefined,
+      ...(requiredFileTypesOverride !== undefined ? { requiredFileTypes: requiredFileTypesOverride } : {}),
       boostTroveId: boostTrove === undefined ? undefined : boostTrove,
       searchView: view ?? undefined,
       thumbnailOnly: thumbnailOnlyOverride,
@@ -713,7 +739,8 @@ function App() {
     if (urlHasPrimaryOrCompare && stateHasNone) return
     const urlHasQuery = searchParams.get('q') != null && searchParams.get('q') !== ''
     const urlHasTrove = searchParams.getAll('trove').length > 0
-    const urlHasFileTypes = searchParams.getAll('fileTypes').length > 0
+    const urlHasFileTypes = parseFileTypesQueryValues(searchParams.getAll('fileTypes')).length > 0
+    const urlHasRequireFileTypes = parseFileTypesQueryValues(searchParams.getAll('requireFileTypes')).length > 0
     const urlQuickMode = normalizeFileTypeQuickMode(searchParams.get('ftq'))
     const urlHasThumbs = searchParams.get('thumbs') === '1'
     const urlHasExtraFields = searchParams.getAll('extraFields').length > 0
@@ -722,6 +749,7 @@ function App() {
       ((urlHasQuery && (!searchQuery || (searchQuery ?? '').trim() === '')) ||
         (urlHasTrove && searchSelectedTroveIds.size === 0) ||
         (urlHasFileTypes && fileTypeFilters.size === 0) ||
+        (urlHasRequireFileTypes && requiredFileTypes.size === 0) ||
         (urlQuickMode !== fileTypeQuickMode) ||
         (urlHasThumbs && !thumbnailOnly) ||
         (urlHasExtraFields && extraGridFieldsSelected.size === 0))
@@ -740,6 +768,7 @@ function App() {
     dupCompareTroveIds,
     uniqCompareTroveIds,
     fileTypeFilters,
+    requiredFileTypes,
     fileTypeQuickMode,
     thumbnailOnly,
     boostTroveId,
@@ -797,7 +826,7 @@ function App() {
       }
       const pageParam = Number(searchParams.get('page'))
       const initialPage = Number.isFinite(pageParam) && pageParam > 0 ? pageParam - 1 : 0
-      const urlFileTypes = new Set(searchParams.getAll('fileTypes').filter((f) => f != null && f.trim()).map((f) => (f.trim() === 'URL' ? 'Link' : f.trim())))
+      const urlFileTypes = new Set(parseFileTypesQueryValues(searchParams.getAll('fileTypes')))
       const fileTypesToUse = fileTypeFilters.size > 0 ? undefined : (urlFileTypes.size > 0 ? urlFileTypes : undefined)
       fetchSearch(initialPage, null, null, null, null, fileTypesToUse)
     }, 400)
@@ -2055,15 +2084,24 @@ function App() {
                   {searching ? 'Searching\u2026' : 'Go!'}
                 </button>
                 {searchMode === 'search' && (() => {
-                  const showMediaDropdown = (allAvailableFileTypes.length >= 1 || fileTypeFilters.size > 0)
+                  const upper = (s) => (s || '').toUpperCase()
+                  const seenDisplay = new Set(ALL_KNOWN_FILE_TYPES.map(upper))
+                  const displayFileTypes = [...ALL_KNOWN_FILE_TYPES]
+                  ;(allAvailableFileTypes || []).forEach((t) => {
+                    if (!seenDisplay.has(upper(t))) {
+                      seenDisplay.add(upper(t))
+                      displayFileTypes.push(t)
+                    }
+                  })
+                  displayFileTypes.sort((a, b) => String(a).localeCompare(String(b), undefined, { sensitivity: 'base' }))
+                  const showMediaDropdown = (displayFileTypes.length >= 1 || fileTypeFilters.size > 0)
                   const showExtraFieldsPicker = extraFieldKeysOnPage.length > 0 && searchResultsViewMode === 'list'
                   if (!showMediaDropdown && !showExtraFieldsPicker) {
                     return null
                   }
-                  const urlFileTypes = new Set(searchParams.getAll('fileTypes').filter((f) => f != null && f.trim()).map((f) => (f.trim() === 'URL' ? 'Link' : f.trim())))
+                  const urlFileTypes = new Set(parseFileTypesQueryValues(searchParams.getAll('fileTypes')))
                   const fileTypesForLabel = fileTypeFilters.size > 0 ? fileTypeFilters : urlFileTypes
-                  const upper = (s) => (s || '').toUpperCase()
-                  const availableUpper = new Set((allAvailableFileTypes || []).map(upper))
+                  const availableUpper = new Set(displayFileTypes.map(upper))
                   const selectedUpper = new Set([...fileTypesForLabel].map(upper))
                   const allSelected = availableUpper.size > 0 && availableUpper.size === selectedUpper.size && [...availableUpper].every((t) => selectedUpper.has(t))
                   const hasFileTypeFilter = fileTypesForLabel.size > 0 && !allSelected
@@ -2118,8 +2156,8 @@ function App() {
                               : mehQuickSelected || fileTypesForLabel.size === 0
                                 ? <>Must have {' '}<img src="/thumb-thumbnail.png" alt="" className="search-filetype-trigger-inline-icon" aria-hidden="true" /></>
                                 : (() => {
-                                    const groupNames = getFullySelectedGroupNames(fileTypesForLabel, allAvailableFileTypes)
-                                    const label = (groupNames != null && groupNames.length > 0) ? groupNames.join(', ') : (getGroupNameIfFullySelected(fileTypesForLabel, allAvailableFileTypes) ?? [...fileTypesForLabel].sort().join(', '))
+                                    const groupNames = getFullySelectedGroupNames(fileTypesForLabel, displayFileTypes)
+                                    const label = (groupNames != null && groupNames.length > 0) ? groupNames.join(', ') : (getGroupNameIfFullySelected(fileTypesForLabel, displayFileTypes) ?? [...fileTypesForLabel].sort().join(', '))
                                     return <>Only {label} + {' '}<img src="/thumb-thumbnail.png" alt="" className="search-filetype-trigger-inline-icon" aria-hidden="true" /></>
                                   })())
                           : (fileTypesForLabel.size === 0
@@ -2136,8 +2174,8 @@ function App() {
                               : allSelected
                                 ? 'Any media'
                                 : (() => {
-                                    const groupNames = getFullySelectedGroupNames(fileTypesForLabel, allAvailableFileTypes)
-                                    const label = (groupNames != null && groupNames.length > 0) ? groupNames.join(', ') : (getGroupNameIfFullySelected(fileTypesForLabel, allAvailableFileTypes) ?? [...fileTypesForLabel].sort().join(', '))
+                                    const groupNames = getFullySelectedGroupNames(fileTypesForLabel, displayFileTypes)
+                                    const label = (groupNames != null && groupNames.length > 0) ? groupNames.join(', ') : (getGroupNameIfFullySelected(fileTypesForLabel, displayFileTypes) ?? [...fileTypesForLabel].sort().join(', '))
                                     return `Only ${label}`
                                   })())}
                       </button>
@@ -2153,8 +2191,9 @@ function App() {
                             setThumbnailOnly(false)
                             setFileTypeQuickMode(FileTypeQuickMode.Meh)
                             setFileTypeFilters(new Set())
-                            setSearchParams(buildSearchParams('search', searchSelectedTroveIds, dupPrimaryTroveId, dupCompareTroveIds, uniqPrimaryTroveId, uniqCompareTroveIds, new Set(), boostTroveId, searchResultsViewMode, false, FileTypeQuickMode.Meh), { replace: true })
-                            fetchSearch(0, null, null, null, null, new Set())
+                            setRequiredFileTypes(new Set())
+                            setSearchParams(buildSearchParams('search', searchSelectedTroveIds, dupPrimaryTroveId, dupCompareTroveIds, uniqPrimaryTroveId, uniqCompareTroveIds, new Set(), boostTroveId, searchResultsViewMode, false, FileTypeQuickMode.Meh, new Set()), { replace: true })
+                            fetchSearch(0, null, null, null, null, new Set(), new Set())
                           }}
                           aria-label="Clear file type filter"
                         >
@@ -2192,11 +2231,13 @@ function App() {
                               if (anyQuickSelected) return
                               skipFileTypeSearchRef.current = true
                               lastFileTypeOrViewSearchRef.current = Date.now()
-                              const next = new Set(allAvailableFileTypes)
+                              const next = new Set(displayFileTypes.map(normalizeFileTypeToken))
+                              const nextReq = pruneRequiredFileTypes(next, requiredFileTypes)
                               setFileTypeQuickMode(FileTypeQuickMode.Any)
                               setFileTypeFilters(next)
-                              setSearchParams(buildSearchParams('search', searchSelectedTroveIds, dupPrimaryTroveId, dupCompareTroveIds, uniqPrimaryTroveId, uniqCompareTroveIds, next, boostTroveId, searchResultsViewMode, undefined, FileTypeQuickMode.Any), { replace: true })
-                              fetchSearch(0, null, null, null, null, next)
+                              setRequiredFileTypes(nextReq)
+                              setSearchParams(buildSearchParams('search', searchSelectedTroveIds, dupPrimaryTroveId, dupCompareTroveIds, uniqPrimaryTroveId, uniqCompareTroveIds, next, boostTroveId, searchResultsViewMode, undefined, FileTypeQuickMode.Any, nextReq), { replace: true })
+                              fetchSearch(0, null, null, null, null, next, nextReq)
                             }}
                           >
                             <span className="search-filetype-quick-prefix search-filetype-quick-prefix--asterisk" aria-hidden="true">*</span> Any
@@ -2213,16 +2254,21 @@ function App() {
                               const next = new Set<string>()
                               setFileTypeQuickMode(FileTypeQuickMode.Meh)
                               setFileTypeFilters(next)
-                              setSearchParams(buildSearchParams('search', searchSelectedTroveIds, dupPrimaryTroveId, dupCompareTroveIds, uniqPrimaryTroveId, uniqCompareTroveIds, next, boostTroveId, searchResultsViewMode, undefined, FileTypeQuickMode.Meh), { replace: true })
-                              fetchSearch(0, null, null, null, null, next)
+                              setRequiredFileTypes(new Set())
+                              setSearchParams(buildSearchParams('search', searchSelectedTroveIds, dupPrimaryTroveId, dupCompareTroveIds, uniqPrimaryTroveId, uniqCompareTroveIds, next, boostTroveId, searchResultsViewMode, undefined, FileTypeQuickMode.Meh, new Set()), { replace: true })
+                              fetchSearch(0, null, null, null, null, next, new Set())
                             }}
                           >
                             <span className="search-filetype-quick-prefix" aria-hidden="true">×</span> Meh
                           </button>
                         </div>
-                        {groupFileTypes(allAvailableFileTypes).map(({ group, types }) => {
-                          const allSelected = types.every((ft) => fileTypeFilters.has(ft))
-                          const someSelected = types.some((ft) => fileTypeFilters.has(ft))
+                        <div className="search-filetype-dropdown-require-header" aria-hidden="true">
+                          <span className="search-filetype-dropdown-require-header-label">Must include</span>
+                          <span className="search-filetype-dropdown-require-header-mark">!</span>
+                        </div>
+                        {groupFileTypes(displayFileTypes).map(({ group, types }) => {
+                          const allSelected = types.every((ft) => fileTypeSetHas(fileTypeFilters, ft))
+                          const someSelected = types.some((ft) => fileTypeSetHas(fileTypeFilters, ft))
                           return (
                           <div key={group ?? 'other'} className="search-filetype-group">
                             {group != null && (
@@ -2235,13 +2281,15 @@ function App() {
                                     onChange={() => {
                                       skipFileTypeSearchRef.current = true
                                       lastFileTypeOrViewSearchRef.current = Date.now()
-                                      const next = new Set(fileTypeFilters)
-                                      if (allSelected) types.forEach((t) => next.delete(t))
-                                      else types.forEach((t) => next.add(t))
+                                      const next = new Set([...fileTypeFilters].map(normalizeFileTypeToken))
+                                      if (allSelected) types.forEach((t) => next.delete(normalizeFileTypeToken(t)))
+                                      else types.forEach((t) => next.add(normalizeFileTypeToken(t)))
+                                      const nextReq = pruneRequiredFileTypes(next, requiredFileTypes)
                                       if (anyQuickSelected) setFileTypeQuickMode(FileTypeQuickMode.Meh)
                                       setFileTypeFilters(next)
-                                      setSearchParams(buildSearchParams('search', searchSelectedTroveIds, dupPrimaryTroveId, dupCompareTroveIds, uniqPrimaryTroveId, uniqCompareTroveIds, next, boostTroveId, searchResultsViewMode, undefined, anyQuickSelected ? FileTypeQuickMode.Meh : fileTypeQuickMode), { replace: true })
-                                      fetchSearch(0, null, null, null, null, next)
+                                      setRequiredFileTypes(nextReq)
+                                      setSearchParams(buildSearchParams('search', searchSelectedTroveIds, dupPrimaryTroveId, dupCompareTroveIds, uniqPrimaryTroveId, uniqCompareTroveIds, next, boostTroveId, searchResultsViewMode, undefined, anyQuickSelected ? FileTypeQuickMode.Meh : fileTypeQuickMode, nextReq), { replace: true })
+                                      fetchSearch(0, null, null, null, null, next, nextReq)
                                     }}
                                   />
                                   {group}
@@ -2257,15 +2305,18 @@ function App() {
                                     e.stopPropagation()
                                     skipFileTypeSearchRef.current = true
                                     lastFileTypeOrViewSearchRef.current = Date.now()
-                                    const next = new Set(fileTypeFilters)
+                                    const next = new Set([...fileTypeFilters].map(normalizeFileTypeToken))
                                     types.forEach((t) => {
-                                      if (next.has(t)) next.delete(t)
-                                      else next.add(t)
+                                      const nt = normalizeFileTypeToken(t)
+                                      if (next.has(nt)) next.delete(nt)
+                                      else next.add(nt)
                                     })
+                                    const nextReq = pruneRequiredFileTypes(next, requiredFileTypes)
                                     if (anyQuickSelected) setFileTypeQuickMode(FileTypeQuickMode.Meh)
                                     setFileTypeFilters(next)
-                                    setSearchParams(buildSearchParams('search', searchSelectedTroveIds, dupPrimaryTroveId, dupCompareTroveIds, uniqPrimaryTroveId, uniqCompareTroveIds, next, boostTroveId, searchResultsViewMode, undefined, anyQuickSelected ? FileTypeQuickMode.Meh : fileTypeQuickMode), { replace: true })
-                                    fetchSearch(0, null, null, null, null, next)
+                                    setRequiredFileTypes(nextReq)
+                                    setSearchParams(buildSearchParams('search', searchSelectedTroveIds, dupPrimaryTroveId, dupCompareTroveIds, uniqPrimaryTroveId, uniqCompareTroveIds, next, boostTroveId, searchResultsViewMode, undefined, anyQuickSelected ? FileTypeQuickMode.Meh : fileTypeQuickMode, nextReq), { replace: true })
+                                    fetchSearch(0, null, null, null, null, next, nextReq)
                                   }}
                                 >
                                   <img src="/complement.png" alt="" aria-hidden="true" />
@@ -2273,35 +2324,91 @@ function App() {
                               </div>
                             )}
                             {types.map((ft) => (
-                              <label key={ft} className="search-filetype-option">
-                                <input
-                                  type="checkbox"
-                                  checked={fileTypeFilters.has(ft)}
-                                  onChange={() => {
+                              <div key={ft} className="search-filetype-option-row">
+                                <label className="search-filetype-option">
+                                  <input
+                                    type="checkbox"
+                                    checked={fileTypeSetHas(fileTypeFilters, ft)}
+                                    onChange={() => {
+                                      skipFileTypeSearchRef.current = true
+                                      lastFileTypeOrViewSearchRef.current = Date.now()
+                                      const nft = normalizeFileTypeToken(ft)
+                                      const next = new Set([...fileTypeFilters].map(normalizeFileTypeToken))
+                                      if (next.has(nft)) next.delete(nft)
+                                      else next.add(nft)
+                                      const nextReq = pruneRequiredFileTypes(next, requiredFileTypes)
+                                      if (anyQuickSelected) setFileTypeQuickMode(FileTypeQuickMode.Meh)
+                                      setFileTypeFilters(next)
+                                      setRequiredFileTypes(nextReq)
+                                      setSearchParams(buildSearchParams('search', searchSelectedTroveIds, dupPrimaryTroveId, dupCompareTroveIds, uniqPrimaryTroveId, uniqCompareTroveIds, next, boostTroveId, searchResultsViewMode, undefined, anyQuickSelected ? FileTypeQuickMode.Meh : fileTypeQuickMode, nextReq), { replace: true })
+                                      fetchSearch(0, null, null, null, null, next, nextReq)
+                                    }}
+                                  />
+                                  {ft}
+                                  {searchResult?.fileTypeCounts != null && typeof searchResult.fileTypeCounts[ft] === 'number' && (
+                                    <span className="search-filetype-option-count" aria-hidden="true"> ({formatCount(searchResult.fileTypeCounts[ft])})</span>
+                                  )}
+                                  {ft === 'Link' && <img src="/link.png" alt="" className="search-filetype-option-icon" aria-hidden="true" />}
+                                  {ft === 'PDF' && <img src="/pdf.png" alt="" className="search-filetype-option-icon" aria-hidden="true" />}
+                                  {['JPG', 'JPEG', 'GIF', 'WEBP', 'TIFF', 'PNG'].includes(ft) && <img src="/image.png" alt="" className="search-filetype-option-icon" aria-hidden="true" />}
+                                  {['RDF', 'TXT', 'DOC', 'DOCX'].includes(ft) && <img src="/document.png" alt="" className="search-filetype-option-icon" aria-hidden="true" />}
+                                  {['MP4', 'M4V', 'AVI', 'MOV', 'MKV'].includes(ft) && <img src="/video.svg" alt="" className="search-filetype-option-icon" aria-hidden="true" />}
+                                  {ft === 'MP3' && <img src="/audio.png" alt="" className="search-filetype-option-icon" aria-hidden="true" />}
+                                  {['EPUB', 'MOBI'].includes(ft) && <img src="/book.svg" alt="" className="search-filetype-option-icon" aria-hidden="true" />}
+                                  {ft === 'ZIP' && <img src="/zip.png" alt="" className="search-filetype-option-icon" aria-hidden="true" />}
+                                </label>
+                                <button
+                                  type="button"
+                                  className={`search-filetype-require-btn${fileTypeSetHas(requiredFileTypes, ft) ? ' search-filetype-require-btn--active' : ''}`}
+                                  title={
+                                    fileTypeSetHas(requiredFileTypes, ft)
+                                      ? 'Must include this type (on)'
+                                      : fileTypeSetHas(fileTypeFilters, ft)
+                                        ? 'Require this type: result must include it'
+                                        : 'Require this type (adds it to the filter if needed)'
+                                  }
+                                  aria-label={fileTypeSetHas(requiredFileTypes, ft) ? `Required: ${ft}` : `Require ${ft}`}
+                                  aria-pressed={fileTypeSetHas(requiredFileTypes, ft)}
+                                  onClick={(e) => {
+                                    e.preventDefault()
+                                    e.stopPropagation()
                                     skipFileTypeSearchRef.current = true
                                     lastFileTypeOrViewSearchRef.current = Date.now()
-                                    const next = new Set(fileTypeFilters)
-                                    if (next.has(ft)) next.delete(ft)
-                                    else next.add(ft)
+                                    const nft = normalizeFileTypeToken(ft)
+                                    const nextFt = new Set([...fileTypeFilters].map(normalizeFileTypeToken))
+                                    const nextReq = new Set([...requiredFileTypes].map(normalizeFileTypeToken))
+                                    if (nextReq.has(nft)) {
+                                      nextReq.delete(nft)
+                                    } else {
+                                      nextReq.add(nft)
+                                      nextFt.add(nft)
+                                    }
                                     if (anyQuickSelected) setFileTypeQuickMode(FileTypeQuickMode.Meh)
-                                    setFileTypeFilters(next)
-                                    setSearchParams(buildSearchParams('search', searchSelectedTroveIds, dupPrimaryTroveId, dupCompareTroveIds, uniqPrimaryTroveId, uniqCompareTroveIds, next, boostTroveId, searchResultsViewMode, undefined, anyQuickSelected ? FileTypeQuickMode.Meh : fileTypeQuickMode), { replace: true })
-                                    fetchSearch(0, null, null, null, null, next)
+                                    setFileTypeFilters(nextFt)
+                                    setRequiredFileTypes(nextReq)
+                                    setSearchParams(
+                                      buildSearchParams(
+                                        'search',
+                                        searchSelectedTroveIds,
+                                        dupPrimaryTroveId,
+                                        dupCompareTroveIds,
+                                        uniqPrimaryTroveId,
+                                        uniqCompareTroveIds,
+                                        nextFt,
+                                        boostTroveId,
+                                        searchResultsViewMode,
+                                        undefined,
+                                        anyQuickSelected ? FileTypeQuickMode.Meh : fileTypeQuickMode,
+                                        nextReq
+                                      ),
+                                      { replace: true }
+                                    )
+                                    fetchSearch(0, null, null, null, null, nextFt, nextReq)
                                   }}
-                                />
-                                {ft}
-                                {searchResult?.fileTypeCounts != null && typeof searchResult.fileTypeCounts[ft] === 'number' && (
-                                  <span className="search-filetype-option-count" aria-hidden="true"> ({formatCount(searchResult.fileTypeCounts[ft])})</span>
-                                )}
-                                {ft === 'Link' && <img src="/link.png" alt="" className="search-filetype-option-icon" aria-hidden="true" />}
-                                {ft === 'PDF' && <img src="/pdf.png" alt="" className="search-filetype-option-icon" aria-hidden="true" />}
-                                {['JPG', 'JPEG', 'GIF', 'WEBP', 'TIFF', 'PNG'].includes(ft) && <img src="/image.png" alt="" className="search-filetype-option-icon" aria-hidden="true" />}
-                                {['RDF', 'TXT', 'DOC', 'DOCX'].includes(ft) && <img src="/document.png" alt="" className="search-filetype-option-icon" aria-hidden="true" />}
-                                {['MP4', 'M4V', 'AVI', 'MOV', 'MKV'].includes(ft) && <img src="/video.svg" alt="" className="search-filetype-option-icon" aria-hidden="true" />}
-                                {ft === 'MP3' && <img src="/audio.png" alt="" className="search-filetype-option-icon" aria-hidden="true" />}
-                                {['EPUB', 'MOBI'].includes(ft) && <img src="/book.svg" alt="" className="search-filetype-option-icon" aria-hidden="true" />}
-                                {ft === 'ZIP' && <img src="/zip.png" alt="" className="search-filetype-option-icon" aria-hidden="true" />}
-                              </label>
+                                >
+                                  !
+                                </button>
+                              </div>
                             ))}
                           </div>
                           )

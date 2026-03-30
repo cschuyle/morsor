@@ -5,6 +5,7 @@
  */
 import type { FileTypeQuickModeValue } from './fileTypeQuickMode'
 import { FileTypeQuickMode, normalizeFileTypeQuickMode } from './fileTypeQuickMode'
+import { normalizeFileTypeToken } from './fileTypeRequireUtils'
 import type { Trove } from './types'
 import type { DuplicatesTabSession, SearchTabSession, UniquesTabSession } from './sessionTabState'
 
@@ -17,6 +18,7 @@ export type DeserializeActiveUrlResult = {
   pageSize: number | null
   searchPageOneBased: number | null
   fileTypeFilters: string[]
+  requireFileTypes: string[]
   fileTypeQuickMode: FileTypeQuickModeValue
   thumbnailOnly: boolean
   boostTroveId: string | null
@@ -46,6 +48,23 @@ function posInt(s: string | null): number | null {
   return Number.isFinite(n) && n > 0 ? n : null
 }
 
+/**
+ * Flatten `fileTypes` / `requireFileTypes` query values. Each param may be comma-separated
+ * (same as `/api/search`), matching Spring's parsing; multiple `fileTypes` keys are also merged.
+ */
+export function parseFileTypesQueryValues(ftAll: string[]): string[] {
+  const out: string[] = []
+  for (const raw of ftAll) {
+    if (raw == null || !String(raw).trim()) continue
+    for (const part of String(raw).split(',')) {
+      const t = part.trim()
+      if (!t) continue
+      out.push(normalizeFileTypeToken(t))
+    }
+  }
+  return out
+}
+
 export function modeFromParams(params: URLSearchParams): TabMode {
   const m = params.get('mode')
   if (m === 'duplicates' || m === 'uniques') return m
@@ -70,6 +89,7 @@ export function deserializeActiveTabFromUrl(
     pageSize: null,
     searchPageOneBased: null,
     fileTypeFilters: [],
+    requireFileTypes: [],
     fileTypeQuickMode: normalizeFileTypeQuickMode(params.get('ftq')),
     thumbnailOnly: params.get('thumbs') === '1',
     boostTroveId: null,
@@ -103,10 +123,8 @@ export function deserializeActiveTabFromUrl(
     const boostRaw = params.get('boost')
     const boostTroveId =
       boostRaw != null && boostRaw !== '' ? (urlTroveId(boostRaw, troves) ?? boostRaw) : null
-    const ftAll = params.getAll('fileTypes')
-    const fileTypeFilters = ftAll
-      .filter((f) => f != null && f.trim())
-      .map((f) => (f.trim() === 'URL' ? 'Link' : f.trim()))
+    const fileTypeFilters = parseFileTypesQueryValues(params.getAll('fileTypes'))
+    const requireFileTypes = parseFileTypesQueryValues(params.getAll('requireFileTypes'))
     const view = params.get('view')
     const searchView = view === 'gallery' ? 'gallery' : 'list'
     return {
@@ -116,6 +134,7 @@ export function deserializeActiveTabFromUrl(
       pageSize: rawSize,
       searchPageOneBased: pageOne,
       fileTypeFilters,
+      requireFileTypes,
       fileTypeQuickMode: normalizeFileTypeQuickMode(params.get('ftq')),
       thumbnailOnly: params.get('thumbs') === '1',
       boostTroveId,
@@ -173,6 +192,8 @@ export type SerializeTabUrlInput = {
   pageSize: number
   searchPage0Based: number | null | undefined
   fileTypeFilters: Set<string>
+  /** When omitted, treated as empty (no required-type filter in URL). */
+  requiredFileTypes?: Set<string>
   fileTypeQuickMode: FileTypeQuickModeValue
   thumbnailOnly: boolean
   boostTroveId: string | null
@@ -213,6 +234,9 @@ export function serializeActiveTabToUrl(input: SerializeTabUrlInput): URLSearchP
     const boostId = input.boostTroveId ? tid(input.boostTroveId) : null
     if (boostId) next.set('boost', boostId)
     input.fileTypeFilters.forEach((f) => next.append('fileTypes', f))
+    ;[...(input.requiredFileTypes ?? new Set<string>())]
+      .sort((a, b) => a.localeCompare(b))
+      .forEach((f) => next.append('requireFileTypes', f))
     next.set('ftq', input.fileTypeQuickMode)
     if (input.thumbnailOnly) next.set('thumbs', '1')
     next.set('view', input.searchView === 'gallery' ? 'gallery' : 'list')
@@ -275,6 +299,7 @@ function emptySearchSession(): SearchTabSession {
     searchSelectedTroveIds: [],
     pageSize: 500,
     fileTypeFilters: [],
+    requiredFileTypes: [],
     fileTypeQuickMode: FileTypeQuickMode.Meh,
     thumbnailOnly: false,
     boostTroveId: null,
@@ -340,6 +365,7 @@ export function serializeUrlFromTabSessions(
       pageSize: s.pageSize,
       searchPage0Based: s.searchPage0Based ?? 0,
       fileTypeFilters: new Set(s.fileTypeFilters),
+      requiredFileTypes: new Set(s.requiredFileTypes ?? []),
       fileTypeQuickMode: s.fileTypeQuickMode,
       thumbnailOnly: s.thumbnailOnly,
       boostTroveId: s.boostTroveId,
@@ -375,6 +401,7 @@ export function serializeUrlFromTabSessions(
       pageSize: 500,
       searchPage0Based: null,
       fileTypeFilters: new Set(),
+      requiredFileTypes: new Set(),
       fileTypeQuickMode: FileTypeQuickMode.Meh,
       thumbnailOnly: false,
       boostTroveId: null,
@@ -409,6 +436,7 @@ export function serializeUrlFromTabSessions(
     pageSize: 500,
     searchPage0Based: null,
     fileTypeFilters: new Set(),
+    requiredFileTypes: new Set(),
     fileTypeQuickMode: FileTypeQuickMode.Meh,
     thumbnailOnly: false,
     boostTroveId: null,
