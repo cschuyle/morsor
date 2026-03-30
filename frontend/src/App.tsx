@@ -917,6 +917,23 @@ function App() {
     if (searchMode === 'search') fetchSearch(0, null, new Set([troveId]))
   }
 
+  /** Compare tab: set compare selection to this trove only (duplicates: allows self-compare). Uniques cannot use primary as compare — clear compare when target is primary. */
+  function handleCompareTargetClick(troveId: string) {
+    setFreezeTroveListOrder(true)
+    if (searchMode === 'uniques' && troveId === primaryTroveId) {
+      setSelectedTroveIds(new Set())
+    } else {
+      selectOnlyTrove(troveId)
+    }
+    if (searchMode === 'duplicates' && !dupQuery.trim()) {
+      queryRef.current = '*'
+      setDupQuery('*')
+    } else if (searchMode === 'uniques' && !uniqQuery.trim()) {
+      queryRef.current = '*'
+      setUniqQuery('*')
+    }
+  }
+
   function cancelSearch() {
     abortControllerRef.current?.abort()
   }
@@ -1660,13 +1677,12 @@ function App() {
                                 {t.name} {searchResult != null ? <span className="trove-count-suffix">({formatCount(t.resultCount)}/{formatCount(t.count)})</span> : `(${formatCount(t.count)})`}
                               </span>
                             </label>
-                            {(selectedTroveIds.size !== 1 || !selectedTroveIds.has(t.id)) && (
+                            {(selectedTroveIds.size !== 1 || !selectedTroveIds.has(t.id) || t.id === primaryTroveId) && (
                               <span className="trove-only-actions">
                                 <button
                                   type="button"
                                   className="trove-only-link"
-                                  disabled={isPrimaryDisabled}
-                                  onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleTargetClick(t.id) }}
+                                  onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleCompareTargetClick(t.id) }}
                                   aria-label={`Compare only ${t.name}`}
                                   title="Only this trove"
                                 >
@@ -1700,13 +1716,12 @@ function App() {
                                 {t.name} {searchResult != null ? <span className="trove-count-suffix">({formatCount(t.resultCount)}/{formatCount(t.count)})</span> : `(${formatCount(t.count)})`}
                               </span>
                             </label>
-                            {(selectedTroveIds.size !== 1 || !selectedTroveIds.has(t.id)) && (
+                            {(selectedTroveIds.size !== 1 || !selectedTroveIds.has(t.id) || t.id === primaryTroveId) && (
                               <span className="trove-only-actions">
                                 <button
                                   type="button"
                                   className="trove-only-link"
-                                  disabled={isPrimaryDisabled}
-                                  onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleTargetClick(t.id) }}
+                                  onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleCompareTargetClick(t.id) }}
                                   aria-label={`Compare only ${t.name}`}
                                   title="Only this trove"
                                 >

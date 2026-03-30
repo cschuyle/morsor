@@ -1331,7 +1331,11 @@ function MobileApp() {
 
   function handleCompareTargetClick(troveId) {
     if (!isDupOrUniques) return
-    setCompareTroveIds(new Set([troveId]))
+    if (searchMode === 'uniques' && troveId === primaryTroveId) {
+      setCompareTroveIds(new Set())
+    } else {
+      setCompareTroveIds(new Set([troveId]))
+    }
     setShowTrovePicker(false)
   }
 
@@ -2699,9 +2703,9 @@ onClick={() => {
                             />
                             <span>{t.name}</span>
                           </label>
-                          {(compareTroveIds.size !== 1 || !compareTroveIds.has(t.id)) && (
+                          {(compareTroveIds.size !== 1 || !compareTroveIds.has(t.id) || t.id === primaryTroveId) && (
                             <span className="mobile-trove-only-actions">
-                              <button type="button" className="mobile-trove-only-link mobile-trove-only-link--target" disabled={isPrimaryDisabled} onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleCompareTargetClick(t.id) }} aria-label={`Compare only ${t.name}`} title="Only this trove"><img src="/target.png" alt="" className="mobile-trove-only-icon" /></button>
+                              <button type="button" className="mobile-trove-only-link mobile-trove-only-link--target" onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleCompareTargetClick(t.id) }} aria-label={`Compare only ${t.name}`} title="Only this trove"><img src="/target.png" alt="" className="mobile-trove-only-icon" /></button>
                             </span>
                           )}
                         </li>
