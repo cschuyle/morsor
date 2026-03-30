@@ -427,6 +427,12 @@ function App() {
   }, [extraFieldDropdownOpen])
 
   useEffect(() => {
+    if (searchResultsViewMode === 'gallery') {
+      setExtraFieldDropdownOpen(false)
+    }
+  }, [searchResultsViewMode])
+
+  useEffect(() => {
     fetch('/api/troves', { credentials: 'include', headers: { ...getApiAuthHeaders() } })
       .then((res) => {
         if (res.status === 401) { window.location.href = '/login'; return null }
@@ -2028,7 +2034,7 @@ function App() {
                 </button>
                 {searchMode === 'search' && (() => {
                   const showMediaDropdown = (allAvailableFileTypes.length >= 1 || fileTypeFilters.size > 0)
-                  const showExtraFieldsPicker = extraFieldKeysOnPage.length > 0
+                  const showExtraFieldsPicker = extraFieldKeysOnPage.length > 0 && searchResultsViewMode === 'list'
                   if (!showMediaDropdown && !showExtraFieldsPicker) {
                     return null
                   }

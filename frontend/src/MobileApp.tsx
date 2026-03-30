@@ -1543,6 +1543,12 @@ function MobileApp() {
     }
   }, [extraFieldKeysOnPage.length, extraFieldDropdownOpen])
 
+  useEffect(() => {
+    if (effectiveSearchResultsViewMode === 'gallery' && extraFieldDropdownOpen) {
+      setExtraFieldDropdownOpen(false)
+    }
+  }, [effectiveSearchResultsViewMode, extraFieldDropdownOpen])
+
   const troveLabel = isDupOrUniques
     ? (primaryTroveId
         ? <><strong>Primary:</strong> {troves.find((t) => t.id === primaryTroveId)?.name ?? primaryTroveId} · {(compareTroveIds.size === 0 || (compareTroveIds.size === 1 && compareTroveIds.has(primaryTroveId))) ? <strong>Self-compare</strong> : <><strong>Compare:</strong> {formatCount(compareTroveIds.size)}</>}</>
@@ -2175,7 +2181,7 @@ onClick={() => {
             <span className="mobile-troves-btn-label">{mobileTroveDropdownLabel}</span>
             <span className="mobile-troves-btn-change" aria-hidden="true" />
           </button>
-          {searchMode === 'search' && searchResult != null && (showMobileViewModeToggle || extraFieldKeysOnPage.length > 0) && (
+          {searchMode === 'search' && searchResult != null && (showMobileViewModeToggle || (effectiveSearchResultsViewMode === 'list' && extraFieldKeysOnPage.length > 0)) && (
             <span className="mobile-view-and-size-wrap mobile-troves-row-right">
               {showMobileViewModeToggle && (
               <span className="mobile-view-mode-toggle" role="group" aria-label="Results view">
@@ -2209,7 +2215,7 @@ onClick={() => {
                 </button>
               </span>
               )}
-              {extraFieldKeysOnPage.length > 0 && (() => {
+              {effectiveSearchResultsViewMode === 'list' && extraFieldKeysOnPage.length > 0 && (() => {
                 const extraFieldKeysSelectedInPanel = extraFieldKeysOnPage.filter((k) => extraGridFieldsSelected.has(k))
                 const extraFieldKeysNotSelectedInPanel = extraFieldKeysOnPage.filter((k) => !extraGridFieldsSelected.has(k))
                 const extraFieldKeysSelectedFiltered = extraFieldKeysSelectedInPanel.filter((k) =>
