@@ -2,7 +2,39 @@
 
 ## Unreleased
 
-*(Tag created when deploy runs.)*
+*(Tag created when deploy runs. Summarizes commits since `release-v20260327-1216-1c2e1dc`.)*
+
+### Features
+
+#### Gallery sort: Extra fields
+- Sort options include extra fields derived from the **full** result set; improved labels and merged ordering.
+
+#### Query history (session and database)
+- **Query history** page with log and navigation, session-only.
+- **Saved queries:** Save speicific entries from History to the database per user.
+
+####  Require file types
+- **Required types (`!`):** Meaning, AND search logic is now possible (was only OR before).
+- **Gallery PDF sash:** Purple-tinted blue to align with the audio sash family.
+
+### Improved User Experience
+- **Meh** is highlighted only when it's **really** enabled.
+- **Extra fields:** Picker hidden in gallery view.
+- Pagination controls on Desktop are grouped into 3 subsections.
+- Query timestamp and duration display: Query console shows original **cached duration** and **completion time** in the UI for susequent queries which use the cached results.
+- **Fix:** Preserve pagination when switching among search / duplicates / uniques.
+- **Fix:** Page size dropdown includes **50** for duplicates and uniques.
+- **Fix:** Namespaced URL state for search vs duplicates vs uniques; session holds inactive tabs while the URL reflects the active tab only.
+
+### Backend
+
+#### Database & migrations (backend)
+- **Flyway** migrations with a **single script set** for H2 and Postgres; datasource configuration via **environment**; Flyway on the base application configuration; dedicated `postgres` Spring profile removed.
+
+## release-v20260327-1216-1c2e1dc
+
+### Sign-in
+- **Login:** Improved password-manager autofill behavior on the first submit.
 
 ## release-v20260327-0315-77099d5
 
