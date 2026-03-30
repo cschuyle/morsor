@@ -1929,6 +1929,7 @@ onClick={() => {
             const hasFileTypeFilter = fileTypesForLabel.size > 0 && !allSelected
             const anyQuickSelected = fileTypeQuickMode === FileTypeQuickMode.Any
             const mehQuickSelected = fileTypeQuickMode === FileTypeQuickMode.Meh
+            const mehQuickActiveStyle = mehQuickSelected && fileTypesForLabel.size === 0
             const hasThumbFilter = thumbnailOnly
             const mediaPickerHasSelection =
               hasThumbFilter || fileTypesForLabel.size > 0 || anyQuickSelected
@@ -2001,10 +2002,10 @@ onClick={() => {
                     </button>
                     <button
                       type="button"
-                      className={`mobile-filetype-quick-btn ${mehQuickSelected ? 'mobile-filetype-quick-btn--active' : ''}`}
+                      className={`mobile-filetype-quick-btn ${mehQuickActiveStyle ? 'mobile-filetype-quick-btn--active' : ''}`}
                       onClick={(e) => {
                         e.preventDefault()
-                        if (mehQuickSelected) return
+                        if (mehQuickSelected && fileTypesForLabel.size === 0) return
                         skipFileTypeSearchRef.current = true
                         lastFileTypeOrViewSearchRef.current = Date.now()
                         const next = new Set<string>()

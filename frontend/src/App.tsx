@@ -2069,6 +2069,7 @@ function App() {
                   const hasFileTypeFilter = fileTypesForLabel.size > 0 && !allSelected
                   const anyQuickSelected = fileTypeQuickMode === FileTypeQuickMode.Any
                   const mehQuickSelected = fileTypeQuickMode === FileTypeQuickMode.Meh
+                  const mehQuickActiveStyle = mehQuickSelected && fileTypesForLabel.size === 0
                   const hasThumbFilter = thumbnailOnly
                   const extraFieldKeysSelectedInPanel = extraFieldKeysOnPage.filter((k) => extraGridFieldsSelected.has(k))
                   const extraFieldKeysNotSelectedInPanel = extraFieldKeysOnPage.filter((k) => !extraGridFieldsSelected.has(k))
@@ -2202,11 +2203,11 @@ function App() {
                           </button>
                           <button
                             type="button"
-                            className={`search-filetype-quick-btn ${mehQuickSelected ? 'search-filetype-quick-btn--active' : ''}`}
+                            className={`search-filetype-quick-btn ${mehQuickActiveStyle ? 'search-filetype-quick-btn--active' : ''}`}
                             title="Additional media not required"
                             onClick={(e) => {
                               e.preventDefault()
-                              if (mehQuickSelected) return
+                              if (mehQuickSelected && fileTypesForLabel.size === 0) return
                               skipFileTypeSearchRef.current = true
                               lastFileTypeOrViewSearchRef.current = Date.now()
                               const next = new Set<string>()
