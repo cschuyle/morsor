@@ -1351,23 +1351,8 @@ function App() {
   const gallerySortAfterFilterSlot = searchResultsViewMode === 'gallery'
     ? (
       <div className="gallery-sort-wrap">
-        <div className="gallery-sort-trigger-wrap">
-          <label className="gallery-sort-label">
-            Sort by{' '}
-            <select
-              value={gallerySortValue}
-              onChange={handleGallerySortChange}
-              className="gallery-sort-select"
-              aria-label="Gallery sort"
-            >
-              {gallerySortOptions.map((opt) => (
-                <option key={opt.value} value={opt.value}>
-                  {opt.label}
-                </option>
-              ))}
-            </select>
-          </label>
-          <span className="gallery-sort-divider" aria-hidden="true" />
+        <div className="gallery-sort-trigger-wrap" role="group" aria-label="Gallery sort">
+          <span className="gallery-sort-by-prefix">Sort</span>
           <button
             type="button"
             className="gallery-sort-dir-btn"
@@ -1377,6 +1362,19 @@ function App() {
           >
             {effectiveSortDir === 'asc' ? '↑' : '↓'}
           </button>
+          <span className="gallery-sort-divider" aria-hidden="true" />
+          <select
+            value={gallerySortValue}
+            onChange={handleGallerySortChange}
+            className="gallery-sort-select"
+            aria-label="Sort field"
+          >
+            {gallerySortOptions.map((opt) => (
+              <option key={opt.value} value={opt.value}>
+                {opt.label}
+              </option>
+            ))}
+          </select>
         </div>
       </div>
     )

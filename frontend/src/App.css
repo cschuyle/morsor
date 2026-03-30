@@ -1703,14 +1703,16 @@
 .card .search-results-options .pagination-ellipsis {
   color: #b8b8b8;
 }
-.gallery-sort-label {
+.gallery-sort-by-prefix {
   display: inline-flex;
   align-items: center;
-  gap: 0.5rem;
+  flex-shrink: 0;
+  padding: 0 0.15rem 0 0.5rem;
   font-size: 0.9rem;
   color: #000;
+  white-space: nowrap;
 }
-.card .grid-toolbar .gallery-sort-label {
+.card .grid-toolbar .gallery-sort-by-prefix {
   color: #252525;
 }
 
@@ -1740,12 +1742,13 @@
   align-items: center;
   justify-content: center;
   font-size: 1rem;
+  font-weight: 700;
   font-family: inherit;
   line-height: 1;
   border: none;
   border-radius: 0;
   background: transparent;
-  color: #252525;
+  color: #6633cc;
   cursor: pointer;
 }
 
@@ -1760,21 +1763,13 @@
   background: #ddd;
 }
 
-.gallery-sort-trigger-wrap .gallery-sort-label {
-  margin: 0;
-  padding: 0 0.5rem;
-  display: inline-flex;
-  align-items: center;
-  gap: 0.35rem;
-  border: none;
-  background: transparent;
-}
-
 .gallery-sort-trigger-wrap .gallery-sort-select {
+  flex: 1;
+  min-width: 4.5rem;
+  padding: 0 0.5rem 0 0.35rem;
   border: none;
   border-radius: 0;
   background: transparent;
-  min-width: 4.5rem;
 }
 .search-results-options {
   margin-top: 0.5rem;

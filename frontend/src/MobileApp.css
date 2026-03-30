@@ -1946,6 +1946,16 @@
   background: #fff;
 }
 
+.mobile-search-results-grid .mobile-gallery-sort-by-prefix {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  padding: 0 0.15rem 0 0.45rem;
+  font-size: 0.9rem;
+  color: #252525;
+  white-space: nowrap;
+}
+
 .mobile-search-results-grid .mobile-gallery-sort-dir-btn {
   flex-shrink: 0;
   width: 2rem;
@@ -1955,12 +1965,13 @@
   align-items: center;
   justify-content: center;
   font-size: 1rem;
+  font-weight: 700;
   font-family: inherit;
   line-height: 1;
   border: none;
   border-radius: 0;
   background: transparent;
-  color: #252525;
+  color: #6633cc;
   cursor: pointer;
   -webkit-tap-highlight-color: #ede8ff;
 }

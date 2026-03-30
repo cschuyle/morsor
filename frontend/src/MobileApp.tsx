@@ -1505,7 +1505,8 @@ function MobileApp() {
   const mobileGallerySortAfterFilterSlot = effectiveSearchResultsViewMode === 'gallery'
     ? (
       <div className="mobile-gallery-sort-dropdown-wrap" ref={gallerySortDropdownRef}>
-        <div className="mobile-gallery-sort-trigger-wrap">
+        <div className="mobile-gallery-sort-trigger-wrap" role="group" aria-label="Gallery sort">
+          <span className="mobile-gallery-sort-by-prefix">Sort</span>
           <button
             type="button"
             className="mobile-gallery-sort-dir-btn"
@@ -1522,7 +1523,7 @@ function MobileApp() {
             onClick={() => setGallerySortDropdownOpen((o) => !o)}
             aria-expanded={gallerySortDropdownOpen}
             aria-haspopup="listbox"
-            aria-label="Gallery sort"
+            aria-label="Sort field"
           >
             {mobileGallerySortOptions.find((o) => o.value === mobileGallerySortValue)?.label ?? mobileGallerySortValue}
           </button>
