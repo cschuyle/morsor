@@ -19,6 +19,10 @@ import {
   collectExtraFieldKeysFromRows,
   extraFieldKeyMatchesFilter,
   formatLittlePrinceFieldLabel,
+  gallerySortSelectValue,
+  defaultGallerySortDirForSortBy,
+  mergeGalleryExtraSortKeys,
+  buildSortedGallerySortOptions,
 } from './SearchResultsGrid'
 import { DuplicateResultsView } from './DuplicateResultsView'
 import { UniquesResultsView } from './UniquesResultsView'
@@ -1413,7 +1417,7 @@ function MobileApp() {
   }
 
   function applyGallerySortChange(nextSortBy) {
-    const nextSortDir = nextSortBy === 'score' ? 'desc' : 'asc'
+    const nextSortDir = defaultGallerySortDirForSortBy(nextSortBy)
     if (isStarQuery) {
       setStarSortBy(nextSortBy)
       setStarSortDir(nextSortDir)
@@ -1456,12 +1460,19 @@ function MobileApp() {
     [results, galleryDecorate]
   )
   const effectiveSearchResultsViewMode = showMobileViewModeToggle ? searchResultsViewMode : 'list'
-  const mobileGallerySortValue = effectiveSortBy === 'score' || effectiveSortBy === 'trove' ? effectiveSortBy : 'title'
-  const GALLERY_SORT_OPTIONS = [
-    { value: 'title', label: 'Title' },
-    { value: 'score', label: 'Score' },
-    { value: 'trove', label: 'Trove' }
-  ]
+  const mobileGallerySortOptions = useMemo(() => {
+    if (searchMode !== 'search') {
+      return buildSortedGallerySortOptions([])
+    }
+    return buildSortedGallerySortOptions(
+      mergeGalleryExtraSortKeys(
+        searchResult?.availableExtraFieldKeys,
+        searchResult?.results,
+        effectiveSortBy
+      )
+    )
+  }, [searchMode, searchResult?.availableExtraFieldKeys, searchResult?.results, effectiveSortBy])
+  const mobileGallerySortValue = gallerySortSelectValue(effectiveSortBy)
   const mobileGallerySortAfterFilterSlot = effectiveSearchResultsViewMode === 'gallery'
     ? (
       <div className="mobile-gallery-sort-dropdown-wrap" ref={gallerySortDropdownRef}>
@@ -1484,12 +1495,12 @@ function MobileApp() {
             aria-haspopup="listbox"
             aria-label="Gallery sort"
           >
-            {GALLERY_SORT_OPTIONS.find((o) => o.value === mobileGallerySortValue)?.label ?? mobileGallerySortValue}
+            {mobileGallerySortOptions.find((o) => o.value === mobileGallerySortValue)?.label ?? mobileGallerySortValue}
           </button>
         </div>
         {gallerySortDropdownOpen && (
           <div className="mobile-gallery-sort-panel" role="listbox" aria-label="Gallery sort">
-            {GALLERY_SORT_OPTIONS.map((opt) => (
+            {mobileGallerySortOptions.map((opt) => (
               <button
                 key={opt.value}
                 type="button"

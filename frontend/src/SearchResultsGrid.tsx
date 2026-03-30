@@ -99,12 +99,30 @@ export function formatLittlePrinceFieldLabel(key: string): string {
   if (!s) {
     return ''
   }
+  const lower = s.toLowerCase()
+  if (lower === 'isbn13') {
+    return 'ISBN13'
+  }
+  if (lower === 'isbn') {
+    return 'ISBN'
+  }
+  if (lower === 'lpid') {
+    return 'LPID'
+  }
+  if (lower === 'asin') {
+    return 'ASIN'
+  }
   const noHyphens = s.replace(/-/g, ' ')
   const spaced = noHyphens.replace(/([a-z])([A-Z])/g, '$1 $2')
   return spaced
     .split(/\s+/)
     .filter(Boolean)
-    .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+    .map((w) => {
+      if (w.toLowerCase() === 'id') {
+        return 'ID'
+      }
+      return w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()
+    })
     .join(' ')
 }
 
@@ -466,6 +484,76 @@ export function collectExtraFieldKeysFromRows(rows: SearchResultRow[] | null | u
     }
   }
   return [...keys].sort((a, b) => a.localeCompare(b))
+}
+
+/** API / server sort parameter for an extra JSON key (see {@link collectExtraFieldKeysFromRows}). */
+export const GALLERY_EXTRA_SORT_PREFIX = 'extra:'
+
+export function extraSortByParam(jsonKey: string): string {
+  return `${GALLERY_EXTRA_SORT_PREFIX}${jsonKey}`
+}
+
+export function extraSortJsonKey(sortBy: string | null | undefined): string | null {
+  if (!sortBy) {
+    return null
+  }
+  if (!sortBy.toLowerCase().startsWith(GALLERY_EXTRA_SORT_PREFIX.toLowerCase())) {
+    return null
+  }
+  const k = sortBy.slice(GALLERY_EXTRA_SORT_PREFIX.length).trim()
+  return k || null
+}
+
+/** Maps persisted {@code sortBy} to the gallery sort control value (built-in or {@code extra:…}). */
+export function gallerySortSelectValue(sortBy: string): string {
+  if (sortBy === 'score' || sortBy === 'trove') {
+    return sortBy
+  }
+  if (extraSortJsonKey(sortBy)) {
+    return sortBy
+  }
+  return 'title'
+}
+
+export function defaultGallerySortDirForSortBy(sortBy: string): 'asc' | 'desc' {
+  return sortBy === 'score' ? 'desc' : 'asc'
+}
+
+/** Full-set keys from the API, with current page fallback; includes the JSON key of the active extra sort if missing. */
+export function mergeGalleryExtraSortKeys(
+  availableFromApi: string[] | null | undefined,
+  fallbackRows: SearchResultRow[] | null | undefined,
+  effectiveSortBy: string
+): string[] {
+  const base = Array.isArray(availableFromApi)
+    ? [...availableFromApi]
+    : collectExtraFieldKeysFromRows(fallbackRows)
+  const fromSort = extraSortJsonKey(effectiveSortBy)
+  if (fromSort && !base.includes(fromSort)) {
+    base.push(fromSort)
+    base.sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }))
+  }
+  return base
+}
+
+/** Built-in (title, score, trove) and extra-field sorts merged and ordered by display label. */
+export function buildSortedGallerySortOptions(extraKeys: string[]): Array<{ value: string; label: string }> {
+  const builtIn = [
+    { value: 'title', label: 'Title' },
+    { value: 'score', label: 'Score' },
+    { value: 'trove', label: 'Trove' },
+  ]
+  const extra = extraKeys.map((k) => ({
+    value: extraSortByParam(k),
+    label: formatLittlePrinceFieldLabel(k),
+  }))
+  return [...builtIn, ...extra].sort((a, b) => {
+    const c = a.label.localeCompare(b.label, undefined, { sensitivity: 'base' })
+    if (c !== 0) {
+      return c
+    }
+    return a.value.localeCompare(b.value, undefined, { sensitivity: 'base' })
+  })
 }
 
 /** Extra map for lightbox / tooltips (supports legacy field on the payload). */

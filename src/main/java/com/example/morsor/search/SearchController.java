@@ -172,11 +172,36 @@ public class SearchController {
                 .filter(r -> r.result().troveId() != null && !r.result().troveId().isBlank())
                 .collect(Collectors.groupingBy(r -> r.result().troveId(), Collectors.counting()));
         Map<String, Long> fileTypeCounts = FileTypeCounts.countPerFileType(all);
+        List<String> availableExtraFieldKeys = collectAvailableExtraFieldKeys(all);
         int from = (int) Math.min((long) page * size, total);
         int to = (int) Math.min(from + size, total);
         List<SearchResultWithScore> pageResults = from < to ? all.subList(from, to) : List.of();
         String warning = cacheResult.cached() ? null : "Result not cached (cache memory limit reached). Pagination may be slower.";
-        return new SearchResponse(total, pageResults, page, size, troveCounts, availableFileTypes, fileTypeCounts, warning);
+        return new SearchResponse(total, pageResults, page, size, troveCounts, availableFileTypes, fileTypeCounts, availableExtraFieldKeys, warning);
+    }
+
+    /** Distinct {@link SearchResult#extraFields()} keys across the full filtered result set (before pagination), for gallery sort. */
+    private static List<String> collectAvailableExtraFieldKeys(List<SearchResultWithScore> all) {
+        TreeSet<String> keys = new TreeSet<>();
+        boolean hasLittlePrince = false;
+        for (SearchResultWithScore rw : all) {
+            SearchResult r = rw.result();
+            if (r == null) {
+                continue;
+            }
+            if ("littlePrinceItem".equals(r.itemType())) {
+                hasLittlePrince = true;
+            }
+            Map<String, Object> ex = r.extraFields();
+            if (ex != null && !ex.isEmpty()) {
+                keys.addAll(ex.keySet());
+            }
+        }
+        if (hasLittlePrince) {
+            keys.add("lpid");
+            keys.add("tintenfassId");
+        }
+        return List.copyOf(keys);
     }
 
     private static final int DEFAULT_DUPLICATES_MAX_MATCHES = 20;

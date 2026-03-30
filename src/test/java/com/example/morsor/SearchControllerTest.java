@@ -152,6 +152,9 @@ class SearchControllerTest {
         assertThat(matchBody.results())
                 .as("Query should match text stored in extraFields (e.g. author)")
                 .isNotEmpty();
+        assertThat(matchBody.availableExtraFieldKeys())
+                .as("Full-set extra keys should include fields present anywhere in the result set")
+                .contains("author");
         boolean anyExtraHasDaniele = matchBody.results().stream()
                 .map(r -> r.result() != null ? r.result().extraFields() : null)
                 .filter(Objects::nonNull)

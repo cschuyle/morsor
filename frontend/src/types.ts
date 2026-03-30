@@ -29,6 +29,8 @@ export interface SearchResultData {
   availableFileTypes?: string[]
   /** Hit count per file type for the full search result (for media dropdown). */
   fileTypeCounts?: Record<string, number>
+  /** Distinct {@link SearchResultRow.extraFields} keys across the full result set (before pagination); for gallery sort. */
+  availableExtraFieldKeys?: string[]
 }
 
 /** Trove from /api/troves */

@@ -7,6 +7,10 @@ import {
   collectExtraFieldKeysFromRows,
   extraFieldKeyMatchesFilter,
   formatLittlePrinceFieldLabel,
+  gallerySortSelectValue,
+  defaultGallerySortDirForSortBy,
+  mergeGalleryExtraSortKeys,
+  buildSortedGallerySortOptions,
 } from './SearchResultsGrid'
 import { DuplicateResultsView } from './DuplicateResultsView'
 import { UniquesResultsView } from './UniquesResultsView'
@@ -165,6 +169,22 @@ function App() {
     }
     return collectExtraFieldKeysFromRows(searchResult.results)
   }, [searchMode, searchResult?.results])
+
+  const galleryExtraSortKeys = useMemo(() => {
+    if (searchMode !== 'search') {
+      return [] as string[]
+    }
+    return mergeGalleryExtraSortKeys(
+      searchResult?.availableExtraFieldKeys,
+      searchResult?.results,
+      effectiveSortBy
+    )
+  }, [searchMode, searchResult?.availableExtraFieldKeys, searchResult?.results, effectiveSortBy])
+
+  const gallerySortOptions = useMemo(
+    () => buildSortedGallerySortOptions(galleryExtraSortKeys),
+    [galleryExtraSortKeys]
+  )
 
   const visibleExtraFieldKeysForGrid = useMemo(
     () => [...extraGridFieldsSelected],
@@ -1254,7 +1274,7 @@ function App() {
 
   function handleGallerySortChange(e) {
     const nextSortBy = e.target.value
-    const nextSortDir = nextSortBy === 'score' ? 'desc' : 'asc'
+    const nextSortDir = defaultGallerySortDirForSortBy(nextSortBy)
     if (isStarQuery) {
       setStarSortBy(nextSortBy)
       setStarSortDir(nextSortDir)
@@ -1281,7 +1301,7 @@ function App() {
     fetchSearch(pageNum, null, null, effectiveSortBy, nextDir)
   }
 
-  const gallerySortValue = effectiveSortBy === 'score' || effectiveSortBy === 'trove' ? effectiveSortBy : 'title'
+  const gallerySortValue = gallerySortSelectValue(effectiveSortBy)
   const gallerySortAfterFilterSlot = searchResultsViewMode === 'gallery'
     ? (
       <div className="gallery-sort-wrap">
@@ -1294,9 +1314,11 @@ function App() {
               className="gallery-sort-select"
               aria-label="Gallery sort"
             >
-              <option value="title">Title</option>
-              <option value="score">Score</option>
-              <option value="trove">Trove</option>
+              {gallerySortOptions.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
             </select>
           </label>
           <span className="gallery-sort-divider" aria-hidden="true" />
