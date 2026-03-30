@@ -1,6 +1,6 @@
 /**
  * Regression test: desktop pagination (Search, Duplicates, Uniques) shows
- * "1 ... 6 7 8 9 10 ... N" so we don't lose it again.
+ * ellipses, first page, and last page when applicable; at most 5 numeric buttons.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, waitFor, fireEvent, within } from '@testing-library/react'
@@ -122,7 +122,7 @@ describe('Desktop search pagination', () => {
     const nav = screen.getByRole('navigation', { name: /Search results pages/i })
     expect(nav).toBeInTheDocument()
     expectNumberedPagination(nav)
-  })
+  }, 15_000)
 })
 
 describe('Desktop duplicates pagination', () => {

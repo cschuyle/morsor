@@ -39,6 +39,7 @@ import {
   type DuplicatesTabSession,
   type UniquesTabSession,
 } from './sessionTabState'
+import { paginationPageWindow } from './paginationPageWindow'
 import './App.css'
 
 const DEFAULT_DUP_SESSION: DuplicatesTabSession = {
@@ -2508,12 +2509,7 @@ function App() {
                       </select>
                     </label>
                     {totalPages > 1 && (() => {
-                    const maxShow = 5
-                    let start = Math.max(0, pageNum - Math.floor(maxShow / 2))
-                    let end = Math.min(totalPages, start + maxShow)
-                    if (end - start < maxShow) start = Math.max(0, end - maxShow)
-                    const pageNumbers: number[] = []
-                    for (let i = start; i < end; i++) pageNumbers.push(i)
+                    const { start, end, pageNumbers } = paginationPageWindow(pageNum, totalPages, 5)
                     return (
                       <nav className="pagination" aria-label="Duplicate results pages">
                         <span className="pagination-info">
@@ -2632,12 +2628,7 @@ function App() {
                       </select>
                     </label>
                     {totalPages > 1 && (() => {
-                    const maxShow = 5
-                    let start = Math.max(0, pageNum - Math.floor(maxShow / 2))
-                    let end = Math.min(totalPages, start + maxShow)
-                    if (end - start < maxShow) start = Math.max(0, end - maxShow)
-                    const pageNumbers: number[] = []
-                    for (let i = start; i < end; i++) pageNumbers.push(i)
+                    const { start, end, pageNumbers } = paginationPageWindow(pageNum, totalPages, 5)
                     return (
                       <nav className="pagination" aria-label="Uniques results pages">
                         <span className="pagination-info">
@@ -2788,7 +2779,7 @@ function App() {
                   <div className="search-results-options">
                     <span className="search-results-options-view-group">
                       <span className="view-mode-toggle" role="group" aria-label="Results view">
-                        <span className="view-mode-label">View:</span>
+                        <span className="view-mode-label">View</span>
                         <button
                           type="button"
                           className={`view-mode-btn ${searchResultsViewMode === 'list' ? 'view-mode-btn--active' : ''}`}
@@ -2846,12 +2837,7 @@ function App() {
                     </span>
                     <span className="search-results-options-pager-group">
                     {totalPages > 1 && (() => {
-                      const maxShow = 5
-                      let start = Math.max(0, pageNum - Math.floor(maxShow / 2))
-                      let end = Math.min(totalPages, start + maxShow)
-                      if (end - start < maxShow) start = Math.max(0, end - maxShow)
-                      const pageNumbers: number[] = []
-                      for (let i = start; i < end; i++) pageNumbers.push(i)
+                      const { start, end, pageNumbers } = paginationPageWindow(pageNum, totalPages, 5)
                       return (
                         <nav className="pagination" aria-label="Search results pages">
                           <span className="pagination-info">
