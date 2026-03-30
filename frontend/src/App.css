@@ -1707,21 +1707,43 @@
   margin-bottom: 0.5rem;
   display: flex;
   align-items: center;
-  gap: 1rem;
+  column-gap: 0.35rem;
+  row-gap: 0.5rem;
   flex-wrap: wrap;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
 }
 
 .search-results-options-view-group {
   display: inline-flex;
   align-items: center;
   gap: 0.5rem;
+  flex-shrink: 0;
 }
 
 .search-results-options-pager-group {
   display: inline-flex;
   align-items: center;
+  flex-wrap: nowrap;
+  gap: 0.25rem;
+  margin-left: auto;
+  min-width: 0;
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+/* Same button sizing as .pagination / .pagination-btn (do not shrink); nowrap + horizontal scroll on narrow viewports. */
+.search-results-options .pagination {
+  display: inline-flex;
+  flex-wrap: nowrap;
   gap: 1rem;
-  margin-left: 2.5rem;
+  min-width: 0;
+}
+
+.search-results-options .pagination-info {
+  white-space: nowrap;
 }
 
 .gallery-decorate-wrap {
@@ -1732,8 +1754,9 @@
   font-size: 0.9rem;
   color: #666;
 }
+/* display:none so list mode does not reserve width for gallery-only controls (avoids pager wrapping early). */
 .gallery-decorate-wrap--hidden {
-  visibility: hidden;
+  display: none;
 }
 .gallery-decorate-label {
   user-select: none;
