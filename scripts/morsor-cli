@@ -1,5 +1,973 @@
-#!/usr/bin/env bash
-set -euo pipefail
-# HTTP CLI for the Morsor backend (Python stdlib). See: tools/morsor-cli/morsor_cli.py
-ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-exec python3 "${ROOT}/tools/morsor-cli/morsor_cli.py" "$@"
+#!/usr/bin/env python3
+"""
+HTTP CLI for the Morsor backend (stdlib only: no pip install required).
+"""
+from __future__ import annotations
+
+import getpass
+import json
+import os
+import re
+import sys
+import urllib.error
+import urllib.parse
+import urllib.request
+from http.cookiejar import CookieJar
+from pathlib import Path
+from typing import Any
+from urllib.error import HTTPError, URLError
+
+DEV_DEFAULT_TOKEN = "dev-token"
+MAX_LOCAL_TROVE_ITEMS = 50_000
+TOKEN_JSON = re.compile(r'"token"\s*:\s*"([^"]+)"')
+TROVE_ROW_JSON = re.compile(
+    r'"id"\s*:\s*"((?:\\.|[^"\\])*)".*?"name"\s*:\s*"((?:\\.|[^"\\])*)".*?"count"\s*:\s*(\d+)',
+    re.DOTALL,
+)
+
+
+def die(msg: str, code: int = 2) -> None:
+    print(f"morsor-cli: {msg}", file=sys.stderr)
+    sys.exit(code)
+
+
+def strip_trailing_slash(s: str) -> str:
+    return s[:-1] if s.endswith("/") and len(s) > 1 else s
+
+
+def is_likely_local_dev_base(base: str) -> bool:
+    try:
+        p = urllib.parse.urlparse(base)
+        h = (p.hostname or "").lower()
+        return h in ("localhost", "127.0.0.1")
+    except Exception:
+        return False
+
+
+def shell_single_quoted(s: str) -> str:
+    return "'" + s.replace("'", "'\\''") + "'"
+
+
+def normalize_output_mode(raw: str) -> str:
+    v = (raw or "").strip().lower()
+    if v in ("json", "j"):
+        return "json"
+    if v in ("text", "txt", "t"):
+        return "text"
+    die(f"invalid output mode: {raw} (expected json/j or text/txt/t)")
+
+
+def map_shorthand_key(key: str) -> str:
+    m = {
+        "q": "query",
+        "p": "primaryTrove",
+        "primary": "primaryTrove",
+        "c": "compareTrove",
+        "compare": "compareTrove",
+        "P": "page",
+        "page": "page",
+        "S": "size",
+        "pageSize": "size",
+        "size": "size",
+        "s": "sortBy",
+        "sortBy": "sortBy",
+        "d": "sortDir",
+        "sortDir": "sortDir",
+        "t": "trove",
+        "trove": "trove",
+    }
+    return m.get(key, key)
+
+
+def add_shorthand_param(params: list[tuple[str, str]], key: str, value: str) -> None:
+    k = map_shorthand_key(key)
+    if k == "trove":
+        for part in value.split(","):
+            t = part.strip()
+            if t:
+                params.append(("trove", t))
+        return
+    params.append((k, value))
+
+
+def add_or_append_query(params: list[tuple[str, str]], value: str) -> None:
+    for j, (pk, pv) in enumerate(params):
+        if pk == "query":
+            params[j] = ("query", pv + " " + value)
+            return
+    params.append(("query", value))
+
+
+def encode_query(params: list[tuple[str, str]]) -> str:
+    if not params:
+        return ""
+    parts = []
+    for k, v in params:
+        parts.append(
+            urllib.parse.quote(k, safe="")
+            + "="
+            + urllib.parse.quote(v, safe="")
+        )
+    return "&".join(parts)
+
+
+def parse_shorthand_query(args: list[str], start_idx: int) -> str:
+    params: list[tuple[str, str]] = []
+    naked: list[str] = []
+    i = start_idx
+    while i < len(args):
+        a = args[i]
+        if a == "--man":
+            print_usage()
+            sys.exit(0)
+        if a in ("--help", "-h", "help"):
+            print_summary_usage()
+            sys.exit(0)
+        if a == "--":
+            i += 1
+            while i < len(args):
+                raw = args[i]
+                i += 1
+                if "=" not in raw or raw.index("=") <= 0:
+                    die(f"raw query items after -- must be key=value, got: {raw}")
+                eq = raw.index("=")
+                params.append((raw[:eq], raw[eq + 1 :]))
+            break
+        if a.startswith("--"):
+            nv = a[2:]
+            if not nv:
+                die(f"empty parameter name: {a}")
+            if "=" in nv:
+                eq = nv.index("=")
+                key, value = nv[:eq], nv[eq + 1 :]
+            else:
+                key = nv
+                i += 1
+                if i >= len(args):
+                    die(f"missing value for --{key}")
+                value = args[i]
+            add_shorthand_param(params, key, value)
+        elif a.startswith("-") and len(a) > 1:
+            nv = a[1:]
+            if "=" in nv:
+                eq = nv.index("=")
+                key, value = nv[:eq], nv[eq + 1 :]
+            else:
+                key = nv
+                i += 1
+                if i >= len(args):
+                    die(f"missing value for -{key}")
+                value = args[i]
+            add_shorthand_param(params, key, value)
+        else:
+            naked.append(a)
+        i += 1
+    if naked:
+        add_or_append_query(params, " ".join(naked))
+    return encode_query(params)
+
+
+def resolve_action(token: str) -> tuple[str, str] | None:
+    t = token.lower().rstrip(":")
+    actions = {
+        "troves": ("GET", "/api/troves"),
+        "status": ("GET", "/api/status"),
+        "search": ("GET", "/api/search"),
+        "dups": ("GET", "/api/search/duplicates"),
+        "duplicates": ("GET", "/api/search/duplicates"),
+        "dupliicates": ("GET", "/api/search/duplicates"),
+        "unique": ("GET", "/api/search/uniques"),
+        "uniques": ("GET", "/api/search/uniques"),
+    }
+    if t in actions:
+        return actions[t]
+    return None
+
+
+def is_http_method(s: str) -> bool:
+    return s.upper() in ("GET", "POST", "HEAD")
+
+
+def is_local_trove_action(token: str) -> bool:
+    t = token.lower().rstrip(":")
+    return t in ("local-trove", "register-local-dir")
+
+
+def pad_right(s: str, n: int) -> str:
+    return s if len(s) >= n else s + " " * (n - len(s))
+
+
+def print_search_text(json_str: str) -> None:
+    if not json_str or not json_str.strip():
+        return
+    try:
+        root = json.loads(json_str)
+    except json.JSONDecodeError:
+        return
+    results = root.get("results")
+    if not isinstance(results, list):
+        return
+    rows: list[tuple[float, str, str]] = []
+    for node in results:
+        if not isinstance(node, dict):
+            continue
+        payload = node["result"] if isinstance(node.get("result"), dict) else node
+        title = _json_text(payload.get("title"))
+        trove_id = _json_text(payload.get("troveId")) or ""
+        score = 0.0
+        sn = node.get("score")
+        if isinstance(sn, (int, float)):
+            score = float(sn)
+        rows.append((score, trove_id, title or ""))
+    if not rows:
+        return
+    max_trove = max(len(r[1]) for r in rows)
+    for score, trove_id, title in rows:
+        print(f"{score:.2f}\t{pad_right(trove_id, max_trove)}\t{title}")
+
+
+def _json_text(v: Any) -> str | None:
+    if v is None:
+        return None
+    if isinstance(v, str):
+        return v
+    if isinstance(v, (int, float, bool)):
+        return str(v)
+    return json.dumps(v)
+
+
+def print_troves_text(json_str: str) -> None:
+    if not json_str or not json_str.strip():
+        return
+    try:
+        arr = json.loads(json_str)
+    except json.JSONDecodeError:
+        m = TROVE_ROW_JSON.finditer(json_str)
+        rows = []
+        for x in m:
+            rows.append((x.group(1), x.group(3), x.group(2)))
+        if not rows:
+            return
+    else:
+        if not isinstance(arr, list):
+            return
+        rows = []
+        for o in arr:
+            if not isinstance(o, dict):
+                continue
+            rows.append((str(o.get("id", "")), str(o.get("count", "")), str(o.get("name", ""))))
+    max_id = max(len(r[0]) for r in rows) if rows else 0
+    max_c = max(len(r[1]) for r in rows) if rows else 0
+    for tid, cnt, name in rows:
+        print(f"{pad_right(tid, max_id)}\t{pad_right(cnt, max_c)}\t{name}")
+
+
+def print_duplicates_text(json_str: str) -> None:
+    if not json_str or not json_str.strip():
+        return
+    try:
+        root = json.loads(json_str)
+    except json.JSONDecodeError:
+        return
+    rows = root.get("rows")
+    if not isinstance(rows, list):
+        return
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        prim = row.get("primary")
+        title = ""
+        if isinstance(prim, dict):
+            title = str(prim.get("title", ""))
+        matches = row.get("matches") or []
+        n = len(matches) if isinstance(matches, list) else 0
+        print(f"{title}\tmatches={n}")
+
+
+def print_uniques_text(json_str: str) -> None:
+    if not json_str or not json_str.strip():
+        return
+    try:
+        root = json.loads(json_str)
+    except json.JSONDecodeError:
+        return
+    results = root.get("results")
+    if not isinstance(results, list):
+        return
+    for u in results:
+        if not isinstance(u, dict):
+            continue
+        item = u.get("item")
+        if isinstance(item, dict):
+            title = str(item.get("title", ""))
+        else:
+            title = ""
+        sc = u.get("score", 0)
+        print(f"{float(sc):.2f}\t{title}")
+
+
+def print_text_for_path(json_str: str, path: str) -> None:
+    if "/api/troves" == path:
+        print_troves_text(json_str)
+    elif "/duplicates" in path:
+        print_duplicates_text(json_str)
+    elif "/uniques" in path:
+        print_uniques_text(json_str)
+    else:
+        print_search_text(json_str)
+
+
+def local_trove_err(msg: str) -> None:
+    print(f"morsor-cli: local-trove: {msg}", file=sys.stderr)
+
+
+def json_body_preview(s: str, max_chars: int) -> str:
+    if s is None:
+        return "(null)"
+    if len(s) <= max_chars:
+        return s
+    return s[:max_chars] + f"\n… ({len(s)} chars total)"
+
+
+def run_local_trove(
+    base: str,
+    bearer: str | None,
+    extra_headers: list[str],
+    show_headers: bool,
+    debug: bool,
+    output_mode: str,
+    positional: list[str],
+) -> None:
+    idx = 1
+    while idx < len(positional):
+        if positional[idx].startswith("-"):
+            die(f"unknown option for local-trove: {positional[idx]}")
+        break
+    if idx >= len(positional):
+        die("local-trove: missing directory path")
+    d = Path(positional[idx]).resolve()
+    idx += 1
+    if idx < len(positional):
+        die("local-trove: unexpected extra arguments after directory")
+    if not d.is_dir():
+        die(f"not a directory: {d}")
+    children = sorted(
+        [p for p in d.iterdir()],
+        key=lambda p: p.name.lower(),
+    )
+    if len(children) > MAX_LOCAL_TROVE_ITEMS:
+        die(f"too many entries in directory (max {MAX_LOCAL_TROVE_ITEMS}): {len(children)}")
+    items = []
+    for child in children:
+        rel = child.relative_to(d).as_posix()
+        if not rel:
+            rel = child.name
+        items.append(
+            {
+                "id": rel,
+                "title": child.name,
+                "files": [str(child.resolve())],
+            }
+        )
+    display_name = str(d)
+    body_obj = {"displayName": display_name, "items": items}
+    body_bytes = json.dumps(body_obj).encode("utf-8")
+    token = bearer
+    if (not token or not token.strip()) and is_likely_local_dev_base(base):
+        token = DEV_DEFAULT_TOKEN
+    url = strip_trailing_slash(base) + "/api/ephemeral-troves"
+    local_trove_err(f"directory {d}")
+    local_trove_err(f"entries (one level) {len(children)}, JSON payload {len(body_bytes)} bytes")
+    local_trove_err(f"POST {url}")
+    if debug:
+        sample = ", ".join(p.name for p in children[:10])
+        if len(children) > 10:
+            sample += " …"
+        local_trove_err(f"[verbose] first item titles: {sample}")
+        local_trove_err(f"[verbose] displayName (trove label) {display_name}")
+        local_trove_err(
+            "[verbose] JSON body preview (first 800 chars):\n"
+            + json_body_preview(json.dumps(body_obj), 800)
+        )
+    headers = {"Content-Type": "application/json"}
+    if token and token.strip():
+        headers["Authorization"] = "Bearer " + token.strip()
+    for h in extra_headers:
+        if ":" not in h or h.index(":") <= 0:
+            die(f"header must be Name: value, got: {h}")
+        name, value = h.split(":", 1)
+        headers[name.strip()] = value.strip()
+    req = urllib.request.Request(url, data=body_bytes, method="POST", headers=headers)
+    if debug:
+        print("[debug] request: POST " + url, file=sys.stderr)
+        for k, v in headers.items():
+            if k.lower() == "authorization":
+                print(f"[debug] {k}: <redacted>", file=sys.stderr)
+            else:
+                print(f"[debug] {k}: {v}", file=sys.stderr)
+    try:
+        with urllib.request.urlopen(req, timeout=600) as resp:
+            raw = resp.read().decode("utf-8", errors="replace")
+            code = resp.status
+            if debug:
+                print(f"[debug] response: {code} {resp.url}", file=sys.stderr)
+            if show_headers:
+                print(f"{code} {resp.url}")
+                for hk, hv in resp.headers.items():
+                    print(f"{hk}: {hv}")
+                print()
+            _finish_local_trove_response(code, raw, output_mode, debug, dict(resp.headers))
+    except HTTPError as e:
+        raw = e.read().decode("utf-8", errors="replace") if e.fp else ""
+        code = e.code
+        local_trove_err(f"HTTP {code}, response body {len(raw)} chars")
+        if 300 <= code < 400:
+            loc = e.headers.get("Location") if e.headers else None
+            if loc:
+                local_trove_err(
+                    f"redirect Location: {loc} (urllib may not follow POST redirects; often /login)"
+                )
+        if code in (401, 403):
+            local_trove_err(
+                "auth failed — use -t/--token (or run against localhost for default dev token)"
+            )
+        if raw:
+            local_trove_err("error response body:\n" + json_body_preview(raw, 4096))
+        if output_mode == "json":
+            print(raw)
+        sys.exit(1)
+    except URLError as e:
+        die(f"request failed: {e} (POST {url})")
+
+
+def _finish_local_trove_response(
+    code: int, raw: str, output_mode: str, debug: bool, resp_headers: dict[str, str]
+) -> None:
+    local_trove_err(f"HTTP {code}, response body {len(raw)} chars")
+    if 300 <= code < 400:
+        loc = resp_headers.get("Location")
+        if loc:
+            local_trove_err(
+                f"redirect Location: {loc} (POST redirects often mean auth/CSRF; check server)"
+            )
+    if code in (401, 403):
+        local_trove_err(
+            "auth failed — use -t/--token (or run against localhost for default dev token)"
+        )
+    if debug and raw.strip():
+        local_trove_err(
+            "[verbose] response body preview (first 800 chars):\n" + json_body_preview(raw, 800)
+        )
+    if code >= 400 and raw.strip():
+        local_trove_err("error response body:\n" + json_body_preview(raw, 4096))
+    if output_mode == "text":
+        print_ephemeral_register_text(raw, debug)
+    else:
+        sys.stdout.write(raw)
+        if raw and not raw.endswith("\n"):
+            print()
+    if code >= 400:
+        sys.exit(1)
+
+
+def print_ephemeral_register_text(json_str: str, debug: bool) -> None:
+    if not json_str or not json_str.strip():
+        local_trove_err(
+            "success path but response body is empty — check server logs; nothing printed on stdout"
+        )
+        return
+    try:
+        o = json.loads(json_str)
+        tid = o.get("troveId")
+        name = o.get("displayName")
+        cnt = o.get("count")
+        if tid is not None and name is not None and cnt is not None:
+            if debug:
+                local_trove_err("[verbose] parsed troveId/displayName/count from JSON ok")
+            print(f"troveId\t{tid}")
+            print(f"name\t{name}")
+            print(f"count\t{cnt}")
+            return
+    except json.JSONDecodeError:
+        pass
+    local_trove_err(
+        "could not parse troveId + displayName + count from JSON; raw body on stdout"
+    )
+    print(json_str.rstrip() + ("\n" if json_str and not json_str.endswith("\n") else ""))
+
+
+def run_login(base: str) -> None:
+    user = input("Username: ").strip()
+    pw = getpass.getpass("Password: ")
+    if not user or not pw:
+        die("username and password are required")
+    jar = CookieJar()
+    opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(jar))
+
+    def open_req(r: urllib.request.Request) -> Any:
+        return opener.open(r, timeout=120)
+
+    base_u = strip_trailing_slash(base)
+    open_req(urllib.request.Request(base_u + "/api/auth/csrf-prime", method="GET"))
+    xsrf = None
+    for c in jar:
+        if c.name.upper() == "XSRF-TOKEN":
+            xsrf = c.value
+            break
+    if not xsrf:
+        die("missing XSRF-TOKEN cookie after CSRF prime; is the server reachable?")
+    form = urllib.parse.urlencode({"username": user, "password": pw}).encode("utf-8")
+    login_req = urllib.request.Request(
+        base_u + "/login",
+        data=form,
+        method="POST",
+        headers={
+            "Content-Type": "application/x-www-form-urlencoded",
+            "X-XSRF-TOKEN": xsrf,
+        },
+    )
+    try:
+        open_req(login_req)
+    except HTTPError as e:
+        if e.code in (401, 403):
+            open_req(urllib.request.Request(base_u + "/api/auth/csrf-prime", method="GET"))
+            for c in jar:
+                if c.name.upper() == "XSRF-TOKEN":
+                    xsrf = c.value
+                    break
+            login_req = urllib.request.Request(
+                base_u + "/login",
+                data=form,
+                method="POST",
+                headers={
+                    "Content-Type": "application/x-www-form-urlencoded",
+                    "X-XSRF-TOKEN": xsrf,
+                },
+            )
+            try:
+                open_req(login_req)
+            except HTTPError as e2:
+                if e2.code in (401, 403):
+                    die("login failed: invalid username or password")
+                raise
+        else:
+            raise
+    sess = open_req(urllib.request.Request(base_u + "/api/auth/session", method="GET"))
+    sb = sess.read().decode("utf-8", errors="replace")
+    if '"authenticated":true' not in sb and '"authenticated": true' not in sb:
+        die("login failed: session not authenticated (check credentials and server)")
+    tok_req = urllib.request.Request(
+        base_u + "/api/tokens",
+        data=b"{}",
+        method="POST",
+        headers={"Content-Type": "application/json"},
+    )
+    try:
+        tr = open_req(tok_req)
+    except HTTPError as e:
+        die(f"token creation failed: HTTP {e.code} {e.read().decode(errors='replace')}")
+    tb = tr.read().decode("utf-8", errors="replace")
+    m = TOKEN_JSON.search(tb)
+    tok = m.group(1) if m else None
+    if not tok:
+        die("token creation failed: no token in response")
+    print("export MORSOR_CLI_TOKEN=" + shell_single_quoted(tok))
+
+
+def http_request(
+    base: str,
+    method: str,
+    path: str,
+    query: str,
+    bearer: str | None,
+    extra_headers: list[str],
+    body_file: str | None,
+    show_headers: bool,
+    debug: bool,
+    output_mode: str,
+) -> None:
+    token = bearer
+    if (not token or not token.strip()) and is_likely_local_dev_base(base):
+        token = DEV_DEFAULT_TOKEN
+    url = strip_trailing_slash(base) + path
+    if query:
+        url += "?" + query
+    data = None
+    headers: dict[str, str] = {}
+    if method == "POST" and body_file:
+        data = Path(body_file).read_bytes()
+        if not any(h.lower().startswith("content-type:") for h in extra_headers):
+            headers["Content-Type"] = "application/json"
+    if token and token.strip():
+        headers["Authorization"] = "Bearer " + token.strip()
+    for h in extra_headers:
+        if ":" not in h or h.index(":") <= 0:
+            die(f"header must be Name: value, got: {h}")
+        name, value = h.split(":", 1)
+        headers[name.strip()] = value.strip()
+    req = urllib.request.Request(url, data=data, method=method, headers=headers)
+    if debug:
+        print(f"[debug] request: {method} {url}", file=sys.stderr)
+        for k, v in headers.items():
+            if k.lower() == "authorization":
+                print(f"[debug] {k}: <redacted>", file=sys.stderr)
+            else:
+                print(f"[debug] {k}: {v}", file=sys.stderr)
+    try:
+        with urllib.request.urlopen(req, timeout=600) as resp:
+            raw = resp.read().decode("utf-8", errors="replace")
+            if debug:
+                print(f"[debug] response: {resp.status} {resp.url}", file=sys.stderr)
+            if show_headers:
+                print(f"{resp.status} {resp.url}")
+                for hk, hv in resp.headers.items():
+                    print(f"{hk}: {hv}")
+                print()
+            elif debug:
+                print(f"{resp.status} {resp.url}", file=sys.stderr)
+            if output_mode == "text":
+                print_text_for_path(raw, path)
+            else:
+                sys.stdout.write(raw)
+                if raw and not raw.endswith("\n"):
+                    print()
+            if resp.status >= 400:
+                sys.exit(1)
+    except HTTPError as e:
+        raw = e.read().decode("utf-8", errors="replace") if e.fp else ""
+        if debug:
+            print(f"[debug] response: {e.code}", file=sys.stderr)
+        if show_headers and e.headers:
+            print(f"{e.code}")
+            for hk, hv in e.headers.items():
+                print(f"{hk}: {hv}")
+            print()
+        if output_mode == "json":
+            sys.stdout.write(raw)
+        sys.exit(1)
+    except URLError as e:
+        die(f"request failed: {e} ({method} {url})")
+
+
+MORSOR_CLI_MAN_PAGE = """
+MORSOR-CLI(1)                    User Commands                    MORSOR-CLI(1)
+
+NAME
+       morsor-cli — HTTP client for the Morsor search API
+
+REQUIREMENTS
+
+       Python 3 stdlib only
+
+SYNOPSIS
+       morsor-cli [--help | --man]
+
+       morsor-cli [OPTIONS] login
+
+       morsor-cli [OPTIONS] [<action>] [--key value | -k value | --key=value ...]
+                  [query text...]
+
+       morsor-cli [OPTIONS] local-trove DIRECTORY
+       morsor-cli [OPTIONS] register-local-dir DIRECTORY
+
+       morsor-cli [OPTIONS] METHOD PATH [-- querystring]
+
+DESCRIPTION
+       morsor-cli calls the backend under -b/--base (default http://localhost:8080).
+       Set MORSOR_CLI_BASE_URL to override the default base URL.
+
+       Authenticated servers: use login (session cookie jar) or -T/--token with a
+       Bearer API token.
+
+THREE WAYS TO SEARCH
+       The backend exposes three related operations; pick the matching action:
+
+       search (default)
+              Full-text search over one or more troves (lists). Use --trove (repeat
+              or comma-separated via -t) to restrict troves; optional --query; page
+              with -P/--page and -S/--size/--pageSize. Hits are ranked matches across
+              the selected troves.
+
+       dups, duplicates
+              Cross-trove duplicate (near-duplicate) analysis. Requires
+              --primaryTrove / -p: items in that trove are matched against one or
+              more --compareTrove / -c values. Optional query narrows primary items.
+              Pagination: -P, -S (server caps duplicates/uniques page size at 500).
+
+       uniques, unique
+              Converse of duplicates: items in the primary trove that have no good
+              match in the compare troves, for the optional query. Same primary/
+              compare parameters as duplicates (same 500 cap on page size).
+
+EPHEMERAL TROVES (LOCAL DIRECTORY)
+       local-trove (alias register-local-dir) lists one level of names in DIRECTORY,
+       POSTs them to the server as an ephemeral trove, and prints the assigned
+       trove id and display name.
+
+       • Trove id is always server-generated: local-<uuid> (you do not choose it).
+       • Display name is the directory’s absolute path (used as the trove label).
+       • Ephemeral troves are merged into the index with persisted troves and
+         survive reload of trove data on the server; they are in-memory and are
+         lost on JVM restart. DELETE /api/ephemeral-troves/{id} removes one by id.
+
+       Use the printed trove id like any other trove: search --trove=local-...,
+       dups -p local-... -c some-other-trove, etc.
+
+OPTIONS
+       -b, --base URL
+              API base (no trailing slash). Default: http://localhost:8080 unless
+              MORSOR_CLI_BASE_URL is set.
+
+       -T, --token TOKEN
+              Send Authorization: Bearer TOKEN (omit for cookie-only login flow).
+
+       -o, --output json|text
+              json: raw response body. text: abbreviated tables/lines for search,
+              troves, duplicates, uniques.
+
+       -H, --header 'Name: value'
+              Extra request header (repeatable).
+
+       -F, --file PATH
+              POST body from file (only with POST).
+
+       -i, --include-headers
+              Print response status and headers before the body.
+
+       -v, --debug
+              Log request URL and headers on stderr.
+
+ACTIONS
+       search       GET /api/search (default if the first token is not an action)
+       dups         GET /api/search/duplicates
+       duplicates   same as dups
+       uniques      GET /api/search/uniques
+       unique       same as uniques
+       troves       GET /api/troves
+       status       GET /api/status
+       local-trove  Register DIRECTORY as an ephemeral trove (see above)
+       login        Obtain session cookie (no -T/-H)
+
+SHORTHAND PARAMETERS (after an action)
+       Keys are normalized for convenience, e.g. -p → primaryTrove, -c →
+       compareTrove, -t/--trove → trove (repeatable). Use -- query after METHOD
+       PATH for raw key=value pairs.
+
+       q, query          Search query string (naked words append to query)
+       p, primary        primaryTrove (duplicates/uniques)
+       c, compare        compareTrove (repeat; multiple compare troves)
+       t, trove          trove constraint (search); comma-separated ok
+       P, page           page (0-based)
+       S, size, pageSize size (page length)
+       s, sortBy         sort field
+       d, sortDir        sort direction
+
+RAW HTTP
+       morsor-cli GET /api/search -- query=*&page=0&size=10
+
+       After --, each argument must be key=value; joined with & for the query string.
+
+ENVIRONMENT
+       MORSOR_CLI_BASE_URL   Default base URL (-b overrides).
+
+EXAMPLES
+       List all troves:
+
+              ./scripts/morsor-cli troves
+
+       Search the vinyl trove for artists matching “King Gizzard”:
+
+              ./scripts/morsor-cli search --trove=vinyl --query='King Gizzard'
+
+       Register a local directory as an ephemeral trove (output includes trove id):
+
+              ./scripts/morsor-cli local-trove /path/to/local/directory
+
+       Duplicates: primary is ephemeral local trove; compare against vinyl and CDs;
+       large page; JSON to jq (titles of primary rows):
+
+              ./scripts/morsor-cli dups -S 10000 \\
+                --primaryTrove=local-e980f196-ae1c-4c82-9f9f-a3e5b8e06920 \\
+                --compareTrove=vinyl --compareTrove=CDs -o json \\
+                | jq -r '.rows[].primary.title'
+
+       Verbose raw search request:
+
+              ./scripts/morsor-cli -v -b http://localhost:8080 GET /api/search -- \\
+                query=*&page=0&size=10
+
+SEE ALSO
+       https://github.com/cschuyle/morsor
+
+""".strip()
+
+
+def print_summary_usage() -> None:
+    print(
+        """
+USAGE SUMMARY
+
+  morsor-cli --help      # This message
+  morsor-cli --man       # Full manual (man-page style; use with a pager)
+
+  morsor-cli [OPTIONS] login
+  morsor-cli [OPTIONS] [<action>] [--<key> <value> ...] [query text]
+
+ACTIONS
+  search (default)   dups | duplicates   uniques | unique   troves   status
+  local-trove DIR    register-local-dir DIR
+
+ENV: MORSOR_CLI_BASE_URL overrides -b/--base
+
+Examples:
+  morsor-cli search --trove=vinyl --query='*'
+  morsor-cli local-trove /path/to/folder
+  morsor-cli -v -b http://localhost:8080 GET /api/search -- query=*&page=0&size=10
+""".strip()
+    )
+
+
+def print_usage() -> None:
+    """Long-form manual (stdout) so: morsor-cli --man | less"""
+    print(MORSOR_CLI_MAN_PAGE)
+
+
+def main(argv: list[str]) -> None:
+    if not argv:
+        print_summary_usage()
+        sys.exit(0)
+    extra_headers: list[str] = []
+    base = "http://localhost:8080"
+    bearer: str | None = None
+    body_file: str | None = None
+    output_mode = "text"
+    show_headers = False
+    debug = False
+    positional: list[str] = []
+    i = 0
+    while i < len(argv):
+        a = argv[i]
+        if a == "--man":
+            print_usage()
+            sys.exit(0)
+        if a in ("-h", "--help", "help"):
+            print_summary_usage()
+            sys.exit(0)
+        if a in ("-b", "--base"):
+            i += 1
+            if i >= len(argv):
+                die(f"missing value for {argv[i - 1]}")
+            base = strip_trailing_slash(argv[i])
+        elif a in ("-T", "--token"):
+            i += 1
+            if i >= len(argv):
+                die(f"missing value for {argv[i - 1]}")
+            bearer = argv[i]
+        elif a in ("-H", "--header"):
+            i += 1
+            if i >= len(argv):
+                die(f"missing value for {argv[i - 1]}")
+            extra_headers.append(argv[i])
+        elif a in ("-F", "--file"):
+            i += 1
+            if i >= len(argv):
+                die(f"missing value for {argv[i - 1]}")
+            body_file = argv[i]
+        elif a in ("-o", "--output"):
+            i += 1
+            if i >= len(argv):
+                die(f"missing value for {argv[i - 1]}")
+            output_mode = normalize_output_mode(argv[i])
+        elif a in ("-i", "--include-headers"):
+            show_headers = True
+        elif a in ("-v", "--debug"):
+            debug = True
+        elif a == "--":
+            positional.append(a)
+            i += 1
+            while i < len(argv):
+                positional.append(argv[i])
+                i += 1
+            break
+        else:
+            positional.append(a)
+        i += 1
+
+    if not positional:
+        print_summary_usage()
+        sys.exit(0)
+
+    env_base = os.environ.get("MORSOR_CLI_BASE_URL")
+    if env_base and env_base.strip():
+        base = strip_trailing_slash(env_base.strip())
+
+    if is_local_trove_action(positional[0]):
+        if body_file:
+            die("--file is not valid with local-trove")
+        run_local_trove(
+            base, bearer, extra_headers, show_headers, debug, output_mode, positional
+        )
+        return
+
+    if positional[0].lower() == "login":
+        if len(positional) > 1:
+            die("login takes no arguments (use -b for base URL)")
+        if body_file:
+            die("--file is not valid with login")
+        if bearer:
+            die("--token is not valid with login")
+        if extra_headers:
+            die("-H is not valid with login")
+        if show_headers:
+            die("-i is not valid with login")
+        run_login(base)
+        return
+
+    idx = 0
+    first = positional[idx]
+    if is_http_method(first):
+        method = first.upper()
+        idx += 1
+        if idx >= len(positional):
+            die("missing path")
+        path = positional[idx]
+        idx += 1
+        if path.startswith("http://") or path.startswith("https://"):
+            die("path must be relative (e.g. /api/status), not a full URL")
+        if not path.startswith("/"):
+            path = "/" + path
+        query = ""
+        if idx < len(positional):
+            if positional[idx] != "--":
+                die("unexpected arguments after path (use -- for query string)")
+            idx += 1
+            query = "&".join(positional[idx:])
+    else:
+        spec = resolve_action(first)
+        if spec:
+            method, path = spec
+            idx += 1
+        else:
+            method = "GET"
+            path = "/api/search"
+        query = parse_shorthand_query(positional, idx)
+
+    if body_file and method != "POST":
+        die("--file is only valid for POST")
+
+    http_request(
+        base,
+        method,
+        path,
+        query,
+        bearer,
+        extra_headers,
+        body_file,
+        show_headers,
+        debug,
+        output_mode,
+    )
+
+
+if __name__ == "__main__":
+    main(sys.argv[1:])

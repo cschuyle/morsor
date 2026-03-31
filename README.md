@@ -66,24 +66,27 @@ The project includes a **Python 3** command-line client (stdlib only; no `pip in
 ```bash
 ./scripts/morsor-cli --help
 # or:
-python3 tools/morsor-cli/morsor_cli.py --help
+python3 scripts/morsor-cli --help
 ```
 
 ### Install globally
 
+Copy the script onto your `PATH` (it is a single Python 3 file):
+
 ```bash
-./scripts/install-morsor-cli /usr/local/bin
-# then:
+cp scripts/morsor-cli /usr/local/bin/morsor-cli
+chmod +x /usr/local/bin/morsor-cli
 morsor-cli --help
 ```
 
 ### CLI Examples:
 
 **List all the troves**
+
 ```
 ➜ ./scripts/morsor-cli troves
 ...
-vinyl                                                                                         	98   	Vinyl```
+vinyl                                                                                         	98   	Vinyl
 ```
 
 **Search the `vinyl` trove for anything by King Gizzard and the Lizard Mizard**
