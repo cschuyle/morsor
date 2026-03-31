@@ -33,3 +33,7 @@ frontend/dist/
 
 # direnv
 .envrc
+
+# Python (morsor-cli)
+**/__pycache__/
+*.pyc

@@ -17,7 +17,6 @@ FROM eclipse-temurin:21-jdk-alpine AS builder
 WORKDIR /app
 COPY build.gradle settings.gradle gradlew ./
 COPY gradle/wrapper gradle/wrapper
-COPY tools/morsor-cli tools/morsor-cli
 RUN chmod +x gradlew
 RUN ./gradlew dependencies --no-daemon
 COPY src src

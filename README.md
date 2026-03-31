@@ -55,16 +55,18 @@ There is a distance of 1 between Mordor and Morsor in two pretty basic measureme
 
 - Java 21
 - Node (npm)
+- Python 3 (for `morsor-cli` only; stdlib only)
 
 ## CLI (`morsor-cli`)
 
-The project includes a command-line client for common API actions.
+The project includes a **Python 3** command-line client (stdlib only; no `pip install`).
 
-### Build and run from repo
+### Run from repo
 
 ```bash
-./gradlew :morsor-cli:jar
 ./scripts/morsor-cli --help
+# or:
+python3 tools/morsor-cli/morsor_cli.py --help
 ```
 
 ### Install globally

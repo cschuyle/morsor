@@ -1,14 +1,5 @@
 #!/usr/bin/env bash
 set -euo pipefail
-DEBUG=${DEBUG:-}
-# HTTP CLI for the Morsor backend (shells out to java -jar). See: tools/morsor-cli
+# HTTP CLI for the Morsor backend (Python stdlib). See: tools/morsor-cli/morsor_cli.py
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-cd "$ROOT"
-JAR="$ROOT/tools/morsor-cli/build/libs/morsor-cli-0.0.1-SNAPSHOT.jar"
-[[ ! -z "$DEBUG" ]] && echo Looking for $JAR... 1>&2
-if [[ ! -f "$JAR" ]]; then
-  [[ ! -z "$DEBUG" ]] && echo "@@@@ WARNING: Jar not found. Building morsor-cli..." 1>&2
-  ./gradlew :morsor-cli:jar -q
-fi
-[[ ! -z "$DEBUG" ]] && echo "Running morsor-cli..." 1>&2
-exec java -jar "$JAR" "$@"
+exec python3 "${ROOT}/tools/morsor-cli/morsor_cli.py" "$@"

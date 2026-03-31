@@ -16,7 +16,7 @@ import org.springframework.security.web.authentication.LoginUrlAuthenticationEnt
 import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
 import org.springframework.security.web.authentication.HttpStatusEntryPoint;
 import org.springframework.security.web.csrf.CsrfTokenRequestAttributeHandler;
-import jakarta.servlet.http.HttpServletRequest;
+import org.springframework.security.web.util.matcher.RequestMatcher;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
@@ -78,7 +78,9 @@ public class SecurityConfig {
             .cors(cors -> cors.configurationSource(corsConfigurationSource()))
             .csrf(csrf -> csrf
                 .csrfTokenRepository(csrfRepo)
-                .csrfTokenRequestHandler(requestHandler))
+                .csrfTokenRequestHandler(requestHandler)
+                // CLI and other stateless clients use Bearer only (no X-XSRF-TOKEN cookie flow).
+                .ignoringRequestMatchers(bearerTokenPresentMatcher()))
 
             // Cursor let me get away with this wihtout noticing a thing. Baaaad Cursor! Also, Bad Me for trusting it
             // .authorizeHttpRequests(auth -> auth
@@ -102,7 +104,7 @@ public class SecurityConfig {
             )
             .exceptionHandling(ex -> ex
                 .authenticationEntryPoint((request, response, authException) -> {
-                    if (request.getRequestURI().startsWith("/api/")) {
+                    if (isApiRequestPath(request)) {
                         new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED)
                                 .commence(request, response, authException);
                         return;
@@ -137,6 +139,23 @@ public class SecurityConfig {
     @Bean
     public PasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder();
+    }
+
+    private static RequestMatcher bearerTokenPresentMatcher() {
+        return request -> {
+            String auth = request.getHeader("Authorization");
+            return auth != null && auth.regionMatches(true, 0, "Bearer ", 0, 7);
+        };
+    }
+
+    /** Path after context path, so /api/** is recognized when the app has a non-root context. */
+    static boolean isApiRequestPath(HttpServletRequest request) {
+        String uri = request.getRequestURI();
+        String context = request.getContextPath();
+        if (context != null && !context.isEmpty() && uri.startsWith(context)) {
+            uri = uri.substring(context.length());
+        }
+        return uri.startsWith("/api/");
     }
 }
 

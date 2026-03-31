@@ -56,6 +56,8 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.HashMap;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.BiConsumer;
 import java.util.regex.Pattern;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -91,6 +93,10 @@ public class SearchDataService {
     private final Environment environment;
 
     private List<SearchResult> allResults = List.of();
+    /** Last successful reload payload (before ephemeral merge). */
+    private List<SearchResult> persistedResults = List.of();
+    private final Map<String, List<SearchResult>> ephemeralTroves = new ConcurrentHashMap<>();
+    private final Object mergeLock = new Object();
     private Directory luceneDirectory;
     private IndexSearcher luceneSearcher;
     private final AccentInsensitiveAnalyzer luceneAnalyzer = new AccentInsensitiveAnalyzer();
@@ -163,9 +169,105 @@ public class SearchDataService {
         if (!loadErrors.isEmpty()) {
             log.warn("Trove load completed with {} errors: {}", loadErrors.size(), loadErrors);
         }
-        buildLuceneIndex(combined);
-        allResults = combined;
+        synchronized (mergeLock) {
+            persistedResults = List.copyOf(combined);
+            rebuildMergedIndexLocked();
+        }
         log.info("SearchDataService.reloadData() finished: {} results, {} trove options", allResults.size(), getTroveOptions().size());
+    }
+
+    /** Max items per ephemeral trove registration (CLI upload). */
+    public static final int MAX_EPHEMERAL_ITEMS_PER_TROVE = 50_000;
+
+    /** Enough for typical absolute paths (e.g. full directory path as trove display name). */
+    private static final int MAX_EPHEMERAL_DISPLAY_NAME_LEN = 8192;
+
+    /**
+     * Register an in-memory trove from uploaded items. Trove id is always {@code local-}{@link UUID}.
+     * Rebuilds the merged Lucene index; not persisted across restart.
+     *
+     * @param displayName required non-blank trove label (CLI sends the scanned directory's full path)
+     */
+    public EphemeralTroveRegistration registerEphemeralTrove(String displayName, List<EphemeralManifestItem> items) {
+        if (items == null) {
+            throw new IllegalArgumentException("items must not be null");
+        }
+        if (items.size() > MAX_EPHEMERAL_ITEMS_PER_TROVE) {
+            throw new IllegalArgumentException("items size exceeds limit " + MAX_EPHEMERAL_ITEMS_PER_TROVE);
+        }
+        String troveLabel = displayName == null ? "" : displayName.trim();
+        if (troveLabel.isEmpty()) {
+            throw new IllegalArgumentException("displayName is required");
+        }
+        if (troveLabel.length() > MAX_EPHEMERAL_DISPLAY_NAME_LEN) {
+            throw new IllegalArgumentException("displayName exceeds max length " + MAX_EPHEMERAL_DISPLAY_NAME_LEN);
+        }
+        String troveId = "local-" + UUID.randomUUID();
+        List<SearchResult> stamped = new ArrayList<>(items.size());
+        for (EphemeralManifestItem item : items) {
+            if ((item.title() == null || item.title().isBlank())
+                    && (item.id() == null || item.id().isBlank())) {
+                throw new IllegalArgumentException("each item must have a non-blank id or title");
+            }
+            stamped.add(ephemeralItemToSearchResult(item, troveId, troveLabel));
+        }
+        synchronized (mergeLock) {
+            ephemeralTroves.put(troveId, List.copyOf(stamped));
+            rebuildMergedIndexLocked();
+        }
+        log.info("Registered ephemeral trove id=\"{}\" name=\"{}\" ({} items)", troveId, troveLabel, stamped.size());
+        return new EphemeralTroveRegistration(troveId, troveLabel, stamped.size());
+    }
+
+    /** Remove an ephemeral trove by id. Returns true if it existed. */
+    public boolean removeEphemeralTrove(String troveId) {
+        if (troveId == null || troveId.isBlank()) {
+            return false;
+        }
+        synchronized (mergeLock) {
+            List<SearchResult> removed = ephemeralTroves.remove(troveId.trim());
+            if (removed == null) {
+                return false;
+            }
+            rebuildMergedIndexLocked();
+        }
+        log.info("Removed ephemeral trove \"{}\"", troveId);
+        return true;
+    }
+
+    private void rebuildMergedIndexLocked() {
+        int extra = 0;
+        for (List<SearchResult> list : ephemeralTroves.values()) {
+            extra += list.size();
+        }
+        List<SearchResult> merged = new ArrayList<>(persistedResults.size() + extra);
+        merged.addAll(persistedResults);
+        for (List<SearchResult> list : ephemeralTroves.values()) {
+            merged.addAll(list);
+        }
+        allResults = List.copyOf(merged);
+        buildLuceneIndex(merged);
+    }
+
+    private static SearchResult ephemeralItemToSearchResult(EphemeralManifestItem item, String troveId, String troveLabel) {
+        String title = item.title() != null ? item.title() : "";
+        String id = item.id() != null && !item.id().isBlank() ? item.id() : title;
+        List<String> files = item.files() != null ? List.copyOf(item.files()) : List.of();
+        return new SearchResult(
+                id,
+                item.itemType() != null && !item.itemType().isBlank() ? item.itemType() : "localDirItem",
+                title,
+                item.snippet(),
+                troveLabel,
+                troveId,
+                false,
+                null,
+                null,
+                null,
+                files,
+                item.itemUrl(),
+                item.extraFields() != null && !item.extraFields().isEmpty() ? Map.copyOf(item.extraFields()) : null
+        );
     }
 
     /** When s3troves profile is active, fail fast if any required env var is missing. */
@@ -242,6 +344,8 @@ public class SearchDataService {
     private void buildLuceneIndex(List<SearchResult> from) {
         if (from == null || from.isEmpty()) {
             log.info("Lucene index skipped: no data");
+            luceneDirectory = null;
+            luceneSearcher = null;
             return;
         }
         try {
