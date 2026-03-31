@@ -77,6 +77,35 @@ python3 tools/morsor-cli/morsor_cli.py --help
 morsor-cli --help
 ```
 
+### CLI Examples:
+
+**List all the troves**
+```
+➜ ./scripts/morsor-cli troves
+...
+vinyl                                                                                         	98   	Vinyl```
+```
+
+**Search the `vinyl` trove for anything by King Gizzard and the Lizard Mizard**
+```
+➜ ./scripts/morsor-cli search --trove=vinyl --query='King Gizzard'
+9.14	vinyl	King Gizzard and the Lizard Wizard - Murder of the Universe
+```
+
+**Create an ephemeral trove in preapration for findin interesting things in a directory**
+```
+➜ ./scripts/morsor-cli local-trove /path/to/local/directory
+troveId	local-568fbc8c-acc1-447a-9e3e-389bbf6a338f
+name	/Volumes/cschuyle/Noncloud-Data/video/_Handbreakme
+```
+
+_Notice that the output contains the ID of the new ephemeral trove created by the command_
+
+Use the ephemeral trove to find files/directories in my `/path/to/local/directory` which are in the existing troves `vinyl` or `CDs`
+```
+➜ ./scripts/morsor-cli dups -S 10000 --primaryTrove=local-e980f196-ae1c-4c82-9f9f-a3e5b8e06920 --compareTrove=vinyl --compare-trove=CDs -o json | jq -r '.rows[].primary.title'
+```
+
 ## Web app: How to run
 
 ### Option 1. Using the canned data:

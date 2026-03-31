@@ -649,13 +649,162 @@ def http_request(
         die(f"request failed: {e} ({method} {url})")
 
 
+MORSOR_CLI_MAN_PAGE = """
+MORSOR-CLI(1)                    User Commands                    MORSOR-CLI(1)
+
+NAME
+       morsor-cli — HTTP client for the Morsor search API (Python 3 stdlib only)
+
+SYNOPSIS
+       morsor-cli [--help | --man]
+
+       morsor-cli [OPTIONS] login
+
+       morsor-cli [OPTIONS] [<action>] [--key value | -k value | --key=value ...]
+                  [query text...]
+
+       morsor-cli [OPTIONS] local-trove DIRECTORY
+       morsor-cli [OPTIONS] register-local-dir DIRECTORY
+
+       morsor-cli [OPTIONS] METHOD PATH [-- querystring]
+
+DESCRIPTION
+       morsor-cli calls the backend under -b/--base (default http://localhost:8080).
+       Set MORSOR_CLI_BASE_URL to override the default base URL.
+
+       Authenticated servers: use login (session cookie jar) or -T/--token with a
+       Bearer API token.
+
+THREE WAYS TO SEARCH
+       The backend exposes three related operations; pick the matching action:
+
+       search (default)
+              Full-text search over one or more troves (lists). Use --trove (repeat
+              or comma-separated via -t) to restrict troves; optional --query; page
+              with -P/--page and -S/--size/--pageSize. Hits are ranked matches across
+              the selected troves.
+
+       dups, duplicates
+              Cross-trove duplicate (near-duplicate) analysis. Requires
+              --primaryTrove / -p: items in that trove are matched against one or
+              more --compareTrove / -c values. Optional query narrows primary items.
+              Pagination: -P, -S (server caps duplicates/uniques page size at 500).
+
+       uniques, unique
+              Converse of duplicates: items in the primary trove that have no good
+              match in the compare troves, for the optional query. Same primary/
+              compare parameters as duplicates (same 500 cap on page size).
+
+EPHEMERAL TROVES (LOCAL DIRECTORY)
+       local-trove (alias register-local-dir) lists one level of names in DIRECTORY,
+       POSTs them to the server as an ephemeral trove, and prints the assigned
+       trove id and display name.
+
+       • Trove id is always server-generated: local-<uuid> (you do not choose it).
+       • Display name is the directory’s absolute path (used as the trove label).
+       • Ephemeral troves are merged into the index with persisted troves and
+         survive reload of trove data on the server; they are in-memory and are
+         lost on JVM restart. DELETE /api/ephemeral-troves/{id} removes one by id.
+
+       Use the printed trove id like any other trove: search --trove=local-...,
+       dups -p local-... -c some-other-trove, etc.
+
+OPTIONS
+       -b, --base URL
+              API base (no trailing slash). Default: http://localhost:8080 unless
+              MORSOR_CLI_BASE_URL is set.
+
+       -T, --token TOKEN
+              Send Authorization: Bearer TOKEN (omit for cookie-only login flow).
+
+       -o, --output json|text
+              json: raw response body. text: abbreviated tables/lines for search,
+              troves, duplicates, uniques.
+
+       -H, --header 'Name: value'
+              Extra request header (repeatable).
+
+       -F, --file PATH
+              POST body from file (only with POST).
+
+       -i, --include-headers
+              Print response status and headers before the body.
+
+       -v, --debug
+              Log request URL and headers on stderr.
+
+ACTIONS
+       search       GET /api/search (default if the first token is not an action)
+       dups         GET /api/search/duplicates
+       duplicates   same as dups
+       uniques      GET /api/search/uniques
+       unique       same as uniques
+       troves       GET /api/troves
+       status       GET /api/status
+       local-trove  Register DIRECTORY as an ephemeral trove (see above)
+       login        Obtain session cookie (no -T/-H)
+
+SHORTHAND PARAMETERS (after an action)
+       Keys are normalized for convenience, e.g. -p → primaryTrove, -c →
+       compareTrove, -t/--trove → trove (repeatable). Use -- query after METHOD
+       PATH for raw key=value pairs.
+
+       q, query          Search query string (naked words append to query)
+       p, primary        primaryTrove (duplicates/uniques)
+       c, compare        compareTrove (repeat; multiple compare troves)
+       t, trove          trove constraint (search); comma-separated ok
+       P, page           page (0-based)
+       S, size, pageSize size (page length)
+       s, sortBy         sort field
+       d, sortDir        sort direction
+
+RAW HTTP
+       morsor-cli GET /api/search -- query=*&page=0&size=10
+
+       After --, each argument must be key=value; joined with & for the query string.
+
+ENVIRONMENT
+       MORSOR_CLI_BASE_URL   Default base URL (-b overrides for that invocation).
+
+EXAMPLES
+       List all troves:
+
+              ./scripts/morsor-cli troves
+
+       Search the vinyl trove for artists matching “King Gizzard”:
+
+              ./scripts/morsor-cli search --trove=vinyl --query='King Gizzard'
+
+       Register a local directory as an ephemeral trove (output includes trove id):
+
+              ./scripts/morsor-cli local-trove /path/to/local/directory
+
+       Duplicates: primary is ephemeral local trove; compare against vinyl and CDs;
+       large page; JSON to jq (titles of primary rows):
+
+              ./scripts/morsor-cli dups -S 10000 \\
+                --primaryTrove=local-e980f196-ae1c-4c82-9f9f-a3e5b8e06920 \\
+                --compareTrove=vinyl --compareTrove=CDs -o json \\
+                | jq -r '.rows[].primary.title'
+
+       Verbose raw search request:
+
+              ./scripts/morsor-cli -v -b http://localhost:8080 GET /api/search -- \\
+                query=*&page=0&size=10
+
+SEE ALSO
+       README.md (project root) and tools/morsor-cli/README.md — install and run
+       from repo paths.
+""".strip()
+
+
 def print_summary_usage() -> None:
     print(
         """
 USAGE SUMMARY
 
   morsor-cli --help      # This message
-  morsor-cli --man       # Longer manual (stderr)
+  morsor-cli --man       # Full manual (man-page style; use with a pager)
 
   morsor-cli [OPTIONS] login
   morsor-cli [OPTIONS] [<action>] [--<key> <value> ...] [query text]
@@ -675,15 +824,8 @@ Examples:
 
 
 def print_usage() -> None:
-    print(
-        """
-Full manual (see also README). Key points:
-  -b/--base   -T/--token   -o json|text   -H 'Name: value'   -F/--file POST body
-  -i include response headers   -v debug
-  GET|POST|HEAD /api/... [-- querystring]
-""".strip(),
-        file=sys.stderr,
-    )
+    """Long-form manual (stdout) so: morsor-cli --man | less"""
+    print(MORSOR_CLI_MAN_PAGE)
 
 
 def main(argv: list[str]) -> None:
