@@ -1644,7 +1644,7 @@ function MobileApp() {
   })()
   const filteredTroves = troves.filter((t) => {
     const q = trovePickerFilter.trim().toLowerCase()
-    return !q || (t.name && t.name.toLowerCase().includes(q))
+    return !q || (t.name && t.name.toLowerCase().includes(q)) || (t.id && t.id.toLowerCase().includes(q))
   })
   const sortByName = (a, b) => (a.name || '').localeCompare(b.name || '', undefined, { sensitivity: 'base' })
   const mobileSearchTrovesWithResults = useMemo(() => {
@@ -1667,13 +1667,13 @@ function MobileApp() {
         if (boostTroveId != null && b.id === boostTroveId && a.id !== boostTroveId) return 1
         return sortByName(a, b)
       }
-      const selected = [...filteredTroves.filter((t) => topSectionIds.has(t.id))].sort(sortTopSection)
+      const selected = [...troves.filter((t) => topSectionIds.has(t.id))].sort(sortTopSection)
       const notSelected = [...filteredTroves.filter((t) => !topSectionIds.has(t.id))].sort(sortByName)
       return { selected, notSelected }
     }
     const hitCount = (t) => troveCounts?.[t.id] ?? 0
-    const withHits = filteredTroves.filter((t) => hitCount(t) > 0)
-    const selectedWithNoHits = filteredTroves.filter((t) => hitCount(t) === 0 && (selectedTroveIds.has(t.id) || (boostTroveId != null && t.id === boostTroveId)))
+    const withHits = troves.filter((t) => hitCount(t) > 0)
+    const selectedWithNoHits = troves.filter((t) => hitCount(t) === 0 && (selectedTroveIds.has(t.id) || (boostTroveId != null && t.id === boostTroveId)))
     const sortByHitsDescThenBoostThenName = (a, b) => {
       const diff = hitCount(b) - hitCount(a)
       if (diff !== 0) return diff
@@ -1684,7 +1684,7 @@ function MobileApp() {
     const selected = [...withHits, ...selectedWithNoHits].sort(sortByHitsDescThenBoostThenName)
     const notSelected = filteredTroves.filter((t) => hitCount(t) === 0 && !selectedTroveIds.has(t.id) && t.id !== boostTroveId).sort(sortByName)
     return { selected, notSelected }
-  }, [searchMode, filteredTroves, displaySelectedTroveIds, selectedTroveIds, freezeTroveListOrder, boostTroveId, searchResult?.troveCounts, searchResult?.results])
+  }, [searchMode, troves, filteredTroves, displaySelectedTroveIds, selectedTroveIds, freezeTroveListOrder, boostTroveId, searchResult?.troveCounts, searchResult?.results])
 
   function renderCacheLabel() {
     const label = cacheLabel || 'cache'
@@ -2676,42 +2676,74 @@ onClick={() => {
             </div>
             <ul className="mobile-trove-list">
               {isDupOrUniques && trovePickerSubTab === 'primary'
-                ? filteredTroves.map((t) => (
-                    <li key={t.id} className="mobile-trove-item">
-                      <label className="mobile-trove-label">
-                        <input
-                          type="radio"
-                          name="mobile-primary-trove"
-                          checked={primaryTroveId === t.id}
-                          onChange={() => setPrimary(t.id)}
-                        />
-                        <span>{t.name}</span>
-                      </label>
-                      <button type="button" className="mobile-trove-only-link" onClick={(e) => { e.preventDefault(); setPrimary(t.id); setShowTrovePicker(false) }} aria-label={`Set primary: ${t.name}`} title="Only this trove"><img src="/target.png" alt="" className="mobile-trove-only-icon" /><span className="trove-booster" aria-hidden="true">↑</span></button>
-                    </li>
-                  ))
+                ? (() => {
+                    const primaryRow = primaryTroveId ? troves.find((t) => t.id === primaryTroveId) : undefined
+                    const rest = filteredTroves.filter((t) => t.id !== primaryTroveId)
+                    const primaryLi = (t: (typeof troves)[number]) => (
+                      <li key={t.id} className="mobile-trove-item">
+                        <label className="mobile-trove-label">
+                          <input
+                            type="radio"
+                            name="mobile-primary-trove"
+                            checked={primaryTroveId === t.id}
+                            onChange={() => setPrimary(t.id)}
+                          />
+                          <span>{t.name}</span>
+                        </label>
+                        <button type="button" className="mobile-trove-only-link" onClick={(e) => { e.preventDefault(); setPrimary(t.id); setShowTrovePicker(false) }} aria-label={`Set primary: ${t.name}`} title="Only this trove"><img src="/target.png" alt="" className="mobile-trove-only-icon" /><span className="trove-booster" aria-hidden="true">↑</span></button>
+                      </li>
+                    )
+                    return (
+                      <>
+                        {primaryRow ? primaryLi(primaryRow) : null}
+                        {primaryRow && rest.length > 0 ? (
+                          <li className="mobile-trove-list-separator" aria-hidden="true">
+                            <hr className="mobile-trove-separator" />
+                          </li>
+                        ) : null}
+                        {rest.map((t) => primaryLi(t))}
+                      </>
+                    )
+                  })()
                 : isDupOrUniques && trovePickerSubTab === 'compare'
-                  ? filteredTroves.map((t) => {
-                      const isPrimaryDisabled = t.id === primaryTroveId
+                  ? (() => {
+                      const compareTop = [...compareTroveIds]
+                        .map((id) => troves.find((tr) => tr.id === id))
+                        .filter((tr): tr is NonNullable<typeof tr> => tr != null)
+                      const compareRest = filteredTroves.filter((t) => !compareTroveIds.has(t.id))
+                      const compareLi = (t: (typeof troves)[number]) => {
+                        const isPrimaryDisabled = t.id === primaryTroveId
+                        return (
+                          <li key={t.id} className={`mobile-trove-item ${compareTroveIds.has(t.id) ? ' mobile-trove-item--selected' : ''}${isPrimaryDisabled ? ' mobile-trove-item--disabled' : ''}`}>
+                            <label className="mobile-trove-label">
+                              <input
+                                type="checkbox"
+                                checked={compareTroveIds.has(t.id)}
+                                disabled={isPrimaryDisabled}
+                                onChange={() => !isPrimaryDisabled && toggleCompare(t.id)}
+                              />
+                              <span>{t.name}</span>
+                            </label>
+                            {(compareTroveIds.size !== 1 || !compareTroveIds.has(t.id) || t.id === primaryTroveId) && (
+                              <span className="mobile-trove-only-actions">
+                                <button type="button" className="mobile-trove-only-link mobile-trove-only-link--target" onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleCompareTargetClick(t.id) }} aria-label={`Compare only ${t.name}`} title="Only this trove"><img src="/target.png" alt="" className="mobile-trove-only-icon" /></button>
+                              </span>
+                            )}
+                          </li>
+                        )
+                      }
                       return (
-                        <li key={t.id} className={`mobile-trove-item ${compareTroveIds.has(t.id) ? ' mobile-trove-item--selected' : ''}${isPrimaryDisabled ? ' mobile-trove-item--disabled' : ''}`}>
-                          <label className="mobile-trove-label">
-                            <input
-                              type="checkbox"
-                              checked={compareTroveIds.has(t.id)}
-                              disabled={isPrimaryDisabled}
-                              onChange={() => !isPrimaryDisabled && toggleCompare(t.id)}
-                            />
-                            <span>{t.name}</span>
-                          </label>
-                          {(compareTroveIds.size !== 1 || !compareTroveIds.has(t.id) || t.id === primaryTroveId) && (
-                            <span className="mobile-trove-only-actions">
-                              <button type="button" className="mobile-trove-only-link mobile-trove-only-link--target" onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleCompareTargetClick(t.id) }} aria-label={`Compare only ${t.name}`} title="Only this trove"><img src="/target.png" alt="" className="mobile-trove-only-icon" /></button>
-                            </span>
-                          )}
-                        </li>
+                        <>
+                          {compareTop.map((t) => compareLi(t))}
+                          {compareTop.length > 0 && compareRest.length > 0 ? (
+                            <li className="mobile-trove-list-separator" aria-hidden="true">
+                              <hr className="mobile-trove-separator" />
+                            </li>
+                          ) : null}
+                          {compareRest.map((t) => compareLi(t))}
+                        </>
                       )
-                    })
+                    })()
                   : (() => {
                       const { selected, notSelected } = mobileSearchTrovesWithResults
                       const renderTrove = (t) => {

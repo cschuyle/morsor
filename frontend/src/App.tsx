@@ -1440,8 +1440,18 @@ function App() {
       return sortByName(a, b)
     }
     const selectedSort = doSplit && hasResults ? selectedSortWhenResults : doSplit && searchMode === 'search' ? selectedSortNoResults : sortByName
-    const selected = doSplit ? filtered.filter((t) => idsForSplit.has(t.id)).sort(selectedSort) : []
-    const notSelected = doSplit ? filtered.filter((t) => !idsForSplit.has(t.id)).sort(sortByName) : [...filtered].sort(sortByName)
+    let bottomPoolExclusive: typeof withCounts = []
+    if (doSplit) {
+      let pool = withCounts
+      if (showFilter === 'selected') {
+        pool = pool.filter((t) => selectedTroveIds.has(t.id))
+      } else if (showFilter === 'notSelected') {
+        pool = pool.filter((t) => !selectedTroveIds.has(t.id))
+      }
+      bottomPoolExclusive = pool.filter(textMatches).filter((t) => !idsForSplit.has(t.id))
+    }
+    const selected = doSplit ? withCounts.filter((t) => idsForSplit.has(t.id)).sort(selectedSort) : []
+    const notSelected = doSplit ? [...bottomPoolExclusive].sort(sortByName) : [...filtered].sort(sortByName)
     return { selected, notSelected, displaySelectedTroveIds: idsForSplit }
   }, [troves, searchResult, troveFilter, showFilter, selectedTroveIds, searchMode, freezeTroveListOrder, boostTroveId])
 
@@ -1493,7 +1503,7 @@ function App() {
                     })()}
                   </div>
                   {duplicatesTroveTab === 'primary' && (() => {
-                    const primarySelectedTrove = primaryTrovesFiltered.find((t) => t.id === primaryTroveId)
+                    const primarySelectedTrove = primaryTroveId ? troves.find((t) => t.id === primaryTroveId) : undefined
                     const primaryNotSelectedTroves = primaryTrovesFiltered.filter((t) => t.id !== primaryTroveId)
                     return (
                       <div className="primary-trove-select-wrap" role="tabpanel">
