@@ -74,7 +74,7 @@ public class SearchDataService {
     @Value("${moocho.data.location}")
     private String dataLocation;
 
-    private static final String TROVES_LIST_KEY = "troves";
+    private static final String TROVES_LIST_KEY = "troves.json";
 
     private static final Logger log = LoggerFactory.getLogger(SearchDataService.class);
 
