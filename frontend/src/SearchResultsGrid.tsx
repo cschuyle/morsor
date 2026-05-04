@@ -901,6 +901,15 @@ export function SearchResultsGrid({ data, sortBy = null, sortDir = 'asc', onSort
     () => Array.isArray(data) && data.some((row) => row && row.itemType === 'littlePrinceItem' && (row.thumbnailUrl || (row.itemUrl && String(row.itemUrl).trim()))),
     [data]
   )
+  // Hide the thumb column entirely in list mode when no row has an actual thumbnail image.
+  const hasAnyThumbnail = useMemo(
+    () => Array.isArray(data) && data.some((row) => {
+      if (!row) return false
+      const url = row.thumbnailUrl
+      return Boolean(url && String(url).trim() && !isPlaceholderThumb(url))
+    }),
+    [data]
+  )
   const hasResults = Array.isArray(data) && data.length > 0
   const listTextColumns = useMemo(
     () => (hideTroveInList ? textColumns.filter((c) => c.id !== 'trove') : textColumns),
@@ -932,10 +941,14 @@ export function SearchResultsGrid({ data, sortBy = null, sortDir = 'asc', onSort
     }))
   }, [viewMode, visibleExtraFieldKeys, onSortChange])
   const baseColumns = useMemo(
-    () => [thumbnailColumnDef((payload) => {
-      setLightbox(payload)
-    }, isMobile, setRawSourceLightbox, hasThumbnails, lpExtraHoverHandlers), ...listTextColumns, ...extraFieldColumns],
-    [hasThumbnails, isMobile, listTextColumns, lpExtraHoverHandlers, extraFieldColumns]
+    () => [
+      ...(hasAnyThumbnail ? [thumbnailColumnDef((payload) => {
+        setLightbox(payload)
+      }, isMobile, setRawSourceLightbox, hasThumbnails, lpExtraHoverHandlers)] : []),
+      ...listTextColumns,
+      ...extraFieldColumns,
+    ],
+    [hasAnyThumbnail, hasThumbnails, isMobile, listTextColumns, lpExtraHoverHandlers, extraFieldColumns]
   )
   const columns = useMemo(
     () => (showScoreColumn ? [...baseColumns, scoreColumn] : baseColumns),
