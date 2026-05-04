@@ -428,8 +428,8 @@ const textColumns = [
     accessorKey: 'title',
     header: 'Title',
     cell: (info) => info.getValue(),
-    size: 500,
-    minSize: 80,
+    size: 320,
+    minSize: 48,
     maxSize: 1200,
   },
   {
@@ -437,7 +437,7 @@ const textColumns = [
     accessorKey: 'trove',
     header: 'Trove',
     cell: (info) => info.getValue(),
-    size: 80,
+    size: 64,
     minSize: 40,
     maxSize: 400,
   },
@@ -693,8 +693,8 @@ function thumbnailColumnDef(
     id: 'thumb',
     accessorKey: 'thumbnailUrl',
     header: ({ column }) => <ThumbColumnHeader column={column} />,
-    size: hasThumbnails ? 80 : 48,
-    minSize: 40,
+    size: hasThumbnails ? 64 : 40,
+    minSize: 32,
     maxSize: hasThumbnails ? 200 : 48,
     enableResizing: false,
     cell: (info) => {
@@ -783,8 +783,8 @@ const scoreColumn = {
     const v = info.getValue()
     return typeof v === 'number' ? v.toFixed(2) : '—'
   },
-  size: 100,
-  minSize: 70,
+  size: 84,
+  minSize: 52,
   maxSize: 260,
   enableResizing: true,
 }
@@ -927,7 +927,7 @@ export function SearchResultsGrid({ data, sortBy = null, sortDir = 'asc', onSort
         return <span className="search-grid-extra-cell" title={text}>{text}</span>
       },
       size: 140,
-      minSize: 48,
+      minSize: 36,
       maxSize: 520,
     }))
   }, [viewMode, visibleExtraFieldKeys, onSortChange])
