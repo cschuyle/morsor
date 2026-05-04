@@ -59,7 +59,11 @@
 
 @media (max-width: 1200px) {
   .app-layout {
-    flex-wrap: wrap;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr);
+    overflow-x: hidden;
+    overflow-y: auto;
   }
   .sidebar-wrapper {
     width: 100%;
@@ -75,6 +79,8 @@
   }
   .main {
     width: 100%;
+    min-height: 0;
+    max-height: 100%;
   }
 }
 
