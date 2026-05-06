@@ -3198,12 +3198,20 @@ function App() {
                   setReloadTrovesProgress({ current: 0, total: 0 })
                   const controller = new AbortController()
                   reloadAbortControllerRef.current = controller
-                  const headers = { ...getApiAuthHeaders() }
-                  const token = getCsrfToken()
-                  if (token) headers['X-XSRF-TOKEN'] = token
+                  const makeReloadHeaders = () => {
+                    const h = { ...getApiAuthHeaders() }
+                    const t = getCsrfToken()
+                    if (t) h['X-XSRF-TOKEN'] = t
+                    return h
+                  }
                   try {
-                    const res = await fetch('/api/troves/reload/stream', { method: 'POST', credentials: 'include', headers, signal: controller.signal })
+                    let res = await fetch('/api/troves/reload/stream', { method: 'POST', credentials: 'include', headers: makeReloadHeaders(), signal: controller.signal })
                     if (res.status === 401) { window.location.href = '/login'; return }
+                    // 403 usually means the XSRF-TOKEN cookie was absent; the 403 response sets it — retry once
+                    if (res.status === 403) {
+                      res = await fetch('/api/troves/reload/stream', { method: 'POST', credentials: 'include', headers: makeReloadHeaders(), signal: controller.signal })
+                      if (res.status === 401) { window.location.href = '/login'; return }
+                    }
                     if (!res.ok || !res.body) {
                       if (runId === reloadRunIdRef.current) {
                         reloadInProgressRef.current = false
