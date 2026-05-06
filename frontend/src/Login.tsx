@@ -56,12 +56,18 @@ async function loginOutcomeFromResponse(res: Response, redirectTo: string): Prom
     return { kind: 'error', message: 'Invalid username or password.' }
   }
   if (res.type === 'opaqueredirect' || res.status === 0) {
-    const check = await fetchAuthSession()
-    if (check.status === 503) {
-      return { kind: 'goto', href: '/login?error=service_unavailable' }
-    }
-    if (await sessionResponseIndicatesLoggedIn(check)) {
-      return { kind: 'goto', href: redirectTo }
+    // Spring's session-fixation protection issues a new JSESSIONID in the 302 Set-Cookie.
+    // With redirect:'manual' some browsers apply that cookie asynchronously, so the first
+    // session check may use the old (pre-login) session. Retry twice with short delays.
+    for (const delay of [0, 150, 500]) {
+      if (delay > 0) await new Promise<void>((r) => setTimeout(r, delay))
+      const check = await fetchAuthSession()
+      if (check.status === 503) {
+        return { kind: 'goto', href: '/login?error=service_unavailable' }
+      }
+      if (await sessionResponseIndicatesLoggedIn(check)) {
+        return { kind: 'goto', href: redirectTo }
+      }
     }
     return { kind: 'error', message: 'Invalid username or password.' }
   }

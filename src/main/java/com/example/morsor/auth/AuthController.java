@@ -6,6 +6,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AnonymousAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.web.csrf.CsrfToken;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -39,9 +40,14 @@ public class AuthController {
     /**
      * Anonymous GET so the SPA can create a session and receive the {@code XSRF-TOKEN} cookie before
      * {@code POST /login}. This endpoint is always permitted and returns 204.
+     *
+     * Injecting {@code CsrfToken} forces Spring Security's {@code CsrfTokenArgumentResolver} to call
+     * {@code .get()} on the deferred token, which causes {@code CookieCsrfTokenRepository} to generate
+     * the token and write the {@code XSRF-TOKEN} cookie in the response. Without this, safe-method (GET)
+     * requests never eagerly resolve the deferred token, so the cookie is never written.
      */
     @GetMapping("/auth/csrf-prime")
-    public ResponseEntity<Void> csrfPrime() {
+    public ResponseEntity<Void> csrfPrime(CsrfToken csrfToken) {
         return ResponseEntity.noContent().build();
     }
 
