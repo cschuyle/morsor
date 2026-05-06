@@ -1411,6 +1411,8 @@ function App() {
       filtered = filtered.filter((t) => selectedTroveIds.has(t.id))
     } else if (showFilter === 'notSelected') {
       filtered = filtered.filter((t) => !selectedTroveIds.has(t.id))
+    } else if (showFilter === 'ephemeral') {
+      filtered = filtered.filter((t) => t.cliCreated === true)
     }
     const sortByName = (a, b) => (a.name || '').localeCompare(b.name || '', undefined, { sensitivity: 'base' })
     const sortByHitsDesc = (a, b) => {
@@ -1447,6 +1449,8 @@ function App() {
         pool = pool.filter((t) => selectedTroveIds.has(t.id))
       } else if (showFilter === 'notSelected') {
         pool = pool.filter((t) => !selectedTroveIds.has(t.id))
+      } else if (showFilter === 'ephemeral') {
+        pool = pool.filter((t) => t.cliCreated === true)
       }
       bottomPoolExclusive = pool.filter(textMatches).filter((t) => !idsForSplit.has(t.id))
     }
@@ -1454,6 +1458,17 @@ function App() {
     const notSelected = doSplit ? [...bottomPoolExclusive].sort(sortByName) : [...filtered].sort(sortByName)
     return { selected, notSelected, displaySelectedTroveIds: idsForSplit }
   }, [troves, searchResult, troveFilter, showFilter, selectedTroveIds, searchMode, freezeTroveListOrder, boostTroveId])
+
+  const ephemeralTroveCount = useMemo(
+    () => troves.filter((t) => t.cliCreated === true).length,
+    [troves],
+  )
+
+  useEffect(() => {
+    if (ephemeralTroveCount === 0 && showFilter === 'ephemeral') {
+      setShowFilter('all')
+    }
+  }, [ephemeralTroveCount, showFilter])
 
   return (
     <div className="desktop-app">
@@ -1469,7 +1484,7 @@ function App() {
                 const compareToSelfVisible = isCompareToSelfVisible(primaryTroveId, compareIds)
                 return (
                   <>
-                  <h2 className="trove-picker-heading">Troves</h2>
+                  <h2 className="trove-picker-heading">Troves (total {formatCount(troves.length)})</h2>
                   <div className="trove-picker-tabs" role="tablist" aria-label="Trove selection">
                     {(() => {
                       const primaryTabInvalid = searchMode === 'duplicates' ? !dupPrimaryTroveId : !uniqPrimaryTroveId
@@ -1642,6 +1657,7 @@ function App() {
                             <option value="all">All</option>
                             <option value="selected">Selected</option>
                             <option value="notSelected">Not Selected</option>
+                            {ephemeralTroveCount > 0 && <option value="ephemeral">Only Ephemeral</option>}
                           </select>
                         </label>
                       </div>
@@ -1747,7 +1763,7 @@ function App() {
                 )
               })()) : (
                 <>
-                  <h2 className="trove-picker-heading">Troves</h2>
+                  <h2 className="trove-picker-heading">Troves (total {formatCount(troves.length)})</h2>
                   <div className="search-trove-summary-row">
                     <p className="trove-picker-summary search-trove-summary-text" aria-live="polite">
                       {selectedTroveIds.size === 0
@@ -1779,6 +1795,7 @@ function App() {
                 <option value="all">All</option>
                 <option value="selected">Selected</option>
                 <option value="notSelected">Not Selected</option>
+                {ephemeralTroveCount > 0 && <option value="ephemeral">Only Ephemeral</option>}
               </select>
             </label>
           </div>
@@ -3283,7 +3300,9 @@ function App() {
           <div className="reload-troves-popup">
             <p className="reload-troves-title">
               {reloadTrovesProgress.total > 0
-                ? `Reloading ${reloadTrovesProgress.total} troves`
+                ? ephemeralTroveCount > 0
+                  ? `Reloading ${reloadTrovesProgress.total} troves. ${ephemeralTroveCount} ephemeral ${ephemeralTroveCount === 1 ? 'trove' : 'troves'} excluded.`
+                  : `Reloading ${reloadTrovesProgress.total} troves`
                 : 'Reloading troves'}
             </p>
             {reloadTrovesProgress.total > 0 && (

@@ -38,6 +38,7 @@ export interface Trove {
   id: string
   name: string
   count: number
+  cliCreated?: boolean
   [key: string]: unknown
 }
 
