@@ -117,6 +117,51 @@ class PrefixSearchTest {
     }
 
     @Test
+    void contractionQueryVariantsMatchApostropheIndexedTitle() throws IOException {
+        Directory dir = new ByteBuffersDirectory();
+        IndexWriterConfig config = new IndexWriterConfig(analyzer);
+        config.setOpenMode(IndexWriterConfig.OpenMode.CREATE);
+        try (IndexWriter writer = new IndexWriter(dir, config)) {
+            addDoc(writer, 0, "trove-a", "Wayne's World");
+            writer.commit();
+        }
+        IndexSearcher search = new IndexSearcher(DirectoryReader.open(dir));
+
+        Query queryWayne = SearchQueryBuilder.buildQuery("Wayne", analyzer, CONTENT_FIELD);
+        Query queryWaynes = SearchQueryBuilder.buildQuery("Waynes", analyzer, CONTENT_FIELD);
+        Query queryWayneApos = SearchQueryBuilder.buildQuery("Wayne's", analyzer, CONTENT_FIELD);
+
+        assertThat(queryWayne).isNotNull();
+        assertThat(queryWaynes).isNotNull();
+        assertThat(queryWayneApos).isNotNull();
+
+        assertThat(search.search(queryWayne, 10).totalHits.value).isEqualTo(1);
+        assertThat(search.search(queryWaynes, 10).totalHits.value).isEqualTo(1);
+        assertThat(search.search(queryWayneApos, 10).totalHits.value).isEqualTo(1);
+    }
+
+    @Test
+    void curlyApostropheInIndexedTitleAndQueryAlsoMatches() throws IOException {
+        Directory dir = new ByteBuffersDirectory();
+        IndexWriterConfig config = new IndexWriterConfig(analyzer);
+        config.setOpenMode(IndexWriterConfig.OpenMode.CREATE);
+        try (IndexWriter writer = new IndexWriter(dir, config)) {
+            addDoc(writer, 0, "trove-a", "Wayne\u2019s World");
+            writer.commit();
+        }
+        IndexSearcher search = new IndexSearcher(DirectoryReader.open(dir));
+
+        Query queryCurly = SearchQueryBuilder.buildQuery("Wayne\u2019s", analyzer, CONTENT_FIELD);
+        Query queryPlain = SearchQueryBuilder.buildQuery("Waynes", analyzer, CONTENT_FIELD);
+
+        assertThat(queryCurly).isNotNull();
+        assertThat(queryPlain).isNotNull();
+
+        assertThat(search.search(queryCurly, 10).totalHits.value).isEqualTo(1);
+        assertThat(search.search(queryPlain, 10).totalHits.value).isEqualTo(1);
+    }
+
+    @Test
     void slashDelimitedQueryIsTreatedAsRegex() {
         assertThat(SearchQueryBuilder.isRegexDelimited("/pattern/")).isTrue();
         assertThat(SearchQueryBuilder.isRegexDelimited("/a/")).isTrue();
