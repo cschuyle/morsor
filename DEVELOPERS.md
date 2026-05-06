@@ -114,19 +114,10 @@ After you run the image, open [http://localhost:8080](http://localhost:8080).
 
 ## Deploying as a Docker image
 
-Build and Push Docker Image all at once
+Script that does everything:
 ```
-docker buildx build --platform linux/amd64 -t artifact-repo-username/morsor:latest --push .
+./deploy-container-to-registry.sh
 ```
-
-Or tag then push
-
-```
-docker tag morsor artifact-repo-username/morsor:latest
-docker push artifact-repo-username/morsor:latest
-```
-
-That should get you on your way to deploying on a webhost which can host Docker images.
 
 ## Deploying the Docker image to a container registry
 
@@ -143,6 +134,23 @@ Example:
 ```bash
 MOOCHO_REGISTRY=myregistry.io/me/morsor MOOCHO_VERSION=1.2.3 MOOCHO_ARCHITECTURE=linux/amd64 ./deploy-container-to-registry.sh
 ```
+
+After that, you can deploy the image to a webhost which can host Docker images.
+
+### Details
+
+To just build and Push Docker Image all at once
+```
+docker buildx build --platform linux/amd64 -t artifact-repo-username/morsor:latest --push .
+```
+
+Or, tag then push:
+
+```
+docker tag morsor artifact-repo-username/morsor:latest
+docker push artifact-repo-username/morsor:latest
+```
+
 
 
 # CLI (`morsor-cli`)
