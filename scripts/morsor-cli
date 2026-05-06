@@ -405,7 +405,7 @@ def run_local_trove(
                 "files": [],
             }
         )
-    body_obj = {"displayName": display_name, "items": items}
+    body_obj = {"displayName": display_name, "items": items, "cliCreated": True}
     body_bytes = json.dumps(body_obj).encode("utf-8")
     token = bearer
     if (not token or not token.strip()) and is_likely_local_dev_base(base):

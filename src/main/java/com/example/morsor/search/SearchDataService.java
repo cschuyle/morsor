@@ -96,6 +96,7 @@ public class SearchDataService {
     /** Last successful reload payload (before ephemeral merge). */
     private List<SearchResult> persistedResults = List.of();
     private final Map<String, List<SearchResult>> ephemeralTroves = new ConcurrentHashMap<>();
+    private final Set<String> cliCreatedEphemeralTroveIds = ConcurrentHashMap.newKeySet();
     private final Object mergeLock = new Object();
     private Directory luceneDirectory;
     private IndexSearcher luceneSearcher;
@@ -188,7 +189,7 @@ public class SearchDataService {
      *
      * @param displayName required non-blank trove label (CLI sends the scanned directory's full path)
      */
-    public EphemeralTroveRegistration registerEphemeralTrove(String displayName, List<EphemeralManifestItem> items) {
+    public EphemeralTroveRegistration registerEphemeralTrove(String displayName, List<EphemeralManifestItem> items, boolean cliCreated) {
         if (items == null) {
             throw new IllegalArgumentException("items must not be null");
         }
@@ -213,6 +214,11 @@ public class SearchDataService {
         }
         synchronized (mergeLock) {
             ephemeralTroves.put(troveId, List.copyOf(stamped));
+            if (cliCreated) {
+                cliCreatedEphemeralTroveIds.add(troveId);
+            } else {
+                cliCreatedEphemeralTroveIds.remove(troveId);
+            }
             rebuildMergedIndexLocked();
         }
         log.info("Registered ephemeral trove id=\"{}\" name=\"{}\" ({} items)", troveId, troveLabel, stamped.size());
@@ -229,6 +235,7 @@ public class SearchDataService {
             if (removed == null) {
                 return false;
             }
+            cliCreatedEphemeralTroveIds.remove(troveId.trim());
             rebuildMergedIndexLocked();
         }
         log.info("Removed ephemeral trove \"{}\"", troveId);
@@ -1025,7 +1032,7 @@ public class SearchDataService {
                     String id = e.getKey();
                     List<SearchResult> items = e.getValue();
                     String name = items.isEmpty() ? id : (items.get(0).trove() != null ? items.get(0).trove() : id);
-                    return new TroveOption(id, name, items.size());
+                    return new TroveOption(id, name, items.size(), cliCreatedEphemeralTroveIds.contains(id));
                 })
                 .sorted(java.util.Comparator.comparing(TroveOption::name, String.CASE_INSENSITIVE_ORDER))
                 .toList();

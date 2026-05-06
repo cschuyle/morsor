@@ -45,7 +45,7 @@ public class EphemeralTroveController {
                 items.size(),
                 previewForLog(dn));
         try {
-            EphemeralTroveRegistration reg = searchDataService.registerEphemeralTrove(dn, items);
+                EphemeralTroveRegistration reg = searchDataService.registerEphemeralTrove(dn, items, Boolean.TRUE.equals(body.cliCreated()));
             searchCache.clear();
             log.info(
                     "POST /api/ephemeral-troves: registered troveId={} count={} name.preview={}",

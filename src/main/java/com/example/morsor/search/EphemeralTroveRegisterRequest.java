@@ -8,4 +8,6 @@ import java.util.List;
 public record EphemeralTroveRegisterRequest(
         /** Trove label in the UI/API, e.g. the directory's full path from the CLI. */
         String displayName,
-        List<EphemeralManifestItem> items) {}
+        List<EphemeralManifestItem> items,
+        /** True when this request comes from the CLI local-trove flow. */
+        Boolean cliCreated) {}
