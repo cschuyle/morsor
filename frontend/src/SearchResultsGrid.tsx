@@ -1325,26 +1325,6 @@ export function SearchResultsGrid({ data, sortBy = null, sortDir = 'asc', onSort
       })()}
       {hasResults && (
         <div className="grid-toolbar">
-          <div className="grid-filter-wrap">
-            <input
-              type="search"
-              placeholder="Filter this page"
-              value={globalFilter}
-              onChange={(e) => setGlobalFilter(e.target.value)}
-              onKeyDown={(e) => { if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); setGlobalFilter('') } }}
-              className="grid-filter-input"
-            />
-            {globalFilter && (
-              <button
-                type="button"
-                className="grid-filter-clear"
-                onClick={() => setGlobalFilter('')}
-                aria-label="Clear filter"
-              >
-                ×
-              </button>
-            )}
-          </div>
           <button
             type="button"
             className="search-results-copy-btn"
@@ -1365,6 +1345,26 @@ export function SearchResultsGrid({ data, sortBy = null, sortDir = 'asc', onSort
             </svg>
             Copy Titles
           </button>
+          <div className="grid-filter-wrap">
+            <input
+              type="search"
+              placeholder="Filter this page"
+              value={globalFilter}
+              onChange={(e) => setGlobalFilter(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); setGlobalFilter('') } }}
+              className="grid-filter-input"
+            />
+            {globalFilter && (
+              <button
+                type="button"
+                className="grid-filter-clear"
+                onClick={() => setGlobalFilter('')}
+                aria-label="Clear filter"
+              >
+                ×
+              </button>
+            )}
+          </div>
           {afterFilterSlot}
         </div>
       )}

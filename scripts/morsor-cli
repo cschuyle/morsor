@@ -9,6 +9,7 @@ import json
 import os
 import re
 import sys
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -337,51 +338,85 @@ def run_local_trove(
     debug: bool,
     output_mode: str,
     positional: list[str],
+    preparsed_name_override: str | None = None,
 ) -> None:
     idx = 1
+    input_file: Path | None = None
+    name_override: str | None = preparsed_name_override
     while idx < len(positional):
-        if positional[idx].startswith("-"):
-            die(f"unknown option for local-trove: {positional[idx]}")
-        break
-    if idx >= len(positional):
-        die("local-trove: missing directory path")
-    d = Path(positional[idx]).resolve()
-    idx += 1
-    if idx < len(positional):
-        die("local-trove: unexpected extra arguments after directory")
-    if not d.is_dir():
-        die(f"not a directory: {d}")
-    children = sorted(
-        [p for p in d.iterdir()],
-        key=lambda p: p.name.lower(),
-    )
-    if len(children) > MAX_LOCAL_TROVE_ITEMS:
-        die(f"too many entries in directory (max {MAX_LOCAL_TROVE_ITEMS}): {len(children)}")
+        token = positional[idx]
+        if token.startswith("--name="):
+            value = token.split("=", 1)[1].strip()
+            if not value:
+                die("local-trove: --name requires a non-empty value")
+            if name_override is not None:
+                die("local-trove: --name was provided more than once")
+            name_override = value
+            idx += 1
+            continue
+        if token == "--name":
+            idx += 1
+            if idx >= len(positional):
+                die("local-trove: --name requires a value")
+            value = positional[idx].strip()
+            if not value:
+                die("local-trove: --name requires a non-empty value")
+            if name_override is not None:
+                die("local-trove: --name was provided more than once")
+            name_override = value
+            idx += 1
+            continue
+        if token.startswith("-"):
+            die(f"unknown option for local-trove: {token}")
+        if input_file is not None:
+            die("local-trove: unexpected extra arguments (expected at most one filename)")
+        input_file = Path(token).resolve()
+        idx += 1
+    if input_file is not None:
+        if not input_file.is_file():
+            die(f"not a file: {input_file}")
+        lines = input_file.read_text(encoding="utf-8", errors="replace").splitlines()
+        display_name = str(input_file)
+        input_label = f"file {input_file}"
+        stdin_id_prefix = None
+    else:
+        lines = sys.stdin.read().splitlines()
+        ts = int(time.time())
+        display_name = f"stdin-{ts}"
+        input_label = "stdin"
+        stdin_id_prefix = f"local-{ts}"
+
+    if name_override is not None:
+        display_name = name_override
+
+    titles = [line.strip() for line in lines if line.strip()]
+    if not titles:
+        die("local-trove: no non-empty item titles were provided")
+    if len(titles) > MAX_LOCAL_TROVE_ITEMS:
+        die(f"too many items (max {MAX_LOCAL_TROVE_ITEMS}): {len(titles)}")
+
     items = []
-    for child in children:
-        rel = child.relative_to(d).as_posix()
-        if not rel:
-            rel = child.name
+    for i, title in enumerate(titles, start=1):
+        item_id = str(i) if stdin_id_prefix is None else f"{stdin_id_prefix}-{i}"
         items.append(
             {
-                "id": rel,
-                "title": child.name,
-                "files": [str(child.resolve())],
+                "id": item_id,
+                "title": title,
+                "files": [],
             }
         )
-    display_name = str(d)
     body_obj = {"displayName": display_name, "items": items}
     body_bytes = json.dumps(body_obj).encode("utf-8")
     token = bearer
     if (not token or not token.strip()) and is_likely_local_dev_base(base):
         token = DEV_DEFAULT_TOKEN
     url = strip_trailing_slash(base) + "/api/ephemeral-troves"
-    local_trove_err(f"directory {d}")
-    local_trove_err(f"entries (one level) {len(children)}, JSON payload {len(body_bytes)} bytes")
+    local_trove_err(f"input {input_label}")
+    local_trove_err(f"items {len(titles)}, JSON payload {len(body_bytes)} bytes")
     local_trove_err(f"POST {url}")
     if debug:
-        sample = ", ".join(p.name for p in children[:10])
-        if len(children) > 10:
+        sample = ", ".join(titles[:10])
+        if len(titles) > 10:
             sample += " …"
         local_trove_err(f"[verbose] first item titles: {sample}")
         local_trove_err(f"[verbose] displayName (trove label) {display_name}")
@@ -667,8 +702,8 @@ SYNOPSIS
        morsor-cli [OPTIONS] [<action>] [--key value | -k value | --key=value ...]
                   [query text...]
 
-       morsor-cli [OPTIONS] local-trove DIRECTORY
-       morsor-cli [OPTIONS] register-local-dir DIRECTORY
+    morsor-cli [OPTIONS] local-trove [FILE]
+    morsor-cli [OPTIONS] register-local-dir [FILE]
 
        morsor-cli [OPTIONS] METHOD PATH [-- querystring]
 
@@ -699,13 +734,14 @@ THREE WAYS TO SEARCH
               match in the compare troves, for the optional query. Same primary/
               compare parameters as duplicates (same 500 cap on page size).
 
-EPHEMERAL TROVES (LOCAL DIRECTORY)
-       local-trove (alias register-local-dir) lists one level of names in DIRECTORY,
-       POSTs them to the server as an ephemeral trove, and prints the assigned
-       trove id and display name.
+EPHEMERAL TROVES (LINE INPUT)
+    local-trove (alias register-local-dir) reads item titles one-per-line from
+    FILE, or from stdin when FILE is omitted. It POSTs those items to the
+    server as an ephemeral trove, and prints the assigned trove id and display
+    name.
 
        • Trove id is always server-generated: local-<uuid> (you do not choose it).
-       • Display name is the directory’s absolute path (used as the trove label).
+    • Display name is FILE’s absolute path, or "stdin" when reading from stdin.
        • Ephemeral troves are merged into the index with persisted troves and
          survive reload of trove data on the server; they are in-memory and are
          lost on JVM restart. DELETE /api/ephemeral-troves/{id} removes one by id.
@@ -731,6 +767,10 @@ OPTIONS
        -F, --file PATH
               POST body from file (only with POST).
 
+    --name NAME
+        local-trove only: override generated display name for the uploaded
+        ephemeral trove.
+
        -i, --include-headers
               Print response status and headers before the body.
 
@@ -745,7 +785,8 @@ ACTIONS
        unique       same as uniques
        troves       GET /api/troves
        status       GET /api/status
-       local-trove  Register DIRECTORY as an ephemeral trove (see above)
+    local-trove  Register line input as an ephemeral trove (see above).
+              Accepts optional --name NAME.
        login        Obtain session cookie (no -T/-H)
 
 SHORTHAND PARAMETERS (after an action)
@@ -779,9 +820,17 @@ EXAMPLES
 
               ./scripts/morsor-cli search --trove=vinyl --query='King Gizzard'
 
-       Register a local directory as an ephemeral trove (output includes trove id):
+    Register from a file (one title per line):
 
-              ./scripts/morsor-cli local-trove /path/to/local/directory
+        ./scripts/morsor-cli local-trove /path/to/titles.txt
+
+    Register from stdin:
+
+        cat /path/to/titles.txt | ./scripts/morsor-cli local-trove
+
+    Override the generated trove name:
+
+        ./scripts/morsor-cli local-trove --name "My Temp List" /path/to/titles.txt
 
        Duplicates: primary is ephemeral local trove; compare against vinyl and CDs;
        large page; JSON to jq (titles of primary rows):
@@ -815,13 +864,14 @@ USAGE SUMMARY
 
 ACTIONS
   search (default)   dups | duplicates   uniques | unique   troves   status
-  local-trove DIR    register-local-dir DIR
+    local-trove [FILE] register-local-dir [FILE]
 
-ENV: MORSOR_CLI_BASE_URL overrides -b/--base
+ENV: MORSOR_CLI_BASE_URL sets default base if -b/--base is not provided
 
 Examples:
   morsor-cli search --trove=vinyl --query='*'
-  morsor-cli local-trove /path/to/folder
+    morsor-cli local-trove /path/to/titles.txt
+    cat /path/to/titles.txt | morsor-cli local-trove
   morsor-cli -v -b http://localhost:8080 GET /api/search -- query=*&page=0&size=10
 """.strip()
     )
@@ -838,8 +888,10 @@ def main(argv: list[str]) -> None:
         sys.exit(0)
     extra_headers: list[str] = []
     base = "http://localhost:8080"
+    base_set_by_arg = False
     bearer: str | None = None
     body_file: str | None = None
+    local_trove_name_override: str | None = None
     output_mode = "text"
     show_headers = False
     debug = False
@@ -858,6 +910,7 @@ def main(argv: list[str]) -> None:
             if i >= len(argv):
                 die(f"missing value for {argv[i - 1]}")
             base = strip_trailing_slash(argv[i])
+            base_set_by_arg = True
         elif a in ("-T", "--token"):
             i += 1
             if i >= len(argv):
@@ -873,6 +926,19 @@ def main(argv: list[str]) -> None:
             if i >= len(argv):
                 die(f"missing value for {argv[i - 1]}")
             body_file = argv[i]
+        elif a == "--name":
+            i += 1
+            if i >= len(argv):
+                die("missing value for --name")
+            val = argv[i].strip()
+            if not val:
+                die("--name requires a non-empty value")
+            local_trove_name_override = val
+        elif a.startswith("--name="):
+            val = a.split("=", 1)[1].strip()
+            if not val:
+                die("--name requires a non-empty value")
+            local_trove_name_override = val
         elif a in ("-o", "--output"):
             i += 1
             if i >= len(argv):
@@ -898,16 +964,26 @@ def main(argv: list[str]) -> None:
         sys.exit(0)
 
     env_base = os.environ.get("MORSOR_CLI_BASE_URL")
-    if env_base and env_base.strip():
+    if (not base_set_by_arg) and env_base and env_base.strip():
         base = strip_trailing_slash(env_base.strip())
 
     if is_local_trove_action(positional[0]):
         if body_file:
             die("--file is not valid with local-trove")
         run_local_trove(
-            base, bearer, extra_headers, show_headers, debug, output_mode, positional
+            base,
+            bearer,
+            extra_headers,
+            show_headers,
+            debug,
+            output_mode,
+            positional,
+            local_trove_name_override,
         )
         return
+
+    if local_trove_name_override is not None:
+        die("--name is only valid with local-trove")
 
     if positional[0].lower() == "login":
         if len(positional) > 1:
