@@ -93,6 +93,63 @@ export function UniquesResultsView({ results = [], sortBy = null, sortDir = 'asc
     }
   }
 
+  const toCsvCell = (value: unknown): string => {
+    const s = String(value ?? '')
+    return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s
+  }
+
+  const toTsvCell = (value: unknown): string => String(value ?? '').replace(/[\t\n\r]+/g, ' ')
+
+  const buildDelimitedTable = (delimiter: ',' | '\t'): string => {
+    const encode = delimiter === ',' ? toCsvCell : toTsvCell
+    const lines = [
+      ['Title', 'Trove', 'Score'].map(encode).join(delimiter),
+    ]
+    for (const row of results) {
+      const item = (row?.item ?? row) as SearchResultRow | undefined
+      const score = typeof row?.score === 'number' ? row.score.toFixed(2) : ''
+      lines.push([
+        item?.title ?? '',
+        item?.trove ?? item?.troveId ?? '',
+        score,
+      ].map(encode).join(delimiter))
+      for (const m of row?.nearMisses ?? []) {
+        const r = (m?.result ?? m) as SearchResultRow | undefined
+        const s = typeof m?.score === 'number' ? m.score.toFixed(2) : ''
+        lines.push([
+          r?.title ?? '',
+          r?.trove ?? r?.troveId ?? '',
+          s,
+        ].map(encode).join(delimiter))
+      }
+    }
+    return lines.join('\n')
+  }
+
+  const handleCopyCsv = async () => {
+    const text = buildDelimitedTable(',')
+    if (!text || !navigator?.clipboard?.writeText) {
+      return
+    }
+    try {
+      await navigator.clipboard.writeText(text)
+    } catch {
+      // Ignore clipboard errors; button is a convenience action.
+    }
+  }
+
+  const handleCopyTsv = async () => {
+    const text = buildDelimitedTable('\t')
+    if (!text || !navigator?.clipboard?.writeText) {
+      return
+    }
+    try {
+      await navigator.clipboard.writeText(text)
+    } catch {
+      // Ignore clipboard errors; button is a convenience action.
+    }
+  }
+
   if (!results.length) {
     return (
       <p className="duplicate-results-empty">No unique items. Every primary item has a match in the compare troves.</p>
@@ -129,6 +186,46 @@ export function UniquesResultsView({ results = [], sortBy = null, sortDir = 'asc
             <rect x="4" y="8" width="11" height="13" rx="2" ry="2" fill="none" stroke="currentColor" strokeWidth="1.8" />
           </svg>
           Copy Titles
+        </button>
+        <button
+          type="button"
+          className="duplicate-results-copy-btn"
+          onClick={() => {
+            void handleCopyCsv()
+          }}
+        >
+          <svg
+            className="duplicate-results-copy-icon"
+            viewBox="0 0 24 24"
+            width="16"
+            height="16"
+            aria-hidden="true"
+            focusable="false"
+          >
+            <rect x="9" y="3" width="11" height="13" rx="2" ry="2" fill="none" stroke="currentColor" strokeWidth="1.8" />
+            <rect x="4" y="8" width="11" height="13" rx="2" ry="2" fill="none" stroke="currentColor" strokeWidth="1.8" />
+          </svg>
+          CSV
+        </button>
+        <button
+          type="button"
+          className="duplicate-results-copy-btn"
+          onClick={() => {
+            void handleCopyTsv()
+          }}
+        >
+          <svg
+            className="duplicate-results-copy-icon"
+            viewBox="0 0 24 24"
+            width="16"
+            height="16"
+            aria-hidden="true"
+            focusable="false"
+          >
+            <rect x="9" y="3" width="11" height="13" rx="2" ry="2" fill="none" stroke="currentColor" strokeWidth="1.8" />
+            <rect x="4" y="8" width="11" height="13" rx="2" ry="2" fill="none" stroke="currentColor" strokeWidth="1.8" />
+          </svg>
+          TSV
         </button>
       </div>
       <table className="duplicate-results-table">

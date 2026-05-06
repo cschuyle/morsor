@@ -2154,6 +2154,10 @@
 }
 
 .duplicate-results-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
   margin-bottom: 0.5rem;
 }
 

@@ -36,4 +36,30 @@ describe('UniquesResultsView copy titles', () => {
 
     expect(navigator.clipboard.writeText).toHaveBeenCalledWith('Apollo 13\nThe Knick')
   })
+
+  it('copies full uniques table as CSV and TSV', () => {
+    render(
+      <UniquesResultsView
+        results={[
+          {
+            item: { id: '1', title: 'Apollo 13', trove: 'Movies' },
+            score: 0.87,
+            nearMisses: [
+              { result: { id: '2', title: 'Apollo 18', trove: 'Movies' }, score: 0.72 },
+            ],
+          },
+        ]}
+      />,
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: 'CSV' }))
+    expect(navigator.clipboard.writeText).toHaveBeenCalledWith(
+      'Title,Trove,Score\nApollo 13,Movies,0.87\nApollo 18,Movies,0.72',
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: 'TSV' }))
+    expect(navigator.clipboard.writeText).toHaveBeenCalledWith(
+      'Title\tTrove\tScore\nApollo 13\tMovies\t0.87\nApollo 18\tMovies\t0.72',
+    )
+  })
 })

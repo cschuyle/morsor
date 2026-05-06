@@ -56,6 +56,13 @@
   flex-shrink: 0;
 }
 
+.search-results-copy-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
 .search-results-copy-btn {
   display: inline-flex;
   align-items: center;

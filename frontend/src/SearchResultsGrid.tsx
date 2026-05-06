@@ -1009,14 +1009,14 @@ export function SearchResultsGrid({ data, sortBy = null, sortDir = 'asc', onSort
 
   const showGallery = viewMode === 'gallery'
 
-  const handleCopyTitles = async () => {
-    const rowsToCopy = showGallery
+  const rowsForCopy = useMemo(
+    () => (showGallery
       ? filteredRowsForGallery
-      : table.getFilteredRowModel().rows.map((row) => row.original)
-    const text = rowsToCopy
-      .map((row) => (row?.title ?? '').trim())
-      .filter((title) => title.length > 0)
-      .join('\n')
+      : table.getFilteredRowModel().rows.map((row) => row.original)),
+    [showGallery, filteredRowsForGallery, table],
+  )
+
+  const copyText = async (text: string) => {
     if (!text || !navigator?.clipboard?.writeText) {
       return
     }
@@ -1025,6 +1025,48 @@ export function SearchResultsGrid({ data, sortBy = null, sortDir = 'asc', onSort
     } catch {
       // Ignore clipboard errors; button is a convenience action.
     }
+  }
+
+  const toCsvCell = (value: unknown): string => {
+    const s = String(value ?? '')
+    return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s
+  }
+
+  const toTsvCell = (value: unknown): string => String(value ?? '').replace(/[\t\n\r]+/g, ' ')
+
+  const buildDelimitedTable = (delimiter: ',' | '\t'): string => {
+    const extraKeys = viewMode === 'list' ? (visibleExtraFieldKeys ?? []) : []
+    const headers = ['Title', 'Trove', ...(showScoreColumn ? ['Score'] : []), ...extraKeys.map((k) => formatLittlePrinceFieldLabel(k))]
+    const encode = delimiter === ',' ? toCsvCell : toTsvCell
+    const lines = [headers.map(encode).join(delimiter)]
+    for (const row of rowsForCopy) {
+      const baseCells: Array<string | number> = [
+        (row?.title ?? '').trim(),
+        row?.trove ?? row?.troveId ?? '',
+      ]
+      if (showScoreColumn) {
+        baseCells.push(typeof row?.score === 'number' ? row.score.toFixed(2) : '')
+      }
+      const extras = extraKeys.map((k) => formatLittlePrinceExtraValue(extraFieldsFromRow(row)?.[k]))
+      lines.push([...baseCells, ...extras].map(encode).join(delimiter))
+    }
+    return lines.join('\n')
+  }
+
+  const handleCopyTitles = async () => {
+    const text = rowsForCopy
+      .map((row) => (row?.title ?? '').trim())
+      .filter((title) => title.length > 0)
+      .join('\n')
+    await copyText(text)
+  }
+
+  const handleCopyCsv = async () => {
+    await copyText(buildDelimitedTable(','))
+  }
+
+  const handleCopyTsv = async () => {
+    await copyText(buildDelimitedTable('\t'))
   }
 
   const [showBackToTop, setShowBackToTop] = useState(false)
@@ -1325,26 +1367,68 @@ export function SearchResultsGrid({ data, sortBy = null, sortDir = 'asc', onSort
       })()}
       {hasResults && (
         <div className="grid-toolbar">
-          <button
-            type="button"
-            className="search-results-copy-btn"
-            onClick={() => {
-              void handleCopyTitles()
-            }}
-          >
-            <svg
-              className="search-results-copy-icon"
-              viewBox="0 0 24 24"
-              width="16"
-              height="16"
-              aria-hidden="true"
-              focusable="false"
+          <div className="search-results-copy-actions">
+            <button
+              type="button"
+              className="search-results-copy-btn"
+              onClick={() => {
+                void handleCopyTitles()
+              }}
             >
-              <rect x="9" y="3" width="11" height="13" rx="2" ry="2" fill="none" stroke="currentColor" strokeWidth="1.8" />
-              <rect x="4" y="8" width="11" height="13" rx="2" ry="2" fill="none" stroke="currentColor" strokeWidth="1.8" />
-            </svg>
-            Copy Titles
-          </button>
+              <svg
+                className="search-results-copy-icon"
+                viewBox="0 0 24 24"
+                width="16"
+                height="16"
+                aria-hidden="true"
+                focusable="false"
+              >
+                <rect x="9" y="3" width="11" height="13" rx="2" ry="2" fill="none" stroke="currentColor" strokeWidth="1.8" />
+                <rect x="4" y="8" width="11" height="13" rx="2" ry="2" fill="none" stroke="currentColor" strokeWidth="1.8" />
+              </svg>
+              Copy Titles
+            </button>
+            <button
+              type="button"
+              className="search-results-copy-btn"
+              onClick={() => {
+                void handleCopyCsv()
+              }}
+            >
+              <svg
+                className="search-results-copy-icon"
+                viewBox="0 0 24 24"
+                width="16"
+                height="16"
+                aria-hidden="true"
+                focusable="false"
+              >
+                <rect x="9" y="3" width="11" height="13" rx="2" ry="2" fill="none" stroke="currentColor" strokeWidth="1.8" />
+                <rect x="4" y="8" width="11" height="13" rx="2" ry="2" fill="none" stroke="currentColor" strokeWidth="1.8" />
+              </svg>
+              CSV
+            </button>
+            <button
+              type="button"
+              className="search-results-copy-btn"
+              onClick={() => {
+                void handleCopyTsv()
+              }}
+            >
+              <svg
+                className="search-results-copy-icon"
+                viewBox="0 0 24 24"
+                width="16"
+                height="16"
+                aria-hidden="true"
+                focusable="false"
+              >
+                <rect x="9" y="3" width="11" height="13" rx="2" ry="2" fill="none" stroke="currentColor" strokeWidth="1.8" />
+                <rect x="4" y="8" width="11" height="13" rx="2" ry="2" fill="none" stroke="currentColor" strokeWidth="1.8" />
+              </svg>
+              TSV
+            </button>
+          </div>
           <div className="grid-filter-wrap">
             <input
               type="search"
