@@ -45,6 +45,21 @@ export function DuplicateResultsView({ rows = [], sortBy = null, sortDir = 'asc'
     onSortChange(columnId, nextDir)
   }
 
+  const handleCopyPrimaryTitles = async () => {
+    const text = rows
+      .map((row) => (row.primary?.title ?? '').trim())
+      .filter((title) => title.length > 0)
+      .join('\n')
+    if (!text || !navigator?.clipboard?.writeText) {
+      return
+    }
+    try {
+      await navigator.clipboard.writeText(text)
+    } catch {
+      // Ignore clipboard errors; button is a convenience action.
+    }
+  }
+
   if (!rows.length) {
     return (
       <p className="duplicate-results-empty">No duplicate rows. Try a different query or trove selection.</p>
@@ -52,6 +67,28 @@ export function DuplicateResultsView({ rows = [], sortBy = null, sortDir = 'asc'
   }
   return (
     <div className="duplicate-results">
+      <div className="duplicate-results-actions">
+        <button
+          type="button"
+          className="duplicate-results-copy-btn"
+          onClick={() => {
+            void handleCopyPrimaryTitles()
+          }}
+        >
+          <svg
+            className="duplicate-results-copy-icon"
+            viewBox="0 0 24 24"
+            width="16"
+            height="16"
+            aria-hidden="true"
+            focusable="false"
+          >
+            <rect x="9" y="3" width="11" height="13" rx="2" ry="2" fill="none" stroke="currentColor" strokeWidth="1.8" />
+            <rect x="4" y="8" width="11" height="13" rx="2" ry="2" fill="none" stroke="currentColor" strokeWidth="1.8" />
+          </svg>
+          Copy Primary Titles
+        </button>
+      </div>
       <table className="duplicate-results-table">
         <thead>
           <tr>

@@ -2153,6 +2153,31 @@
   overflow-x: auto;
 }
 
+.duplicate-results-actions {
+  margin-bottom: 0.5rem;
+}
+
+.duplicate-results-copy-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.35rem 0.7rem;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  background: #f8f8f8;
+  color: #333;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
+.duplicate-results-copy-btn:hover {
+  background: #f0f0f0;
+}
+
+.duplicate-results-copy-icon {
+  flex: 0 0 auto;
+}
+
 .duplicate-results-table {
   width: 100%;
   border-collapse: collapse;
