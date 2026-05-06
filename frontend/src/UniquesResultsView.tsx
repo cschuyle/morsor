@@ -78,6 +78,21 @@ export function UniquesResultsView({ results = [], sortBy = null, sortDir = 'asc
     onSortChange(columnId, nextDir)
   }
 
+  const handleCopyTitles = async () => {
+    const text = results
+      .map((row) => ((row?.item ?? row)?.title ?? '').trim())
+      .filter((title) => title.length > 0)
+      .join('\n')
+    if (!text || !navigator?.clipboard?.writeText) {
+      return
+    }
+    try {
+      await navigator.clipboard.writeText(text)
+    } catch {
+      // Ignore clipboard errors; button is a convenience action.
+    }
+  }
+
   if (!results.length) {
     return (
       <p className="duplicate-results-empty">No unique items. Every primary item has a match in the compare troves.</p>
@@ -94,6 +109,28 @@ export function UniquesResultsView({ results = [], sortBy = null, sortDir = 'asc
 
   return (
     <div className={rootClassName}>
+      <div className="duplicate-results-actions">
+        <button
+          type="button"
+          className="duplicate-results-copy-btn"
+          onClick={() => {
+            void handleCopyTitles()
+          }}
+        >
+          <svg
+            className="duplicate-results-copy-icon"
+            viewBox="0 0 24 24"
+            width="16"
+            height="16"
+            aria-hidden="true"
+            focusable="false"
+          >
+            <rect x="9" y="3" width="11" height="13" rx="2" ry="2" fill="none" stroke="currentColor" strokeWidth="1.8" />
+            <rect x="4" y="8" width="11" height="13" rx="2" ry="2" fill="none" stroke="currentColor" strokeWidth="1.8" />
+          </svg>
+          Copy Titles
+        </button>
+      </div>
       <table className="duplicate-results-table">
         <thead>
           <tr>

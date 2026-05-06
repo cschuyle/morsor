@@ -1008,6 +1008,25 @@ export function SearchResultsGrid({ data, sortBy = null, sortDir = 'asc', onSort
   }, [data, globalFilter])
 
   const showGallery = viewMode === 'gallery'
+
+  const handleCopyTitles = async () => {
+    const rowsToCopy = showGallery
+      ? filteredRowsForGallery
+      : table.getFilteredRowModel().rows.map((row) => row.original)
+    const text = rowsToCopy
+      .map((row) => (row?.title ?? '').trim())
+      .filter((title) => title.length > 0)
+      .join('\n')
+    if (!text || !navigator?.clipboard?.writeText) {
+      return
+    }
+    try {
+      await navigator.clipboard.writeText(text)
+    } catch {
+      // Ignore clipboard errors; button is a convenience action.
+    }
+  }
+
   const [showBackToTop, setShowBackToTop] = useState(false)
   const gridRef = useRef<HTMLDivElement | null>(null)
   const [backToTopCenterX, setBackToTopCenterX] = useState<number | null>(null)
@@ -1326,6 +1345,26 @@ export function SearchResultsGrid({ data, sortBy = null, sortDir = 'asc', onSort
               </button>
             )}
           </div>
+          <button
+            type="button"
+            className="search-results-copy-btn"
+            onClick={() => {
+              void handleCopyTitles()
+            }}
+          >
+            <svg
+              className="search-results-copy-icon"
+              viewBox="0 0 24 24"
+              width="16"
+              height="16"
+              aria-hidden="true"
+              focusable="false"
+            >
+              <rect x="9" y="3" width="11" height="13" rx="2" ry="2" fill="none" stroke="currentColor" strokeWidth="1.8" />
+              <rect x="4" y="8" width="11" height="13" rx="2" ry="2" fill="none" stroke="currentColor" strokeWidth="1.8" />
+            </svg>
+            Copy Titles
+          </button>
           {afterFilterSlot}
         </div>
       )}
