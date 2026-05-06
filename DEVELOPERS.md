@@ -254,6 +254,9 @@ Use the `postgres` profile so the app uses Postgres instead of H2:
 SPRING_PROFILES_ACTIVE=postgres SPRING_DATASOURCE_PASSWORD=morsor ./gradlew bootRun
 ```
 
+Profile defaults for Postgres now live in `src/main/resources/application-postgres.properties`.
+You can override `SPRING_DATASOURCE_URL`, `SPRING_DATASOURCE_USERNAME`, and `SPRING_DATASOURCE_PASSWORD` as needed.
+
 
 ### Notes re: dev API token
 
@@ -277,7 +280,8 @@ Env var `SPRING_PROFILES_ACTIVE` is a comma-delimited list of profiles to activa
   - No env vars required
 
 - Spring profile **postgres**: Postgres, same Flyway scripts (`h2+postgres`), no dev seeding (no seeded user/token).
-  - Env vars: `SPRING_DATASOURCE_PASSWORD`
+  - Env vars: `SPRING_DATASOURCE_PASSWORD` (required if you do not use the default)
+  - Optional overrides: `SPRING_DATASOURCE_URL`, `SPRING_DATASOURCE_USERNAME`, `SPRING_DATASOURCE_DRIVER_CLASS_NAME`
 
 - Spring profile **s3troves**: Trove data loaded from S3; set `MOOCHO_BUCKET_NAME`. Use with `dev` (H2) or `postgres` (Postgres), e.g. `postgres,s3troves`.
   - Env vars: 
