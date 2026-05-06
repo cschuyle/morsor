@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { SearchResultsGrid } from './SearchResultsGrid'
 
 describe('SearchResultsGrid copy titles', () => {
@@ -21,7 +21,7 @@ describe('SearchResultsGrid copy titles', () => {
     })
   })
 
-  it('copies search result titles one per line', () => {
+  it('copies search result titles one per line', async () => {
     render(
       <SearchResultsGrid
         data={[
@@ -35,10 +35,12 @@ describe('SearchResultsGrid copy titles', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Copy Titles' }))
 
-    expect(navigator.clipboard.writeText).toHaveBeenCalledWith("Wayne's World\nFace-Off (1997)")
+    await waitFor(() => {
+      expect(navigator.clipboard.writeText).toHaveBeenCalledWith("Wayne's World\nFace-Off (1997)")
+    })
   })
 
-  it('copies filtered table as CSV and TSV', () => {
+  it('copies filtered table as CSV and TSV', async () => {
     render(
       <SearchResultsGrid
         data={[
@@ -50,13 +52,17 @@ describe('SearchResultsGrid copy titles', () => {
     )
 
     fireEvent.click(screen.getByRole('button', { name: 'CSV' }))
-    expect(navigator.clipboard.writeText).toHaveBeenCalledWith(
-      "Title,Trove,Score\nWayne's World,Movies,1.20\nFace-Off (1997),Movies,1.10",
-    )
+    await waitFor(() => {
+      expect(navigator.clipboard.writeText).toHaveBeenCalledWith(
+        "Title,Trove,Score\nWayne's World,Movies,1.20\nFace-Off (1997),Movies,1.10",
+      )
+    })
 
     fireEvent.click(screen.getByRole('button', { name: 'TSV' }))
-    expect(navigator.clipboard.writeText).toHaveBeenCalledWith(
-      "Title\tTrove\tScore\nWayne's World\tMovies\t1.20\nFace-Off (1997)\tMovies\t1.10",
-    )
+    await waitFor(() => {
+      expect(navigator.clipboard.writeText).toHaveBeenCalledWith(
+        "Title\tTrove\tScore\nWayne's World\tMovies\t1.20\nFace-Off (1997)\tMovies\t1.10",
+      )
+    })
   })
 })

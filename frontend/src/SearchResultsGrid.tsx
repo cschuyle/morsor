@@ -24,6 +24,12 @@ export interface SearchResultsGridProps {
   isMobile?: boolean
   /** List view only: extra JSON keys (from {@link extraFields}) as columns; sorting uses API sortBy "extra:" + key. */
   visibleExtraFieldKeys?: string[] | null
+  /**
+   * Called by copy buttons to obtain the full result set (all pages) for copying.
+   * When provided and resolves non-null, copy operates on all results rather than the current page.
+   * Falls back to the current page if null or on error.
+   */
+  onFetchAllForCopy?: (() => Promise<SearchResultRow[] | null>) | null
 }
 
 const AMAZON_PLACEHOLDER_THUMB = 'https://m.media-amazon.com/images/I/01RmK+J4pJL._SS135_.gif'
@@ -795,7 +801,7 @@ export function rawSourceDisplay(rawSourceItem: unknown): string {
   return (rawSourceItem != null && rawSourceItem !== '') ? String(rawSourceItem) : RAW_SOURCE_NOT_AVAILABLE
 }
 
-export function SearchResultsGrid({ data, sortBy = null, sortDir = 'asc', onSortChange, showScoreColumn = false, afterFilterSlot = null, viewMode = 'list', hideTroveInGallery = false, hideTroveInList = false, showPdfSashInGallery = false, showGalleryDecorations = true, isMobile = false, visibleExtraFieldKeys = null }: SearchResultsGridProps) {
+export function SearchResultsGrid({ data, sortBy = null, sortDir = 'asc', onSortChange, showScoreColumn = false, afterFilterSlot = null, viewMode = 'list', hideTroveInGallery = false, hideTroveInList = false, showPdfSashInGallery = false, showGalleryDecorations = true, isMobile = false, visibleExtraFieldKeys = null, onFetchAllForCopy = null }: SearchResultsGridProps) {
   const [globalFilter, setGlobalFilter] = useState('')
   const [lightbox, setLightbox] = useState<LightboxPayload | null>(null)
   const [rawSourceLightbox, setRawSourceLightbox] = useState<{ title: string; rawSourceItem: string } | null>(null)
@@ -1034,12 +1040,25 @@ export function SearchResultsGrid({ data, sortBy = null, sortDir = 'asc', onSort
 
   const toTsvCell = (value: unknown): string => String(value ?? '').replace(/[\t\n\r]+/g, ' ')
 
-  const buildDelimitedTable = (delimiter: ',' | '\t'): string => {
+  /** Returns the full result set when available via onFetchAllForCopy; falls back to the current page. */
+  const resolveRowsForCopy = async (): Promise<SearchResultRow[]> => {
+    if (onFetchAllForCopy) {
+      try {
+        const all = await onFetchAllForCopy()
+        if (all) return all
+      } catch {
+        // fall through to current page
+      }
+    }
+    return rowsForCopy
+  }
+
+  const buildDelimitedTable = (rows: SearchResultRow[], delimiter: ',' | '\t'): string => {
     const extraKeys = viewMode === 'list' ? (visibleExtraFieldKeys ?? []) : []
     const headers = ['Title', 'Trove', ...(showScoreColumn ? ['Score'] : []), ...extraKeys.map((k) => formatLittlePrinceFieldLabel(k))]
     const encode = delimiter === ',' ? toCsvCell : toTsvCell
     const lines = [headers.map(encode).join(delimiter)]
-    for (const row of rowsForCopy) {
+    for (const row of rows) {
       const baseCells: Array<string | number> = [
         (row?.title ?? '').trim(),
         row?.trove ?? row?.troveId ?? '',
@@ -1054,7 +1073,8 @@ export function SearchResultsGrid({ data, sortBy = null, sortDir = 'asc', onSort
   }
 
   const handleCopyTitles = async () => {
-    const text = rowsForCopy
+    const rows = await resolveRowsForCopy()
+    const text = rows
       .map((row) => (row?.title ?? '').trim())
       .filter((title) => title.length > 0)
       .join('\n')
@@ -1062,11 +1082,11 @@ export function SearchResultsGrid({ data, sortBy = null, sortDir = 'asc', onSort
   }
 
   const handleCopyCsv = async () => {
-    await copyText(buildDelimitedTable(','))
+    await copyText(buildDelimitedTable(await resolveRowsForCopy(), ','))
   }
 
   const handleCopyTsv = async () => {
-    await copyText(buildDelimitedTable('\t'))
+    await copyText(buildDelimitedTable(await resolveRowsForCopy(), '\t'))
   }
 
   const [showBackToTop, setShowBackToTop] = useState(false)

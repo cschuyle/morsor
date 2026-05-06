@@ -175,6 +175,8 @@ function MobileApp() {
   const lastFileTypeOrViewSearchRef = useRef(0)
   const abortRef = useRef<AbortController | null>(null)
   const searchRequestIdRef = useRef(0)
+  /** Holds the full (unpaged) search result rows from the most recent fetchSearch. Used by onFetchAllForCopy. */
+  const fullSearchResultsRef = useRef<import('./types').SearchResultRow[] | null>(null)
   const reloadAbortControllerRef = useRef<AbortController | null>(null)
   const reloadRunIdRef = useRef(0)
   const reloadInProgressRef = useRef(false)
@@ -727,6 +729,7 @@ function MobileApp() {
     if (!q) {
       setSearchResult({ count: 0, results: [], page: 0, size })
       setSearchQueryTiming(null)
+      fullSearchResultsRef.current = null
       return
     }
     const fetchIsStarQuery = q === '*'
@@ -758,104 +761,95 @@ function MobileApp() {
         setOtherSortDir(sortDir)
       }
     }
-    const params = new URLSearchParams({
-      query: q,
-      page: String(pageNum),
-      size: String(size),
-    })
-    selectedTroveIds.forEach((id) => params.append('trove', id))
-    if (boostTroveId) params.set('boostTrove', boostTroveId)
-    if (fileTypesToUse.size > 0) params.set('fileTypes', [...fileTypesToUse].sort().join(','))
-    if (requiredEffective.size > 0) params.set('requireFileTypes', [...requiredEffective].sort().join(','))
-    if (thumbnailOnly) params.set('thumbs', '1')
-    if (sortBy) {
-      params.set('sortBy', sortBy)
-      params.set('sortDir', sortDir)
-    }
-    const url = `/api/search?${params}`
+
+    // Build the full-result cache key (no page/size) so all pages of the same query share one cache entry.
+    const fullKeyParams = new URLSearchParams({ query: q })
+    selectedTroveIds.forEach((id) => fullKeyParams.append('trove', id))
+    if (boostTroveId) fullKeyParams.set('boostTrove', boostTroveId)
+    if (fileTypesToUse.size > 0) fullKeyParams.set('fileTypes', [...fileTypesToUse].sort().join(','))
+    if (requiredEffective.size > 0) fullKeyParams.set('requireFileTypes', [...requiredEffective].sort().join(','))
+    if (thumbnailOnly) fullKeyParams.set('thumbs', '1')
+    if (sortBy) { fullKeyParams.set('sortBy', sortBy); fullKeyParams.set('sortDir', sortDir) }
+    const fullCacheKey = `full:/api/search?${fullKeyParams}`
+
     abortRef.current?.abort()
-    const hit = queryCache.get(url)
-    if (hit) {
-      const cached = hit.data as SearchResultData
-      setSearchResult(cached)
-      setSearchQueryTiming({ durationMs: hit.durationMs, receivedAtMs: hit.receivedAtMs })
-      if (Array.isArray(cached?.availableFileTypes) && cached.availableFileTypes.length > 0) {
+
+    const fullHit = queryCache.get(fullCacheKey)
+    if (fullHit) {
+      const allData = fullHit.data as SearchResultData
+      const pageResults = allData.results.slice(pageNum * size, (pageNum + 1) * size)
+      const pagedData: SearchResultData = { ...allData, results: pageResults, page: pageNum, size }
+      fullSearchResultsRef.current = allData.results
+      setSearchResult(pagedData)
+      setSearchQueryTiming({ durationMs: fullHit.durationMs, receivedAtMs: fullHit.receivedAtMs })
+      if (Array.isArray(allData?.availableFileTypes) && allData.availableFileTypes.length > 0) {
         setAllAvailableFileTypes((prev) => {
           const next = new Set<string>(prev)
-          cached.availableFileTypes!.forEach((t) => next.add(normalizeFileTypeToken(t)))
+          allData.availableFileTypes!.forEach((t) => next.add(normalizeFileTypeToken(t)))
           return [...next].sort()
         })
       }
       const sl = searchHistoryLabels(
-        troves,
-        q,
-        searchResultsViewMode,
-        [...selectedTroveIds],
-        sortBy || null,
-        sortDir,
-        fileTypesToUse,
-        thumbnailOnly,
-        boostTroveId,
-        cached.page,
-        size
+        troves, q, searchResultsViewMode, [...selectedTroveIds], sortBy || null, sortDir,
+        fileTypesToUse, thumbnailOnly, boostTroveId, pageNum, size
       )
       appendQueryHistoryEntry({
         mode: 'search',
-        ranAtMs: hit.receivedAtMs,
-        durationMs: hit.durationMs,
-        consoleQuery: buildAppUrlParams({ searchPage0BasedOverride: cached.page }).toString(),
-        apiCacheKey: url,
-        resultCount: cached.count,
+        ranAtMs: fullHit.receivedAtMs,
+        durationMs: fullHit.durationMs,
+        consoleQuery: buildAppUrlParams({ searchPage0BasedOverride: pageNum }).toString(),
+        apiCacheKey: fullCacheKey,
+        resultCount: allData.count,
         summary: sl.summary,
         detail: sl.detail,
       })
       return
     }
+
+    // Cache miss: fetch the full result set in one request (page=0, large size).
     setSearchQueryTiming(null)
     const searchStartedAt = Date.now()
     const controller = new AbortController()
     abortRef.current = controller
     const requestId = ++searchRequestIdRef.current
     setSearching(true)
-    fetch(url, { credentials: 'include', headers: { ...getApiAuthHeaders() }, signal: controller.signal })
+    const fullFetchParams = new URLSearchParams(fullKeyParams)
+    fullFetchParams.set('page', '0')
+    fullFetchParams.set('size', '10000')
+    const fullFetchUrl = `/api/search?${fullFetchParams}`
+    fetch(fullFetchUrl, { credentials: 'include', headers: { ...getApiAuthHeaders() }, signal: controller.signal })
       .then((res) => {
         if (res.status === 401) { window.location.href = '/login'; return Promise.reject() }
         return res.ok ? res.json() : Promise.reject(new Error(res.statusText))
       })
-      .then((data: SearchResultData) => {
+      .then((allData: SearchResultData) => {
         if (searchRequestIdRef.current !== requestId) return
         const receivedAtMs = Date.now()
         const durationMs = receivedAtMs - searchStartedAt
-        queryCache.set(url, data, { durationMs, receivedAtMs })
+        queryCache.set(fullCacheKey, allData, { durationMs, receivedAtMs })
+        fullSearchResultsRef.current = allData.results
+        const pageResults = allData.results.slice(pageNum * size, (pageNum + 1) * size)
+        const pagedData: SearchResultData = { ...allData, results: pageResults, page: pageNum, size }
         setSearchQueryTiming({ durationMs, receivedAtMs })
-        setSearchResult(data)
-        if (Array.isArray(data?.availableFileTypes) && data.availableFileTypes.length > 0) {
+        setSearchResult(pagedData)
+        if (Array.isArray(allData?.availableFileTypes) && allData.availableFileTypes.length > 0) {
           setAllAvailableFileTypes((prev) => {
             const next = new Set<string>(prev)
-            data.availableFileTypes!.forEach((t) => next.add(normalizeFileTypeToken(t)))
+            allData.availableFileTypes!.forEach((t) => next.add(normalizeFileTypeToken(t)))
             return [...next].sort()
           })
         }
         const sl = searchHistoryLabels(
-          troves,
-          q,
-          searchResultsViewMode,
-          [...selectedTroveIds],
-          sortBy || null,
-          sortDir,
-          fileTypesToUse,
-          thumbnailOnly,
-          boostTroveId,
-          data.page,
-          size
+          troves, q, searchResultsViewMode, [...selectedTroveIds], sortBy || null, sortDir,
+          fileTypesToUse, thumbnailOnly, boostTroveId, pageNum, size
         )
         appendQueryHistoryEntry({
           mode: 'search',
           ranAtMs: receivedAtMs,
           durationMs,
-          consoleQuery: buildAppUrlParams({ searchPage0BasedOverride: data.page }).toString(),
-          apiCacheKey: url,
-          resultCount: data.count,
+          consoleQuery: buildAppUrlParams({ searchPage0BasedOverride: pageNum }).toString(),
+          apiCacheKey: fullCacheKey,
+          resultCount: allData.count,
           summary: sl.summary,
           detail: sl.detail,
         })
@@ -926,50 +920,39 @@ function MobileApp() {
       setDuplicatesSortBy(sortBy || null)
       setDuplicatesSortDir(sortDir)
     }
-    const params = new URLSearchParams({
-      primaryTrove: primaryTroveId.trim(),
-      query: q,
-      page: String(pageNum),
-      size: String(size),
-      maxMatches: '20',
-    })
-    if (sortBy) {
-      params.set('sortBy', sortBy)
-      params.set('sortDir', sortDir)
-    }
     const compareIdsToSend = compareTroveIds.size > 0 ? compareTroveIds : new Set([primaryTroveId.trim()])
-    compareIdsToSend.forEach((id) => params.append('compareTrove', id))
-    const streamUrl = `/api/search/duplicates/stream?${params}`
-    const restUrl = `/api/search/duplicates?${params}`
-    const dupHit = queryCache.get(restUrl)
+
+    // Build the full-result cache key (no page/size) so all pages of the same query share one cache entry.
+    const fullKeyParams = new URLSearchParams({ primaryTrove: primaryTroveId.trim(), query: q, maxMatches: '20' })
+    if (sortBy) { fullKeyParams.set('sortBy', sortBy); fullKeyParams.set('sortDir', sortDir) }
+    compareIdsToSend.forEach((id) => fullKeyParams.append('compareTrove', id))
+    const fullCacheKey = `full:/api/search/duplicates?${fullKeyParams}`
+
+    const dupHit = queryCache.get(fullCacheKey)
     if (dupHit) {
-      const cached = dupHit.data as DuplicatesResultData
-      setDuplicatesResult(cached)
+      const allData = dupHit.data as DuplicatesResultData
+      const pageRows = allData.rows.slice(pageNum * size, (pageNum + 1) * size)
+      const pagedData: DuplicatesResultData = { ...allData, rows: pageRows, page: pageNum, size }
+      setDuplicatesResult(pagedData)
       setDuplicatesPage(pageNum)
       setCompareQueryTiming({ durationMs: dupHit.durationMs, receivedAtMs: dupHit.receivedAtMs })
-      const compareIdsToSend = compareTroveIds.size > 0 ? compareTroveIds : new Set([primaryTroveId.trim()])
       const dl = duplicatesHistoryLabels(
-        troves,
-        q,
-        primaryTroveId.trim(),
-        [...compareIdsToSend],
-        sortBy || null,
-        sortDir,
-        cached.page,
-        size
+        troves, q, primaryTroveId.trim(), [...compareIdsToSend], sortBy || null, sortDir, pageNum, size
       )
       appendQueryHistoryEntry({
         mode: 'duplicates',
         ranAtMs: dupHit.receivedAtMs,
         durationMs: dupHit.durationMs,
-        consoleQuery: buildAppUrlParams({ dupPage0BasedOverride: cached.page }).toString(),
-        apiCacheKey: restUrl,
-        resultCount: cached.total,
+        consoleQuery: buildAppUrlParams({ dupPage0BasedOverride: pageNum }).toString(),
+        apiCacheKey: fullCacheKey,
+        resultCount: allData.total,
         summary: dl.summary,
         detail: dl.detail,
       })
       return
     }
+
+    // Cache miss: stream the full result set (page=0, large size) and cache it.
     setCompareQueryTiming(null)
     abortRef.current?.abort()
     const controller = new AbortController()
@@ -983,33 +966,31 @@ function MobileApp() {
     compareIntervalRef.current = setInterval(() => {
       setCompareElapsedSec(Math.floor((Date.now() - (compareTimerStartRef.current ?? 0)) / 1000))
     }, 1000)
-    readCompareStream(streamUrl, controller.signal, (current, total) => setCompareProgress({ current, total }), (result) => {
-      const data = result as DuplicatesResultData
+    const fullStreamParams = new URLSearchParams(fullKeyParams)
+    fullStreamParams.set('page', '0')
+    fullStreamParams.set('size', '10000')
+    const fullStreamUrl = `/api/search/duplicates/stream?${fullStreamParams}`
+    readCompareStream(fullStreamUrl, controller.signal, (current, total) => setCompareProgress({ current, total }), (result) => {
+      const allDup = result as DuplicatesResultData
       const receivedAtMs = Date.now()
       const durationMs = compareTimerStartRef.current != null ? receivedAtMs - compareTimerStartRef.current : 0
-      queryCache.set(restUrl, data, { durationMs, receivedAtMs })
+      queryCache.set(fullCacheKey, allDup, { durationMs, receivedAtMs })
       setCompareQueryTiming({ durationMs, receivedAtMs })
-      setDuplicatesResult(data)
+      const pageRows = allDup.rows.slice(pageNum * size, (pageNum + 1) * size)
+      const pagedDup: DuplicatesResultData = { ...allDup, rows: pageRows, page: pageNum, size }
+      setDuplicatesResult(pagedDup)
       setDuplicatesPage(pageNum)
       setCompareProgress({ current: 0, total: 0 })
-      const compareIdsToSend = compareTroveIds.size > 0 ? compareTroveIds : new Set([primaryTroveId.trim()])
       const dl = duplicatesHistoryLabels(
-        troves,
-        q,
-        primaryTroveId.trim(),
-        [...compareIdsToSend],
-        sortBy || null,
-        sortDir,
-        data.page,
-        size
+        troves, q, primaryTroveId.trim(), [...compareIdsToSend], sortBy || null, sortDir, pageNum, size
       )
       appendQueryHistoryEntry({
         mode: 'duplicates',
         ranAtMs: receivedAtMs,
         durationMs,
-        consoleQuery: buildAppUrlParams({ dupPage0BasedOverride: data.page }).toString(),
-        apiCacheKey: restUrl,
-        resultCount: data.total,
+        consoleQuery: buildAppUrlParams({ dupPage0BasedOverride: pageNum }).toString(),
+        apiCacheKey: fullCacheKey,
+        resultCount: allDup.total,
         summary: dl.summary,
         detail: dl.detail,
       })
@@ -1045,47 +1026,38 @@ function MobileApp() {
       setUniquesSortBy(sortBy || null)
       setUniquesSortDir(sortDir)
     }
-    const params = new URLSearchParams({
-      primaryTrove: primaryTroveId.trim(),
-      query: q,
-      page: String(pageNum),
-      size: String(size),
-    })
-    if (sortBy) {
-      params.set('sortBy', sortBy)
-      params.set('sortDir', sortDir)
-    }
-    compareTroveIds.forEach((id) => params.append('compareTrove', id))
-    const streamUrl = `/api/search/uniques/stream?${params}`
-    const restUrl = `/api/search/uniques?${params}`
-    const uniqHit = queryCache.get(restUrl)
+
+    // Build the full-result cache key (no page/size) so all pages of the same query share one cache entry.
+    const fullKeyParams = new URLSearchParams({ primaryTrove: primaryTroveId.trim(), query: q })
+    if (sortBy) { fullKeyParams.set('sortBy', sortBy); fullKeyParams.set('sortDir', sortDir) }
+    compareTroveIds.forEach((id) => fullKeyParams.append('compareTrove', id))
+    const fullCacheKey = `full:/api/search/uniques?${fullKeyParams}`
+
+    const uniqHit = queryCache.get(fullCacheKey)
     if (uniqHit) {
-      const cached = uniqHit.data as UniquesResultData
-      setUniquesResult(cached)
+      const allData = uniqHit.data as UniquesResultData
+      const pageResults = allData.results.slice(pageNum * size, (pageNum + 1) * size)
+      const pagedData: UniquesResultData = { ...allData, results: pageResults, page: pageNum, size }
+      setUniquesResult(pagedData)
       setUniquesPage(pageNum)
       setCompareQueryTiming({ durationMs: uniqHit.durationMs, receivedAtMs: uniqHit.receivedAtMs })
       const ul = uniquesHistoryLabels(
-        troves,
-        q,
-        primaryTroveId.trim(),
-        [...compareTroveIds],
-        sortBy || null,
-        sortDir,
-        cached.page,
-        size
+        troves, q, primaryTroveId.trim(), [...compareTroveIds], sortBy || null, sortDir, pageNum, size
       )
       appendQueryHistoryEntry({
         mode: 'uniques',
         ranAtMs: uniqHit.receivedAtMs,
         durationMs: uniqHit.durationMs,
-        consoleQuery: buildAppUrlParams({ uniqPage0BasedOverride: cached.page }).toString(),
-        apiCacheKey: restUrl,
-        resultCount: cached.total,
+        consoleQuery: buildAppUrlParams({ uniqPage0BasedOverride: pageNum }).toString(),
+        apiCacheKey: fullCacheKey,
+        resultCount: allData.total,
         summary: ul.summary,
         detail: ul.detail,
       })
       return
     }
+
+    // Cache miss: stream the full result set (page=0, large size) and cache it.
     setCompareQueryTiming(null)
     abortRef.current?.abort()
     const controller = new AbortController()
@@ -1099,32 +1071,31 @@ function MobileApp() {
     compareIntervalRef.current = setInterval(() => {
       setCompareElapsedSec(Math.floor((Date.now() - (compareTimerStartRef.current ?? 0)) / 1000))
     }, 1000)
-    readCompareStream(streamUrl, controller.signal, (current, total) => setCompareProgress({ current, total }), (result) => {
-      const data = result as UniquesResultData
+    const fullStreamParams = new URLSearchParams(fullKeyParams)
+    fullStreamParams.set('page', '0')
+    fullStreamParams.set('size', '10000')
+    const fullStreamUrl = `/api/search/uniques/stream?${fullStreamParams}`
+    readCompareStream(fullStreamUrl, controller.signal, (current, total) => setCompareProgress({ current, total }), (result) => {
+      const allUniq = result as UniquesResultData
       const receivedAtMs = Date.now()
       const durationMs = compareTimerStartRef.current != null ? receivedAtMs - compareTimerStartRef.current : 0
-      queryCache.set(restUrl, data, { durationMs, receivedAtMs })
+      queryCache.set(fullCacheKey, allUniq, { durationMs, receivedAtMs })
       setCompareQueryTiming({ durationMs, receivedAtMs })
-      setUniquesResult(data)
+      const pageResults = allUniq.results.slice(pageNum * size, (pageNum + 1) * size)
+      const pagedUniq: UniquesResultData = { ...allUniq, results: pageResults, page: pageNum, size }
+      setUniquesResult(pagedUniq)
       setUniquesPage(pageNum)
       setCompareProgress({ current: 0, total: 0 })
       const ul = uniquesHistoryLabels(
-        troves,
-        q,
-        primaryTroveId.trim(),
-        [...compareTroveIds],
-        sortBy || null,
-        sortDir,
-        data.page,
-        size
+        troves, q, primaryTroveId.trim(), [...compareTroveIds], sortBy || null, sortDir, pageNum, size
       )
       appendQueryHistoryEntry({
         mode: 'uniques',
         ranAtMs: receivedAtMs,
         durationMs,
-        consoleQuery: buildAppUrlParams({ uniqPage0BasedOverride: data.page }).toString(),
-        apiCacheKey: restUrl,
-        resultCount: data.total,
+        consoleQuery: buildAppUrlParams({ uniqPage0BasedOverride: pageNum }).toString(),
+        apiCacheKey: fullCacheKey,
+        resultCount: allUniq.total,
         summary: ul.summary,
         detail: ul.detail,
       })
@@ -2902,6 +2873,7 @@ onClick={() => {
                   showGalleryDecorations={galleryDecorate}
                   isMobile
                   visibleExtraFieldKeys={visibleExtraFieldKeysForGrid}
+                  onFetchAllForCopy={async () => fullSearchResultsRef.current}
                 />
               </div>
             )}
