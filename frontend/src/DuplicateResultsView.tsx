@@ -2,19 +2,24 @@ import { Fragment } from 'react'
 import type { DuplicateRow } from './types'
 import { rawSourceDisplay } from './SearchResultsGrid'
 
-const WORD_RE = /\b\w+\b/g
+const WORD_RE = /\b[\w'\u2019]+\b/g
+
+function stripApostrophes(s: string): string {
+  return s.replace(/['\u2019]/g, '')
+}
 
 function getPrimaryWords(primaryTitle: string): Set<string> {
   const lower = (primaryTitle ?? '').toLowerCase()
   const words = lower.match(WORD_RE) ?? []
-  return new Set(words)
+  return new Set(words.map(stripApostrophes))
 }
 
 function titleWithExtraHighlight(matchTitle: string, primaryWords: Set<string>): React.ReactNode {
   if (!matchTitle) return '—'
-  const segments = matchTitle.split(/(\b[\w']+\b)/g)
+  const segments = matchTitle.split(/(\b[\w'\u2019]+\b)/g)
   return segments.map((seg, i) => {
-    if (seg.length > 0 && /^[\w']+$/.test(seg) && !primaryWords.has(seg.toLowerCase())) {
+    const normalized = stripApostrophes(seg.toLowerCase())
+    if (seg.length > 0 && /^[\w'\u2019]+$/.test(seg) && !primaryWords.has(normalized)) {
       return <span key={i} className="dup-match-word-not-in-primary">{seg}</span>
     }
     return seg
