@@ -336,7 +336,7 @@ function App() {
       }
       const sl = searchHistoryLabels(
         troves, qt, searchResultsViewMode, [...troveIds], nextSortBy || null, nextSortDir,
-        fileTypesToUse, thumbnailOnly, boostTroveId, pageNum, size
+        fileTypesToUse, thumbnailOnly, boostTroveId
       )
       appendQueryHistoryEntry({
         mode: 'search',
@@ -388,7 +388,7 @@ function App() {
         }
         const sl = searchHistoryLabels(
           troves, qt, searchResultsViewMode, [...troveIds], nextSortBy || null, nextSortDir,
-          fileTypesToUse, thumbnailOnly, boostTroveId, pageNum, size
+          fileTypesToUse, thumbnailOnly, boostTroveId
         )
         appendQueryHistoryEntry({
           mode: 'search',
@@ -1013,7 +1013,7 @@ function App() {
       setDuplicatesPage(pageNum)
       setCompareQueryTiming({ durationMs: dupHit.durationMs, receivedAtMs: dupHit.receivedAtMs })
       const dl = duplicatesHistoryLabels(
-        troves, q, primaryTroveId.trim(), [...compareIdsToSend], sortBy || null, sortDir, pageNum, size
+        troves, q, primaryTroveId.trim(), [...compareIdsToSend], sortBy || null, sortDir
       )
       appendQueryHistoryEntry({
         mode: 'duplicates',
@@ -1063,7 +1063,7 @@ function App() {
         setDuplicatesPage(pageNum)
         setCompareProgress({ current: 0, total: 0 })
         const dl = duplicatesHistoryLabels(
-          troves, q, primaryTroveId.trim(), [...compareIdsToSend], sortBy || null, sortDir, pageNum, size
+          troves, q, primaryTroveId.trim(), [...compareIdsToSend], sortBy || null, sortDir
         )
         appendQueryHistoryEntry({
           mode: 'duplicates',
@@ -1132,7 +1132,7 @@ function App() {
       setUniquesPage(pageNum)
       setCompareQueryTiming({ durationMs: uniqHit.durationMs, receivedAtMs: uniqHit.receivedAtMs })
       const ul = uniquesHistoryLabels(
-        troves, q, primaryTroveId.trim(), [...selectedTroveIds], sortBy || null, sortDir, pageNum, size
+        troves, q, primaryTroveId.trim(), [...selectedTroveIds], sortBy || null, sortDir
       )
       appendQueryHistoryEntry({
         mode: 'uniques',
@@ -1182,7 +1182,7 @@ function App() {
         setUniquesPage(pageNum)
         setCompareProgress({ current: 0, total: 0 })
         const ul = uniquesHistoryLabels(
-          troves, q, primaryTroveId.trim(), [...selectedTroveIds], sortBy || null, sortDir, pageNum, size
+          troves, q, primaryTroveId.trim(), [...selectedTroveIds], sortBy || null, sortDir
         )
         appendQueryHistoryEntry({
           mode: 'uniques',

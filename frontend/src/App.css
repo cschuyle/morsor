@@ -2916,12 +2916,12 @@
   color: #333;
 }
 
-.history-cell-summary {
-  max-width: 14rem;
+.history-cell-description {
+  max-width: 32rem;
 }
 
-.history-cell-detail {
-  max-width: 22rem;
+.history-description-summary {
+  margin-bottom: 0.3rem;
 }
 
 .history-detail-code {

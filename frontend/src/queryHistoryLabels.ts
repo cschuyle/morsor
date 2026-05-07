@@ -18,9 +18,7 @@ export function searchHistoryLabels(
   sortDir: 'asc' | 'desc' | null,
   fileTypes: Set<string>,
   thumbnailOnly: boolean,
-  boostId: string | null,
-  page0: number,
-  pageSize: number
+  boostId: string | null
 ): { summary: string; detail: string } {
   const qt = (q ?? '').trim()
   const displayQ = qt === '' ? '(empty)' : qt.length > 56 ? `${qt.slice(0, 53)}…` : qt
@@ -29,8 +27,6 @@ export function searchHistoryLabels(
     qt === '' ? 'q=(empty)' : `q=${qt.length > 100 ? `${qt.slice(0, 97)}…` : qt}`,
     troveIds.length ? `troves=${joinTroveLabels(troves, troveIds)}` : 'troves=(none)',
     `view=${view}`,
-    `page=${page0 + 1}`,
-    `size=${pageSize}`,
   ]
   if (sortBy) {
     parts.push(`sort=${sortBy} ${sortDir ?? ''}`.trim())
@@ -53,9 +49,7 @@ export function duplicatesHistoryLabels(
   primaryId: string,
   compareIds: string[],
   sortBy: string | null,
-  sortDir: 'asc' | 'desc',
-  page0: number,
-  pageSize: number
+  sortDir: 'asc' | 'desc'
 ): { summary: string; detail: string } {
   const qt = (q ?? '').trim() || '*'
   const shortQ = qt.length > 40 ? `${qt.slice(0, 37)}…` : qt
@@ -65,8 +59,6 @@ export function duplicatesHistoryLabels(
     `q=${qt}`,
     `primary=${primaryName}`,
     compareIds.length ? `compare=${joinTroveLabels(troves, compareIds)}` : 'compare=(none)',
-    `page=${page0 + 1}`,
-    `size=${pageSize}`,
   ]
   if (sortBy) {
     parts.push(`sort=${sortBy} ${sortDir}`)
@@ -80,9 +72,7 @@ export function uniquesHistoryLabels(
   primaryId: string,
   compareIds: string[],
   sortBy: string | null,
-  sortDir: 'asc' | 'desc',
-  page0: number,
-  pageSize: number
+  sortDir: 'asc' | 'desc'
 ): { summary: string; detail: string } {
   const qt = (q ?? '').trim() || '*'
   const shortQ = qt.length > 40 ? `${qt.slice(0, 37)}…` : qt
@@ -92,8 +82,6 @@ export function uniquesHistoryLabels(
     `q=${qt}`,
     `primary=${primaryName}`,
     compareIds.length ? `compare=${joinTroveLabels(troves, compareIds)}` : 'compare=(none)',
-    `page=${page0 + 1}`,
-    `size=${pageSize}`,
   ]
   if (sortBy) {
     parts.push(`sort=${sortBy} ${sortDir}`)

@@ -147,8 +147,7 @@ export default function History() {
               <thead>
                 <tr>
                   <th scope="col">When (local)</th>
-                  <th scope="col">Summary</th>
-                  <th scope="col">Details</th>
+                  <th scope="col">Description</th>
                   <th scope="col">Results</th>
                   <th scope="col">Duration</th>
                   <th scope="col">Cached</th>
@@ -159,8 +158,8 @@ export default function History() {
                 {rows.map(({ entry: e, cacheLabel }) => (
                   <tr key={e.id}>
                     <td className="history-cell-time">{formatQueryReceivedLocal(e.ranAtMs)}</td>
-                    <td className="history-cell-summary">{e.summary}</td>
-                    <td className="history-cell-detail">
+                    <td className="history-cell-description">
+                      <div className="history-description-summary">{e.summary}</div>
                       <code className="history-detail-code">{e.detail}</code>
                     </td>
                     <td className="history-cell-num">{e.resultCount.toLocaleString()}</td>
