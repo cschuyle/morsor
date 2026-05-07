@@ -1489,7 +1489,7 @@
 .mobile-primary-compare-tabs {
   display: flex;
   margin: 0 1rem 0.75rem;
-  min-height: 2.1rem;
+  min-height: 1.7rem;
   border: 1px solid #ddd;
   border-radius: 8px;
   overflow: hidden;
@@ -1502,8 +1502,8 @@
   align-items: center;
   justify-content: space-between;
   gap: 0.4rem;
-  min-height: 2.1rem;
-  padding: 0.7rem 0.75rem;
+  min-height: 1.7rem;
+  padding: 0.3rem 0.65rem;
   border: none;
   background: transparent;
   font-size: 0.9rem;
@@ -1525,6 +1525,38 @@
   flex-shrink: 0;
   margin-left: auto;
   filter: brightness(1.4) invert(25%) sepia(35%) saturate(1500%) hue-rotate(320deg);
+}
+
+.mobile-primary-compare-swap-btn {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 0.45rem;
+  min-height: 1.7rem;
+  border: none;
+  border-left: 1px solid #ddd;
+  border-right: 1px solid #ddd;
+  background: #e4e4e4;
+  color: #555;
+  font-size: 1.7rem;
+  font-weight: 900;
+  line-height: 1;
+  overflow: hidden;
+  cursor: pointer;
+  font-family: inherit;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.mobile-primary-compare-swap-icon {
+  display: block;
+  line-height: 1;
+  transform: translateY(-3px);
+}
+
+.mobile-primary-compare-swap-btn:hover {
+  background: #d8d0f0;
+  color: #222;
 }
 
 .mobile-search-error {

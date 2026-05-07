@@ -1486,6 +1486,22 @@ function App() {
                             <span>Primary</span>
                             {primaryTabInvalid && <img src="/exclamation.png" alt="" className="trove-picker-tab-invalid-icon" aria-hidden="true" />}
                           </button>
+                          {primaryTroveId && selectedTroveIds.size === 1 && (
+                            <button
+                              type="button"
+                              className="trove-picker-swap-btn"
+                              onClick={() => {
+                                const compareId = [...selectedTroveIds][0]
+                                const oldPrimary = primaryTroveId
+                                setPrimaryTroveId(compareId)
+                                setSelectedTroveIds(new Set([oldPrimary]))
+                              }}
+                              aria-label="Swap primary and compare troves"
+                              title="Swap primary and compare troves"
+                            >
+                              <span className="trove-picker-swap-icon" aria-hidden="true">⇄</span>
+                            </button>
+                          )}
                           <button
                             type="button"
                             role="tab"

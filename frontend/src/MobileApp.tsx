@@ -2575,6 +2575,22 @@ onClick={() => {
                     <span>Primary</span>
                     {primaryTabInvalid && <img src="/exclamation.png" alt="" className="mobile-primary-compare-tab-invalid-icon" aria-hidden="true" />}
                   </button>
+                  {primaryTroveId && compareTroveIds.size === 1 && (
+                    <button
+                      type="button"
+                      className="mobile-primary-compare-swap-btn"
+                      onClick={() => {
+                        const compareId = [...compareTroveIds][0]
+                        const oldPrimary = primaryTroveId
+                        setPrimaryTroveId(compareId)
+                        setCompareTroveIds(new Set([oldPrimary]))
+                      }}
+                      aria-label="Swap primary and compare troves"
+                      title="Swap primary and compare troves"
+                    >
+                      <span className="mobile-primary-compare-swap-icon" aria-hidden="true">⇄</span>
+                    </button>
+                  )}
                   <button
                     type="button"
                     role="tab"

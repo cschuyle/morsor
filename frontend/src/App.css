@@ -602,7 +602,7 @@
   align-items: center;
   justify-content: space-between;
   gap: 0.4rem;
-  padding: 0.4rem 1rem;
+  padding: 0.2rem 0.85rem;
   border: 1px solid #ccc;
   border-bottom: none;
   border-radius: 6px 6px 0 0;
@@ -632,6 +632,38 @@
   flex-shrink: 0;
   margin-left: auto;
   filter: brightness(1.4) invert(25%) sepia(35%) saturate(1500%) hue-rotate(320deg);
+}
+
+.trove-picker-swap-btn {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.05rem 0.4rem;
+  border: 1px solid #ccc;
+  border-bottom: none;
+  border-radius: 4px 4px 0 0;
+  margin-bottom: -1px;
+  background: #f0f0f0;
+  color: #555;
+  font-size: 1.7rem;
+  font-weight: 900;
+  line-height: 1;
+  overflow: hidden;
+  cursor: pointer;
+  font-family: inherit;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.trove-picker-swap-icon {
+  display: block;
+  line-height: 1;
+  transform: translateY(-3px);
+}
+
+.trove-picker-swap-btn:hover {
+  background: #ede8ff;
+  color: #222;
 }
 
 .trove-picker-actions {
