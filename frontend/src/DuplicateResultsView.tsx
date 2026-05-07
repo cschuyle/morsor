@@ -32,21 +32,36 @@ interface DuplicateResultsViewProps {
   sortDir?: 'asc' | 'desc'
   onSortChange?: ((columnId: string, direction: 'asc' | 'desc') => void) | null
   onOpenRawSource?: (payload: { title: string; rawSourceItem: string }) => void
+  /** Returns the full result set (all pages) for copy. Falls back to current page rows if null. */
+  onFetchAllRowsForCopy?: (() => Promise<DuplicateRow[] | null>) | null
 }
 
 /**
  * Renders duplicate-finder results: each row has one primary item and N match rows (different style).
  * sortBy / sortDir / onSortChange: optional column sort (title, trove, score). Sorting uses primary row only.
  */
-export function DuplicateResultsView({ rows = [], sortBy = null, sortDir = 'asc', onSortChange, onOpenRawSource }: DuplicateResultsViewProps) {
+export function DuplicateResultsView({ rows = [], sortBy = null, sortDir = 'asc', onSortChange, onOpenRawSource, onFetchAllRowsForCopy = null }: DuplicateResultsViewProps) {
   const handleSort = (columnId: string) => {
     if (!onSortChange) return
     const nextDir = sortBy === columnId && sortDir === 'asc' ? 'desc' as const : 'asc' as const
     onSortChange(columnId, nextDir)
   }
 
+  const resolveRowsForCopy = async (): Promise<DuplicateRow[]> => {
+    if (onFetchAllRowsForCopy) {
+      try {
+        const all = await onFetchAllRowsForCopy()
+        if (all) return all
+      } catch {
+        // fall through to current page
+      }
+    }
+    return rows
+  }
+
   const handleCopyPrimaryTitles = async () => {
-    const text = rows
+    const allRows = await resolveRowsForCopy()
+    const text = allRows
       .map((row) => (row.primary?.title ?? '').trim())
       .filter((title) => title.length > 0)
       .join('\n')

@@ -53,6 +53,8 @@ interface UniquesResultsViewProps {
   sortDir?: 'asc' | 'desc'
   onSortChange?: ((columnId: string, direction: 'asc' | 'desc') => void) | null
   onOpenRawSource?: (payload: { title: string; rawSourceItem: string }) => void
+  /** Returns the full result set (all pages) for copy. Falls back to current page results if null. */
+  onFetchAllResultsForCopy?: (() => Promise<UniqueResultRow[] | null>) | null
 }
 
 /**
@@ -60,7 +62,7 @@ interface UniquesResultsViewProps {
  * Each result has item (SearchResult), score (nearest-miss), and nearMisses (top possible duplicates).
  * sortBy / sortDir / onSortChange: optional column sort (title, trove, score).
  */
-export function UniquesResultsView({ results = [], sortBy = null, sortDir = 'asc', onSortChange, onOpenRawSource }: UniquesResultsViewProps) {
+export function UniquesResultsView({ results = [], sortBy = null, sortDir = 'asc', onSortChange, onOpenRawSource, onFetchAllResultsForCopy = null }: UniquesResultsViewProps) {
   const [dialogRow, setDialogRow] = useState<number | null>(null)
 
   useEffect(() => {
@@ -78,9 +80,23 @@ export function UniquesResultsView({ results = [], sortBy = null, sortDir = 'asc
     onSortChange(columnId, nextDir)
   }
 
+  const resolveResultsForCopy = async (): Promise<UniqueResultRow[]> => {
+    if (onFetchAllResultsForCopy) {
+      try {
+        const all = await onFetchAllResultsForCopy()
+        if (all) return all
+      } catch {
+        // fall through to current page
+      }
+    }
+    return results
+  }
+
   const handleCopyTitles = async () => {
-    const text = results
-      .map((row) => ((row?.item ?? row)?.title ?? '').trim())
+    const allResults = await resolveResultsForCopy()
+    const text = allResults
+      .map((row) => ((row?.item ?? row) as SearchResultRow | undefined)?.title ?? '')
+      .map((t) => t.trim())
       .filter((title) => title.length > 0)
       .join('\n')
     if (!text || !navigator?.clipboard?.writeText) {
@@ -100,12 +116,12 @@ export function UniquesResultsView({ results = [], sortBy = null, sortDir = 'asc
 
   const toTsvCell = (value: unknown): string => String(value ?? '').replace(/[\t\n\r]+/g, ' ')
 
-  const buildDelimitedTable = (delimiter: ',' | '\t'): string => {
+  const buildDelimitedTable = (rows: UniqueResultRow[], delimiter: ',' | '\t'): string => {
     const encode = delimiter === ',' ? toCsvCell : toTsvCell
     const lines = [
       ['Title', 'Trove', 'Score'].map(encode).join(delimiter),
     ]
-    for (const row of results) {
+    for (const row of rows) {
       const item = (row?.item ?? row) as SearchResultRow | undefined
       const score = typeof row?.score === 'number' ? row.score.toFixed(2) : ''
       lines.push([
@@ -127,7 +143,7 @@ export function UniquesResultsView({ results = [], sortBy = null, sortDir = 'asc
   }
 
   const handleCopyCsv = async () => {
-    const text = buildDelimitedTable(',')
+    const text = buildDelimitedTable(await resolveResultsForCopy(), ',')
     if (!text || !navigator?.clipboard?.writeText) {
       return
     }
@@ -139,7 +155,7 @@ export function UniquesResultsView({ results = [], sortBy = null, sortDir = 'asc
   }
 
   const handleCopyTsv = async () => {
-    const text = buildDelimitedTable('\t')
+    const text = buildDelimitedTable(await resolveResultsForCopy(), '\t')
     if (!text || !navigator?.clipboard?.writeText) {
       return
     }

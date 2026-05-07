@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { DuplicateResultsView } from './DuplicateResultsView'
 
 describe('DuplicateResultsView copy primary titles', () => {
@@ -34,6 +34,8 @@ describe('DuplicateResultsView copy primary titles', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Copy Primary Titles' }))
 
-    expect(navigator.clipboard.writeText).toHaveBeenCalledWith("Wayne's World\nFace-Off (1997)")
+    await waitFor(() => {
+      expect(navigator.clipboard.writeText).toHaveBeenCalledWith("Wayne's World\nFace-Off (1997)")
+    })
   })
 })

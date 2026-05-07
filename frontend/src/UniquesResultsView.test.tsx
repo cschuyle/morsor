@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { UniquesResultsView } from './UniquesResultsView'
 
 describe('UniquesResultsView copy titles', () => {
@@ -21,7 +21,7 @@ describe('UniquesResultsView copy titles', () => {
     })
   })
 
-  it('copies unique item titles one per line', () => {
+  it('copies unique item titles one per line', async () => {
     render(
       <UniquesResultsView
         results={[
@@ -34,10 +34,12 @@ describe('UniquesResultsView copy titles', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Copy Titles' }))
 
-    expect(navigator.clipboard.writeText).toHaveBeenCalledWith('Apollo 13\nThe Knick')
+    await waitFor(() => {
+      expect(navigator.clipboard.writeText).toHaveBeenCalledWith('Apollo 13\nThe Knick')
+    })
   })
 
-  it('copies full uniques table as CSV and TSV', () => {
+  it('copies full uniques table as CSV and TSV', async () => {
     render(
       <UniquesResultsView
         results={[
@@ -53,13 +55,17 @@ describe('UniquesResultsView copy titles', () => {
     )
 
     fireEvent.click(screen.getByRole('button', { name: 'CSV' }))
-    expect(navigator.clipboard.writeText).toHaveBeenCalledWith(
-      'Title,Trove,Score\nApollo 13,Movies,0.87\nApollo 18,Movies,0.72',
-    )
+    await waitFor(() => {
+      expect(navigator.clipboard.writeText).toHaveBeenCalledWith(
+        'Title,Trove,Score\nApollo 13,Movies,0.87\nApollo 18,Movies,0.72',
+      )
+    })
 
     fireEvent.click(screen.getByRole('button', { name: 'TSV' }))
-    expect(navigator.clipboard.writeText).toHaveBeenCalledWith(
-      'Title\tTrove\tScore\nApollo 13\tMovies\t0.87\nApollo 18\tMovies\t0.72',
-    )
+    await waitFor(() => {
+      expect(navigator.clipboard.writeText).toHaveBeenCalledWith(
+        'Title\tTrove\tScore\nApollo 13\tMovies\t0.87\nApollo 18\tMovies\t0.72',
+      )
+    })
   })
 })

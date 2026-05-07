@@ -168,6 +168,10 @@ function App() {
   uniqPageSizeRef.current = uniqPageSize
   /** Holds the full (unpaged) search result rows from the most recent fetchSearch. Used by onFetchAllForCopy. */
   const fullSearchResultsRef = useRef<import('./types').SearchResultRow[] | null>(null)
+  /** Holds all duplicate rows from the most recent fetchDuplicates stream. Used by onFetchAllRowsForCopy. */
+  const fullDuplicatesRowsRef = useRef<import('./types').DuplicateRow[] | null>(null)
+  /** Holds all unique result rows from the most recent fetchUniques stream. Used by onFetchAllResultsForCopy. */
+  const fullUniquesResultsRef = useRef<import('./types').UniqueResultRow[] | null>(null)
   const PAGE_SIZE_OPTIONS = [10, 25, 50, 100, 500, 1000, 5000, 10000]
   useLayoutEffect(() => {
     queryRef.current = searchMode === 'search' ? searchQuery : searchMode === 'duplicates' ? dupQuery : uniqQuery
@@ -1002,6 +1006,7 @@ function App() {
     const dupHit = queryCache.get(fullCacheKey)
     if (dupHit) {
       const allData = dupHit.data as DuplicatesResultData
+      fullDuplicatesRowsRef.current = allData.rows
       const pageRows = allData.rows.slice(pageNum * size, (pageNum + 1) * size)
       const pagedData: DuplicatesResultData = { ...allData, rows: pageRows, page: pageNum, size }
       setDuplicatesResult(pagedData)
@@ -1050,6 +1055,7 @@ function App() {
         const receivedAtMs = Date.now()
         const durationMs = compareTimerStartRef.current != null ? receivedAtMs - compareTimerStartRef.current : 0
         queryCache.set(fullCacheKey, allDup, { durationMs, receivedAtMs })
+        fullDuplicatesRowsRef.current = allDup.rows
         setCompareQueryTiming({ durationMs, receivedAtMs })
         const pageRows = allDup.rows.slice(pageNum * size, (pageNum + 1) * size)
         const pagedDup: DuplicatesResultData = { ...allDup, rows: pageRows, page: pageNum, size }
@@ -1119,6 +1125,7 @@ function App() {
     const uniqHit = queryCache.get(fullCacheKey)
     if (uniqHit) {
       const allData = uniqHit.data as UniquesResultData
+      fullUniquesResultsRef.current = allData.results
       const pageResults = allData.results.slice(pageNum * size, (pageNum + 1) * size)
       const pagedData: UniquesResultData = { ...allData, results: pageResults, page: pageNum, size }
       setUniquesResult(pagedData)
@@ -1167,6 +1174,7 @@ function App() {
         const receivedAtMs = Date.now()
         const durationMs = compareTimerStartRef.current != null ? receivedAtMs - compareTimerStartRef.current : 0
         queryCache.set(fullCacheKey, allUniq, { durationMs, receivedAtMs })
+        fullUniquesResultsRef.current = allUniq.results
         setCompareQueryTiming({ durationMs, receivedAtMs })
         const pageResults = allUniq.results.slice(pageNum * size, (pageNum + 1) * size)
         const pagedUniq: UniquesResultData = { ...allUniq, results: pageResults, page: pageNum, size }
@@ -2743,6 +2751,7 @@ function App() {
                     sortDir={duplicatesSortDir}
                     onSortChange={(col, dir) => fetchDuplicates(0, null, col, dir)}
                     onOpenRawSource={(payload) => setCompareRawSourceLightbox(payload)}
+                    onFetchAllRowsForCopy={async () => fullDuplicatesRowsRef.current}
                   />
                 </>
               )
@@ -2866,6 +2875,7 @@ function App() {
                     sortDir={uniquesSortDir}
                     onSortChange={(col, dir) => fetchUniques(0, col, dir)}
                     onOpenRawSource={(payload) => setCompareRawSourceLightbox(payload)}
+                    onFetchAllResultsForCopy={async () => fullUniquesResultsRef.current}
                   />
                 </>
               )
