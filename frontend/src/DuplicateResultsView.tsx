@@ -79,6 +79,66 @@ export function DuplicateResultsView({ rows = [], sortBy = null, sortDir = 'asc'
     }
   }
 
+  const toCsvCell = (value: unknown): string => {
+    const s = String(value ?? '')
+    return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s
+  }
+
+  const toTsvCell = (value: unknown): string => String(value ?? '').replace(/[\t\n\r]+/g, ' ')
+
+  const buildDelimitedTable = (allRows: DuplicateRow[], delimiter: ',' | '\t'): string => {
+    const encode = delimiter === ',' ? toCsvCell : toTsvCell
+    const lines = [['Result Type', 'Title', 'Trove', 'Score'].map(encode).join(delimiter)]
+    for (const row of allRows) {
+      const primaryScore = (row.matches ?? []).reduce((best, m) => {
+        const s = typeof m?.score === 'number' ? m.score : -Infinity
+        return s > best ? s : best
+      }, -Infinity)
+      lines.push([
+        'primary',
+        row.primary?.title ?? '',
+        row.primary?.trove ?? row.primary?.troveId ?? '',
+        primaryScore === -Infinity ? '' : primaryScore.toFixed(2),
+      ].map(encode).join(delimiter))
+
+      for (const m of (row.matches ?? []).filter((match) => String(match.result?.id ?? '') !== String(row.primary?.id ?? ''))) {
+        lines.push([
+          'compare',
+          m.result?.title ?? '',
+          m.result?.trove ?? m.result?.troveId ?? '',
+          typeof m.score === 'number' ? m.score.toFixed(2) : '',
+        ].map(encode).join(delimiter))
+      }
+    }
+    return lines.join('\n')
+  }
+
+  const copyText = async (text: string): Promise<boolean> => {
+    if (!text || !navigator?.clipboard?.writeText) {
+      return false
+    }
+    try {
+      await navigator.clipboard.writeText(text)
+      return true
+    } catch {
+      return false
+    }
+  }
+
+  const handleCopyCsv = async () => {
+    const allRows = await resolveRowsForCopy()
+    if (await copyText(buildDelimitedTable(allRows, ','))) {
+      showCopyFeedback('Copied a CSV table to the clipboard.')
+    }
+  }
+
+  const handleCopyTsv = async () => {
+    const allRows = await resolveRowsForCopy()
+    if (await copyText(buildDelimitedTable(allRows, '\t'))) {
+      showCopyFeedback('Copied a TSV table to the clipboard.')
+    }
+  }
+
   if (!rows.length) {
     return (
       <p className="duplicate-results-empty">No duplicate rows. Try a different query or trove selection.</p>
@@ -106,6 +166,46 @@ export function DuplicateResultsView({ rows = [], sortBy = null, sortDir = 'asc'
             <rect x="4" y="8" width="11" height="13" rx="2" ry="2" fill="none" stroke="currentColor" strokeWidth="1.8" />
           </svg>
           Copy Primary Titles
+        </button>
+        <button
+          type="button"
+          className="duplicate-results-copy-btn"
+          onClick={() => {
+            void handleCopyCsv()
+          }}
+        >
+          <svg
+            className="duplicate-results-copy-icon"
+            viewBox="0 0 24 24"
+            width="16"
+            height="16"
+            aria-hidden="true"
+            focusable="false"
+          >
+            <rect x="9" y="3" width="11" height="13" rx="2" ry="2" fill="none" stroke="currentColor" strokeWidth="1.8" />
+            <rect x="4" y="8" width="11" height="13" rx="2" ry="2" fill="none" stroke="currentColor" strokeWidth="1.8" />
+          </svg>
+          CSV
+        </button>
+        <button
+          type="button"
+          className="duplicate-results-copy-btn"
+          onClick={() => {
+            void handleCopyTsv()
+          }}
+        >
+          <svg
+            className="duplicate-results-copy-icon"
+            viewBox="0 0 24 24"
+            width="16"
+            height="16"
+            aria-hidden="true"
+            focusable="false"
+          >
+            <rect x="9" y="3" width="11" height="13" rx="2" ry="2" fill="none" stroke="currentColor" strokeWidth="1.8" />
+            <rect x="4" y="8" width="11" height="13" rx="2" ry="2" fill="none" stroke="currentColor" strokeWidth="1.8" />
+          </svg>
+          TSV
         </button>
         <CopyFeedbackFlare message={copyFeedbackMessage} />
       </div>
