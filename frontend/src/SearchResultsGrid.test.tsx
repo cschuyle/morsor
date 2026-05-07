@@ -38,6 +38,7 @@ describe('SearchResultsGrid copy titles', () => {
     await waitFor(() => {
       expect(navigator.clipboard.writeText).toHaveBeenCalledWith("Wayne's World\nFace-Off (1997)")
     })
+    expect(screen.getByRole('status')).toHaveTextContent('Copied titles to the clipboard.')
   })
 
   it('copies filtered table as CSV and TSV', async () => {
@@ -57,6 +58,7 @@ describe('SearchResultsGrid copy titles', () => {
         "Title,Trove,Score\nWayne's World,Movies,1.20\nFace-Off (1997),Movies,1.10",
       )
     })
+    expect(screen.getByRole('status')).toHaveTextContent('Copied a CSV table to the clipboard.')
 
     fireEvent.click(screen.getByRole('button', { name: 'TSV' }))
     await waitFor(() => {

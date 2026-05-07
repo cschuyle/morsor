@@ -7,6 +7,7 @@ import {
   flexRender,
 } from '@tanstack/react-table'
 import type { SearchResultRow, LightboxPayload } from './types'
+import { CopyFeedbackFlare, useCopyFeedback } from './CopyFeedback'
 import './SearchResultsGrid.css'
 
 export interface SearchResultsGridProps {
@@ -805,6 +806,7 @@ export function SearchResultsGrid({ data, sortBy = null, sortDir = 'asc', onSort
   const [globalFilter, setGlobalFilter] = useState('')
   const [lightbox, setLightbox] = useState<LightboxPayload | null>(null)
   const [rawSourceLightbox, setRawSourceLightbox] = useState<{ title: string; rawSourceItem: string } | null>(null)
+  const { copyFeedbackMessage, showCopyFeedback } = useCopyFeedback()
   const galleryClickTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const galleryLastClickRef = useRef<{ rowId: string | number | null; time: number }>({ rowId: null, time: 0 })
   const tableRowLastClickRef = useRef<{ rowId: string | number | null; time: number }>({ rowId: null, time: 0 })
@@ -1022,14 +1024,16 @@ export function SearchResultsGrid({ data, sortBy = null, sortDir = 'asc', onSort
     [showGallery, filteredRowsForGallery, table],
   )
 
-  const copyText = async (text: string) => {
+  const copyText = async (text: string): Promise<boolean> => {
     if (!text || !navigator?.clipboard?.writeText) {
-      return
+      return false
     }
     try {
       await navigator.clipboard.writeText(text)
+      return true
     } catch {
       // Ignore clipboard errors; button is a convenience action.
+      return false
     }
   }
 
@@ -1078,15 +1082,21 @@ export function SearchResultsGrid({ data, sortBy = null, sortDir = 'asc', onSort
       .map((row) => (row?.title ?? '').trim())
       .filter((title) => title.length > 0)
       .join('\n')
-    await copyText(text)
+    if (await copyText(text)) {
+      showCopyFeedback('Copied titles to the clipboard.')
+    }
   }
 
   const handleCopyCsv = async () => {
-    await copyText(buildDelimitedTable(await resolveRowsForCopy(), ','))
+    if (await copyText(buildDelimitedTable(await resolveRowsForCopy(), ','))) {
+      showCopyFeedback('Copied a CSV table to the clipboard.')
+    }
   }
 
   const handleCopyTsv = async () => {
-    await copyText(buildDelimitedTable(await resolveRowsForCopy(), '\t'))
+    if (await copyText(buildDelimitedTable(await resolveRowsForCopy(), '\t'))) {
+      showCopyFeedback('Copied a TSV table to the clipboard.')
+    }
   }
 
   const [showBackToTop, setShowBackToTop] = useState(false)
@@ -1448,6 +1458,7 @@ export function SearchResultsGrid({ data, sortBy = null, sortDir = 'asc', onSort
               </svg>
               TSV
             </button>
+            <CopyFeedbackFlare message={copyFeedbackMessage} />
           </div>
           <div className="grid-filter-wrap">
             <input

@@ -1,5 +1,6 @@
 import { Fragment, useState, useEffect } from 'react'
 import type { UniqueResultRow, SearchResultRow } from './types'
+import { CopyFeedbackFlare, useCopyFeedback } from './CopyFeedback'
 import { rawSourceDisplay } from './SearchResultsGrid'
 
 const WORD_RE = /\b[\w'\u2019]+\b/g
@@ -64,6 +65,7 @@ interface UniquesResultsViewProps {
  */
 export function UniquesResultsView({ results = [], sortBy = null, sortDir = 'asc', onSortChange, onOpenRawSource, onFetchAllResultsForCopy = null }: UniquesResultsViewProps) {
   const [dialogRow, setDialogRow] = useState<number | null>(null)
+  const { copyFeedbackMessage, showCopyFeedback } = useCopyFeedback()
 
   useEffect(() => {
     if (dialogRow == null) return
@@ -104,6 +106,7 @@ export function UniquesResultsView({ results = [], sortBy = null, sortDir = 'asc
     }
     try {
       await navigator.clipboard.writeText(text)
+      showCopyFeedback('Copied titles to the clipboard.')
     } catch {
       // Ignore clipboard errors; button is a convenience action.
     }
@@ -149,6 +152,7 @@ export function UniquesResultsView({ results = [], sortBy = null, sortDir = 'asc
     }
     try {
       await navigator.clipboard.writeText(text)
+      showCopyFeedback('Copied a CSV table to the clipboard.')
     } catch {
       // Ignore clipboard errors; button is a convenience action.
     }
@@ -161,6 +165,7 @@ export function UniquesResultsView({ results = [], sortBy = null, sortDir = 'asc
     }
     try {
       await navigator.clipboard.writeText(text)
+      showCopyFeedback('Copied a TSV table to the clipboard.')
     } catch {
       // Ignore clipboard errors; button is a convenience action.
     }
@@ -243,6 +248,7 @@ export function UniquesResultsView({ results = [], sortBy = null, sortDir = 'asc
           </svg>
           TSV
         </button>
+        <CopyFeedbackFlare message={copyFeedbackMessage} />
       </div>
       <table className="duplicate-results-table">
         <thead>

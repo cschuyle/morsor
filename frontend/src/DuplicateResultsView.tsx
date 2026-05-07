@@ -1,5 +1,6 @@
 import { Fragment } from 'react'
 import type { DuplicateRow } from './types'
+import { CopyFeedbackFlare, useCopyFeedback } from './CopyFeedback'
 import { rawSourceDisplay } from './SearchResultsGrid'
 
 const WORD_RE = /\b[\w'\u2019]+\b/g
@@ -41,6 +42,8 @@ interface DuplicateResultsViewProps {
  * sortBy / sortDir / onSortChange: optional column sort (title, trove, score). Sorting uses primary row only.
  */
 export function DuplicateResultsView({ rows = [], sortBy = null, sortDir = 'asc', onSortChange, onOpenRawSource, onFetchAllRowsForCopy = null }: DuplicateResultsViewProps) {
+  const { copyFeedbackMessage, showCopyFeedback } = useCopyFeedback()
+
   const handleSort = (columnId: string) => {
     if (!onSortChange) return
     const nextDir = sortBy === columnId && sortDir === 'asc' ? 'desc' as const : 'asc' as const
@@ -70,6 +73,7 @@ export function DuplicateResultsView({ rows = [], sortBy = null, sortDir = 'asc'
     }
     try {
       await navigator.clipboard.writeText(text)
+      showCopyFeedback('Copied primary titles to the clipboard.')
     } catch {
       // Ignore clipboard errors; button is a convenience action.
     }
@@ -103,6 +107,7 @@ export function DuplicateResultsView({ rows = [], sortBy = null, sortDir = 'asc'
           </svg>
           Copy Primary Titles
         </button>
+        <CopyFeedbackFlare message={copyFeedbackMessage} />
       </div>
       <table className="duplicate-results-table">
         <thead>

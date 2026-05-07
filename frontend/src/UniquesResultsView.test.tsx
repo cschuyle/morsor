@@ -37,6 +37,7 @@ describe('UniquesResultsView copy titles', () => {
     await waitFor(() => {
       expect(navigator.clipboard.writeText).toHaveBeenCalledWith('Apollo 13\nThe Knick')
     })
+    expect(screen.getByRole('status')).toHaveTextContent('Copied titles to the clipboard.')
   })
 
   it('copies full uniques table as CSV and TSV', async () => {
