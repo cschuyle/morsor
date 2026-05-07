@@ -29,6 +29,16 @@ function newId(): string {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
 }
 
+/** Remove page/size params from a console query string so history entries always start at page 1. */
+function stripPaginationParams(consoleQuery: string): string {
+  const p = new URLSearchParams(consoleQuery)
+  p.delete('page')
+  p.delete('size')
+  p.delete('dpage')
+  p.delete('upage')
+  return p.toString()
+}
+
 function loadRaw(): QueryHistoryEntry[] {
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
@@ -62,7 +72,7 @@ export function appendQueryHistoryEntry(
       mode: entry.mode,
       ranAtMs: entry.ranAtMs,
       durationMs: entry.durationMs,
-      consoleQuery: entry.consoleQuery,
+      consoleQuery: stripPaginationParams(entry.consoleQuery),
       apiCacheKey: entry.apiCacheKey,
       resultCount: entry.resultCount,
       summary: entry.summary,
