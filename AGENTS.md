@@ -8,6 +8,8 @@ Add your preferences below. For example:
 
 - **Commits:** How you want commit messages formatted (e.g. style, what to include, length).
 
+    - **Never commit unless I explicitly ask you to.** Wait for me to say "commit", "commit this", or similar before running any `git commit` command.
+
     - General guidelines:
 
       - If I specify a :"blurb" or "purpose" followed by a phrase, I mean that phrase to be the first line in the commit message. Otherwise, feel free to generate your own first line.
