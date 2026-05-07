@@ -647,9 +647,19 @@ public class SearchDataService {
     /**
      * Build a query that matches each token from the user query. Terms ending with {@code *}
      * are treated as prefix matches; other terms use fuzzy match. Returns null if no terms.
+     * All clauses use MUST (AND semantics), suitable for user-driven search.
      */
     private Query buildFuzzyQuery(String queryTrimmed) throws IOException {
         return SearchQueryBuilder.buildQuery(queryTrimmed, luceneAnalyzer, CONTENT_FIELD);
+    }
+
+    /**
+     * Like {@link #buildFuzzyQuery(String)} but with a configurable clause occurrence.
+     * Pass {@code SHOULD} for similarity search so partial matches are ranked lower
+     * rather than hard-excluded.
+     */
+    private Query buildFuzzyQuery(String queryTrimmed, BooleanClause.Occur occur) throws IOException {
+        return SearchQueryBuilder.buildQuery(queryTrimmed, luceneAnalyzer, CONTENT_FIELD, occur);
     }
 
     /** Return a new list sorted so that results from the boosted trove come first (for no-text and regex paths). */
@@ -992,7 +1002,7 @@ public class SearchDataService {
             BooleanQuery.Builder bq = new BooleanQuery.Builder();
             List<BytesRef> terms = troveIds.stream().map(BytesRef::new).toList();
             bq.add(new TermInSetQuery("troveId", terms), BooleanClause.Occur.FILTER);
-            Query textQuery = buildFuzzyQuery(queryStr);
+            Query textQuery = buildFuzzyQuery(queryStr, BooleanClause.Occur.SHOULD);
             if (textQuery == null) {
                 QueryParser parser = new QueryParser("content", luceneAnalyzer);
                 parser.setDefaultOperator(QueryParser.Operator.OR);

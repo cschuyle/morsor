@@ -40,8 +40,20 @@ final class SearchQueryBuilder {
      * Build a query from the user string. Slash-delimited regex is not handled here
      * (SearchDataService matches full text with Java Pattern). Terms ending with {@code *}
      * are prefix matches; others are fuzzy. Returns null if no clauses.
+     * Uses {@code MUST} for all clauses (AND semantics, suitable for user-driven search).
      */
     static Query buildQuery(String queryTrimmed, Analyzer analyzer, String contentField) throws IOException {
+        return buildQuery(queryTrimmed, analyzer, contentField, BooleanClause.Occur.MUST);
+    }
+
+    /**
+     * Build a query from the user string with a configurable clause occurrence.
+     * Use {@code SHOULD} for similarity search so that partial matches are ranked lower
+     * rather than hard-excluded (e.g. a year token in the primary title should not
+     * prevent finding a compare-trove item that lacks the year).
+     */
+    static Query buildQuery(String queryTrimmed, Analyzer analyzer, String contentField,
+                            BooleanClause.Occur occur) throws IOException {
         if (isRegexDelimited(queryTrimmed)) {
             return null;
         }
@@ -58,7 +70,7 @@ final class SearchQueryBuilder {
             if (qt.prefix()) {
                 String analyzedPrefix = analyzeToSingleToken(qt.text(), analyzer, contentField);
                 if (analyzedPrefix != null && !analyzedPrefix.isEmpty()) {
-                    bq.add(new PrefixQuery(new Term(contentField, analyzedPrefix)), BooleanClause.Occur.MUST);
+                    bq.add(new PrefixQuery(new Term(contentField, analyzedPrefix)), occur);
                     hasClauses = true;
                 }
             } else {
@@ -69,7 +81,7 @@ final class SearchQueryBuilder {
                     }
                     int maxEdits = term.length() <= 3 ? 1 : FUZZY_MAX_EDITS;
                     FuzzyQuery fq = new FuzzyQuery(new Term(contentField, term), maxEdits, FUZZY_PREFIX_LENGTH);
-                    bq.add(fq, BooleanClause.Occur.MUST);
+                    bq.add(fq, occur);
                     hasClauses = true;
                 }
             }
