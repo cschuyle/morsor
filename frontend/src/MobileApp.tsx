@@ -2604,6 +2604,35 @@ onClick={() => {
                 </div>
               )
             })()}
+            {(searchMode === 'duplicates' || searchMode === 'uniques') && primaryTroveId && (() => {
+              const primaryName = troves.find((t) => t.id === primaryTroveId)?.name ?? primaryTroveId
+              const compareIdsList = [...compareTroveIds]
+              const secondaries = compareTroveIds.size === 1
+                ? (troves.find((t) => t.id === compareIdsList[0])?.name ?? compareIdsList[0])
+                : `${formatCount(compareTroveIds.size)} other troves`
+              const boldSecondaries = trovePickerSubTab === 'compare'
+              if (searchMode === 'duplicates') {
+                const isSelfCompare = compareTroveIds.size === 0 || (compareTroveIds.size === 1 && compareTroveIds.has(primaryTroveId))
+                if (isSelfCompare) {
+                  return (
+                    <p className="trove-picker-summary mobile-trove-picker-summary" aria-live="polite">
+                      If self-compare, Duplicates in {primaryName}
+                    </p>
+                  )
+                }
+              }
+              return (
+                <p className="trove-picker-summary mobile-trove-picker-summary" aria-live="polite">
+                  {searchMode === 'duplicates'
+                    ? (boldSecondaries
+                      ? <>In {primaryName} and <strong>{secondaries}</strong></>
+                      : <><strong>In {primaryName}</strong> and {secondaries}</>)
+                    : (boldSecondaries
+                      ? <>In {primaryName} <strong>but NOT in {secondaries}</strong></>
+                      : <><strong>In {primaryName}</strong> but NOT in {secondaries}</>)}
+                </p>
+              )
+            })()}
             <div className="mobile-trove-filter-row">
               <div className="mobile-trove-filter-wrap">
                 <input

@@ -1465,6 +1465,33 @@ function App() {
               {(searchMode === 'duplicates' || searchMode === 'uniques') ? ((() => {
                 const compareIds = searchMode === 'duplicates' ? dupCompareTroveIds : uniqCompareTroveIds
                 const compareToSelfVisible = isCompareToSelfVisible(primaryTroveId, compareIds)
+                const modePickerSummary = (() => {
+                  if (!primaryTroveId) {
+                    return null
+                  }
+                  const primaryName = troves.find((t) => t.id === primaryTroveId)?.name ?? primaryTroveId
+                  const compareIdsList = [...compareIds]
+                  const secondaries = compareIds.size === 1
+                    ? (troves.find((t) => t.id === compareIdsList[0])?.name ?? compareIdsList[0])
+                    : `${formatCount(compareIds.size)} other troves`
+                  if (searchMode === 'duplicates') {
+                    const isSelfCompare = compareIds.size === 0 || (compareIds.size === 1 && compareIds.has(primaryTroveId))
+                    if (isSelfCompare) {
+                      return <>If self-compare, Duplicates in {primaryName}</>
+                    }
+                    if (duplicatesTroveTab === 'compare') {
+                      return <>In {primaryName} and <strong>{secondaries}</strong></>
+                    }
+                    return <><strong>In {primaryName}</strong> and {secondaries}</>
+                  }
+                  if (searchMode === 'uniques') {
+                    if (duplicatesTroveTab === 'compare') {
+                      return <>In {primaryName} <strong>but NOT in {secondaries}</strong></>
+                    }
+                    return <><strong>In {primaryName}</strong> but NOT in {secondaries}</>
+                  }
+                  return null
+                })()
                 return (
                   <>
                   <h2 className="trove-picker-heading">Troves (total {formatCount(troves.length)})</h2>
@@ -1524,7 +1551,7 @@ function App() {
                         <div className="primary-trove-summary-block">
                           <p className="trove-picker-summary primary-trove-summary-text" aria-live="polite">
                             {primaryTroveId
-                              ? (primarySelectedTrove?.name ?? primaryTroveId)
+                              ? (modePickerSummary ?? (primarySelectedTrove?.name ?? primaryTroveId))
                               : 'Select primary trove'}
                           </p>
                           <div className="primary-trove-buttons-row">
@@ -1621,9 +1648,13 @@ function App() {
                     <div role="tabpanel">
                       <div className="compare-trove-summary-block">
                         <p className="trove-picker-summary compare-trove-summary-text" aria-live="polite">
-                          {selectedTroveIds.size === 0
-                            ? 'Select comparison troves'
-                            : `${formatCount(selectedTroveIds.size)} selected`}
+                          {primaryTroveId
+                            ? (modePickerSummary ?? (selectedTroveIds.size === 0
+                              ? 'Select comparison troves'
+                              : `${formatCount(selectedTroveIds.size)} selected`))
+                            : (selectedTroveIds.size === 0
+                              ? 'Select comparison troves'
+                              : `${formatCount(selectedTroveIds.size)} selected`)}
                         </p>
                         <div className="compare-trove-buttons-row">
                           <button
