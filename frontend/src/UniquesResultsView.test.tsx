@@ -69,4 +69,26 @@ describe('UniquesResultsView copy titles', () => {
       )
     })
   })
+
+  it('keeps near-miss rows aligned to all table columns', () => {
+    const { container } = render(
+      <UniquesResultsView
+        results={[
+          {
+            item: { id: '1', title: 'Apollo 13', trove: 'Movies' },
+            score: 0.87,
+            nearMisses: [
+              { result: { id: '2', title: 'Apollo 18', trove: 'Movies' }, score: 0.72 },
+            ],
+          },
+        ]}
+      />,
+    )
+
+    const rows = Array.from(container.querySelectorAll('tbody tr'))
+    expect(rows).toHaveLength(2)
+    for (const row of rows) {
+      expect(row.querySelectorAll('td')).toHaveLength(5)
+    }
+  })
 })

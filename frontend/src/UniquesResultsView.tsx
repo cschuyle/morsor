@@ -321,6 +321,8 @@ export function UniquesResultsView({ results = [], sortBy = null, sortDir = 'asc
                 {nearMisses.map((m, matchIdx) => {
                   const r = (m?.result ?? m) as SearchResultRow | undefined
                   const s = typeof m?.score === 'number' ? m.score : null
+                  const matchRawThumb = r?.thumbnailUrl
+                  const matchThumb = typeof matchRawThumb === 'string' && matchRawThumb.trim() ? matchRawThumb : ''
                   return (
                     <tr
                       key={matchIdx}
@@ -330,6 +332,11 @@ export function UniquesResultsView({ results = [], sortBy = null, sortDir = 'asc
                       } : undefined}
                       title={onOpenRawSource ? 'Click to view raw source' : undefined}
                     >
+                      <td className="col-thumb">
+                        {matchThumb ? (
+                          <img src={matchThumb} alt="" className="dup-thumb" loading="lazy" />
+                        ) : null}
+                      </td>
                       <td className="col-title">{titleWithExtraHighlight(r?.title ?? '—', primaryWords)}</td>
                       <td className="col-trove">{r?.trove ?? r?.troveId ?? ''}</td>
                       <td className="col-score">{s != null ? s.toFixed(2) : '—'}</td>
