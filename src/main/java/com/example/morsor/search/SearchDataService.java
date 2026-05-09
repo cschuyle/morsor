@@ -957,16 +957,20 @@ public class SearchDataService {
             return List.of();
         }
         List<DuplicateMatchRow> exactFirst = new ArrayList<>(rows.size());
+        List<DuplicateMatchRow> yearSuffixSecond = new ArrayList<>(rows.size());
         List<DuplicateMatchRow> others = new ArrayList<>(rows.size());
         for (DuplicateMatchRow row : rows) {
             if (hasExactPrimaryMatch(row)) {
                 exactFirst.add(row);
+            } else if (hasExactPrimaryMatchModuloYearSuffix(row)) {
+                yearSuffixSecond.add(row);
             } else {
                 others.add(row);
             }
         }
         List<DuplicateMatchRow> ordered = new ArrayList<>(rows.size());
         ordered.addAll(exactFirst);
+        ordered.addAll(yearSuffixSecond);
         ordered.addAll(others);
         int total = ordered.size();
         List<DuplicateMatchRow> out = new ArrayList<>(total);
@@ -985,6 +989,31 @@ public class SearchDataService {
         for (ScoredSearchResult match : row.matches() != null ? row.matches() : List.<ScoredSearchResult>of()) {
             if (match != null && match.result() != null && match.result().title() != null
                     && primaryTitle.equalsIgnoreCase(match.result().title().trim())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static boolean hasExactPrimaryMatchModuloYearSuffix(DuplicateMatchRow row) {
+        if (row == null || row.primary() == null || row.primary().title() == null || row.primary().title().isBlank()) {
+            return false;
+        }
+        TitleWithYear primary = parseTitleWithYear(row.primary().title());
+        String primaryCore = normalizeForComparison(primary.core());
+        if (primaryCore.isEmpty()) {
+            return false;
+        }
+        for (ScoredSearchResult match : row.matches() != null ? row.matches() : List.<ScoredSearchResult>of()) {
+            if (match == null || match.result() == null || match.result().title() == null || match.result().title().isBlank()) {
+                continue;
+            }
+            String candidateTitle = match.result().title().trim();
+            if (candidateTitle.equalsIgnoreCase(row.primary().title().trim())) {
+                continue;
+            }
+            TitleWithYear candidate = parseTitleWithYear(candidateTitle);
+            if (primaryCore.equals(normalizeForComparison(candidate.core()))) {
                 return true;
             }
         }
