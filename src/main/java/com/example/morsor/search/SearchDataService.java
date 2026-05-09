@@ -748,15 +748,7 @@ public class SearchDataService {
             }
         }
         List<DuplicateMatchRow> deduped = deduplicateDuplicateRowsByGroup(rows);
-        deduped.sort((a, b) -> Double.compare(maxMatchScore(b), maxMatchScore(a)));
-        return deduped;
-    }
-
-    private static double maxMatchScore(DuplicateMatchRow row) {
-        if (row.matches() == null || row.matches().isEmpty()) {
-            return 0.0;
-        }
-        return row.matches().stream().mapToDouble(ScoredSearchResult::score).max().orElse(0.0);
+        return rerankDuplicateRows(deduped);
     }
 
     /**
@@ -766,7 +758,7 @@ public class SearchDataService {
      * smallest id in the group.
      */
     private List<DuplicateMatchRow> deduplicateDuplicateRowsByGroup(List<DuplicateMatchRow> rows) {
-        Map<String, DuplicateMatchRow> byGroup = new HashMap<>();
+        Map<String, DuplicateMatchRow> byGroup = new java.util.LinkedHashMap<>();
         for (DuplicateMatchRow row : rows) {
             TreeSet<String> group = new TreeSet<>();
             if (row.primary() != null && row.primary().id() != null) {
@@ -907,8 +899,7 @@ public class SearchDataService {
             }
         }
 
-        List<DuplicateMatchRow> deduped = deduplicateDuplicateRowsByGroup(dupRows);
-        deduped.sort((a, b) -> Double.compare(maxMatchScore(b), maxMatchScore(a)));
+        List<DuplicateMatchRow> deduped = rerankDuplicateRows(deduplicateDuplicateRowsByGroup(dupRows));
         uniquesWithScore.sort(java.util.Comparator.comparingDouble(UniqueResult::score));
         return new DupUniqPair(deduped, uniquesWithScore);
     }
@@ -959,6 +950,45 @@ public class SearchDataService {
             return false;
         }
         return !coreTextMatch(primary.core, candidate.core);
+    }
+
+    private static List<DuplicateMatchRow> rerankDuplicateRows(List<DuplicateMatchRow> rows) {
+        if (rows == null || rows.isEmpty()) {
+            return List.of();
+        }
+        List<DuplicateMatchRow> exactFirst = new ArrayList<>(rows.size());
+        List<DuplicateMatchRow> others = new ArrayList<>(rows.size());
+        for (DuplicateMatchRow row : rows) {
+            if (hasExactPrimaryMatch(row)) {
+                exactFirst.add(row);
+            } else {
+                others.add(row);
+            }
+        }
+        List<DuplicateMatchRow> ordered = new ArrayList<>(rows.size());
+        ordered.addAll(exactFirst);
+        ordered.addAll(others);
+        int total = ordered.size();
+        List<DuplicateMatchRow> out = new ArrayList<>(total);
+        for (int i = 0; i < total; i++) {
+            DuplicateMatchRow row = ordered.get(i);
+            out.add(new DuplicateMatchRow(row.primary(), row.matches(), total - i));
+        }
+        return out;
+    }
+
+    private static boolean hasExactPrimaryMatch(DuplicateMatchRow row) {
+        if (row == null || row.primary() == null || row.primary().title() == null || row.primary().title().isBlank()) {
+            return false;
+        }
+        String primaryTitle = row.primary().title().trim();
+        for (ScoredSearchResult match : row.matches() != null ? row.matches() : List.<ScoredSearchResult>of()) {
+            if (match != null && match.result() != null && match.result().title() != null
+                    && primaryTitle.equalsIgnoreCase(match.result().title().trim())) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private static boolean coreTextMatch(String a, String b) {

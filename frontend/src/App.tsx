@@ -58,8 +58,8 @@ const DEFAULT_DUP_SESSION: DuplicatesTabSession = {
   dupPrimaryTroveId: '',
   dupCompareTroveIds: [],
   dupPageSize: 50,
-  duplicatesSortBy: null,
-  duplicatesSortDir: 'asc',
+  duplicatesSortBy: 'rerank',
+  duplicatesSortDir: 'desc',
 }
 const DEFAULT_UNIQ_SESSION: UniquesTabSession = {
   uniqQuery: '',
@@ -110,8 +110,8 @@ function App() {
   const [duplicatesResult, setDuplicatesResult] = useState<DuplicatesResultData | null>(null)
   const [duplicatesPage, setDuplicatesPage] = useState(0)
   const [dupPageSize, setDupPageSize] = useState(50)
-  const [duplicatesSortBy, setDuplicatesSortBy] = useState<string | null>(null)
-  const [duplicatesSortDir, setDuplicatesSortDir] = useState<'asc' | 'desc'>('asc')
+  const [duplicatesSortBy, setDuplicatesSortBy] = useState<string | null>('rerank')
+  const [duplicatesSortDir, setDuplicatesSortDir] = useState<'asc' | 'desc'>('desc')
   const [uniquesResult, setUniquesResult] = useState<UniquesResultData | null>(null)
   const [uniquesPage, setUniquesPage] = useState(0)
   const [uniqPageSize, setUniqPageSize] = useState(50)

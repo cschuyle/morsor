@@ -88,7 +88,7 @@ export function DuplicateResultsView({ rows = [], sortBy = null, sortDir = 'asc'
 
   const buildDelimitedTable = (allRows: DuplicateRow[], delimiter: ',' | '\t'): string => {
     const encode = delimiter === ',' ? toCsvCell : toTsvCell
-    const lines = [['Result Type', 'Title', 'Trove', 'Score'].map(encode).join(delimiter)]
+    const lines = [['Result Type', 'Rerank', 'Title', 'Trove', 'Score'].map(encode).join(delimiter)]
     for (const row of allRows) {
       const primaryScore = (row.matches ?? []).reduce((best, m) => {
         const s = typeof m?.score === 'number' ? m.score : -Infinity
@@ -96,6 +96,7 @@ export function DuplicateResultsView({ rows = [], sortBy = null, sortDir = 'asc'
       }, -Infinity)
       lines.push([
         'primary',
+        typeof row.rerank === 'number' ? String(row.rerank) : '',
         row.primary?.title ?? '',
         row.primary?.trove ?? row.primary?.troveId ?? '',
         primaryScore === -Infinity ? '' : primaryScore.toFixed(2),
@@ -104,6 +105,7 @@ export function DuplicateResultsView({ rows = [], sortBy = null, sortDir = 'asc'
       for (const m of (row.matches ?? []).filter((match) => String(match.result?.id ?? '') !== String(row.primary?.id ?? ''))) {
         lines.push([
           'compare',
+          '',
           m.result?.title ?? '',
           m.result?.trove ?? m.result?.troveId ?? '',
           typeof m.score === 'number' ? m.score.toFixed(2) : '',
@@ -223,6 +225,14 @@ export function DuplicateResultsView({ rows = [], sortBy = null, sortDir = 'asc'
               {sortBy === 'title' && <span className="sort-indicator">{sortDir === 'asc' ? ' ↑' : ' ↓'}</span>}
             </th>
             <th
+              className={`col-rerank ${onSortChange ? 'sortable' : ''}`}
+              onClick={onSortChange ? () => handleSort('rerank') : undefined}
+              scope="col"
+            >
+              Rerank
+              {sortBy === 'rerank' && <span className="sort-indicator">{sortDir === 'asc' ? ' ↑' : ' ↓'}</span>}
+            </th>
+            <th
               className={`col-trove ${onSortChange ? 'sortable' : ''}`}
               onClick={onSortChange ? () => handleSort('trove') : undefined}
             >
@@ -262,6 +272,7 @@ export function DuplicateResultsView({ rows = [], sortBy = null, sortDir = 'asc'
                   ) : null}
                 </td>
                 <td className="col-title">{row.primary?.title ?? '—'}</td>
+                <td className="col-rerank">{typeof row.rerank === 'number' ? row.rerank : '—'}</td>
                 <td className="col-trove">{row.primary?.trove ?? row.primary?.troveId ?? ''}</td>
                 <td className="col-score" aria-label="Primary item (max match score)">{primaryScore}</td>
               </tr>
@@ -284,6 +295,7 @@ export function DuplicateResultsView({ rows = [], sortBy = null, sortDir = 'asc'
                     ) : null}
                   </td>
                   <td className="col-title">{titleWithExtraHighlight(matchItem?.title ?? '—', primaryWords)}</td>
+                  <td className="col-rerank">—</td>
                   <td className="col-trove">{matchItem?.trove ?? matchItem?.troveId ?? ''}</td>
                   <td className="col-score">{typeof m.score === 'number' ? m.score.toFixed(2) : '—'}</td>
                 </tr>

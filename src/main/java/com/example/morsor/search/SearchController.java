@@ -448,15 +448,13 @@ public class SearchController {
         }
         return rows.stream()
                 .map(row -> new DuplicateMatchRow(row.primary(),
-                        row.matches().size() <= maxMatches ? row.matches() : row.matches().stream().limit(maxMatches).toList()))
+                        row.matches().size() <= maxMatches ? row.matches() : row.matches().stream().limit(maxMatches).toList(),
+                        row.rerank()))
                 .toList();
     }
 
-    private static double maxDuplicateRowScore(DuplicateMatchRow row) {
-        if (row.matches() == null || row.matches().isEmpty()) {
-            return 0.0;
-        }
-        return row.matches().stream().mapToDouble(ScoredSearchResult::score).max().orElse(0.0);
+    private static int duplicateRowRerank(DuplicateMatchRow row) {
+        return row != null ? row.rerank() : 0;
     }
 
     private static Comparator<DuplicateMatchRow> duplicatesComparatorFor(String sortBy) {
@@ -465,7 +463,13 @@ public class SearchController {
                     r -> r.primary().title() != null ? r.primary().title().toLowerCase() : "");
             case "trove" -> Comparator.comparing(
                     r -> r.primary().trove() != null ? r.primary().trove().toLowerCase() : "");
-            case "score" -> Comparator.comparingDouble(SearchController::maxDuplicateRowScore);
+            case "rerank" -> Comparator.comparingInt(SearchController::duplicateRowRerank);
+            case "score" -> Comparator.comparingDouble(r -> {
+                if (r.matches() == null || r.matches().isEmpty()) {
+                    return 0.0;
+                }
+                return r.matches().stream().mapToDouble(ScoredSearchResult::score).max().orElse(0.0);
+            });
             default -> null;
         };
     }

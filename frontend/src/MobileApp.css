@@ -2302,6 +2302,11 @@
   white-space: nowrap;
 }
 
+.mobile-dup-uniques-results .duplicate-results-table .col-rerank {
+  width: 1%;
+  white-space: nowrap;
+}
+
 .mobile-dup-uniques-results .duplicate-results-table .col-thumb {
   width: 1%;
   white-space: nowrap;

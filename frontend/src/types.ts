@@ -45,6 +45,7 @@ export interface Trove {
 /** Duplicate finder row: primary item + matches */
 export interface DuplicateRow {
   primary?: SearchResultRow
+  rerank?: number
   matches?: Array<{ result?: SearchResultRow; score?: number }>
 }
 
