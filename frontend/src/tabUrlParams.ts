@@ -102,7 +102,7 @@ export function deserializeActiveTabFromUrl(
     dupCompare: [],
     dupPageSize: null,
     dupPageOneBased: null,
-    duplicatesSortBy: null,
+    duplicatesSortBy: 'rerank',
     duplicatesSortDir: 'asc',
     uniqQuery: '',
     uniqPrimary: '',
@@ -168,7 +168,7 @@ export function deserializeActiveTabFromUrl(
       dupCompare: compare,
       dupPageSize: rawSize,
       dupPageOneBased: pageOne ?? posInt(params.get('dpage')),
-      duplicatesSortBy: sb != null && sb !== '' ? sb : null,
+      duplicatesSortBy: sb != null && sb !== '' ? sb : 'rerank',
       duplicatesSortDir: sd === 'desc' ? 'desc' : 'asc',
     }
   }
@@ -319,7 +319,7 @@ function emptyDuplicatesSession(): DuplicatesTabSession {
     dupPrimaryTroveId: '',
     dupCompareTroveIds: [],
     dupPageSize: 50,
-    duplicatesSortBy: null,
+    duplicatesSortBy: 'rerank',
     duplicatesSortDir: 'asc',
     duplicatesPage0Based: 0,
   }

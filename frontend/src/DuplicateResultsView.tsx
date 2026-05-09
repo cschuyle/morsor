@@ -96,7 +96,7 @@ export function DuplicateResultsView({ rows = [], sortBy = null, sortDir = 'asc'
       }, -Infinity)
       lines.push([
         'primary',
-        typeof row.rerank === 'number' ? String(row.rerank) : '',
+        typeof row.rerank === 'string' ? row.rerank : '',
         row.primary?.title ?? '',
         row.primary?.trove ?? row.primary?.troveId ?? '',
         primaryScore === -Infinity ? '' : primaryScore.toFixed(2),
@@ -272,7 +272,7 @@ export function DuplicateResultsView({ rows = [], sortBy = null, sortDir = 'asc'
                   ) : null}
                 </td>
                 <td className="col-title">{row.primary?.title ?? '—'}</td>
-                <td className="col-rerank">{typeof row.rerank === 'number' ? row.rerank : '—'}</td>
+                <td className="col-rerank">{typeof row.rerank === 'string' ? row.rerank : '—'}</td>
                 <td className="col-trove">{row.primary?.trove ?? row.primary?.troveId ?? ''}</td>
                 <td className="col-score" aria-label="Primary item (max match score)">{primaryScore}</td>
               </tr>

@@ -120,7 +120,7 @@ class SearchDataServiceTest {
         );
 
         SearchResult exactPrimary = new SearchResult(
-                "1", null, "Alpha (2001)", "Alpha (2001)", "Trove", "trove", false,
+                "1", null, "Alpha !!! @@ (2001)", "Alpha !!! @@ (2001)", "Trove", "trove", false,
                 null, null, null, List.of(), null, null
         );
         SearchResult exactMatch = new SearchResult(
@@ -128,11 +128,11 @@ class SearchDataServiceTest {
                 null, null, null, List.of(), null, null
         );
         SearchResult yearPrimary = new SearchResult(
-                "3", null, "Beta", "Beta", "Trove", "trove", false,
+                "3", null, "Beta :: Cut", "Beta :: Cut", "Trove", "trove", false,
                 null, null, null, List.of(), null, null
         );
         SearchResult yearMatch = new SearchResult(
-                "4", null, "Beta (2001)", "Beta (2001)", "Compare", "compare", false,
+                "4", null, "Beta Cut (2001)", "Beta Cut (2001)", "Compare", "compare", false,
                 null, null, null, List.of(), null, null
         );
         SearchResult otherPrimary = new SearchResult(
@@ -156,8 +156,8 @@ class SearchDataServiceTest {
         List<DuplicateMatchRow> reranked = (List<DuplicateMatchRow>) rerank.invoke(null, rows);
 
         assertThat(reranked).extracting(r -> r.primary().title())
-                .containsExactly("Alpha (2001)", "Beta", "Gamma");
+                .containsExactly("Alpha !!! @@ (2001)", "Beta :: Cut", "Gamma");
         assertThat(reranked).extracting(DuplicateMatchRow::rerank)
-                .containsExactly(3, 2, 1);
+                .containsExactly("1.1", "2.1", "9.1");
     }
 }

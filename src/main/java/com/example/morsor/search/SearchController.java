@@ -453,8 +453,38 @@ public class SearchController {
                 .toList();
     }
 
-    private static int duplicateRowRerank(DuplicateMatchRow row) {
-        return row != null ? row.rerank() : 0;
+    private static String duplicateRowRerank(DuplicateMatchRow row) {
+        return row != null ? row.rerank() : null;
+    }
+
+    private static int rerankTier(DuplicateMatchRow row) {
+        String rerank = duplicateRowRerank(row);
+        if (rerank == null || rerank.isBlank()) {
+            return 9;
+        }
+        int dot = rerank.indexOf('.');
+        String tierPart = dot >= 0 ? rerank.substring(0, dot) : rerank;
+        try {
+            return Integer.parseInt(tierPart);
+        } catch (NumberFormatException e) {
+            return 9;
+        }
+    }
+
+    private static int rerankRank(DuplicateMatchRow row) {
+        String rerank = duplicateRowRerank(row);
+        if (rerank == null || rerank.isBlank()) {
+            return Integer.MAX_VALUE;
+        }
+        int dot = rerank.indexOf('.');
+        if (dot < 0 || dot + 1 >= rerank.length()) {
+            return Integer.MAX_VALUE;
+        }
+        try {
+            return Integer.parseInt(rerank.substring(dot + 1));
+        } catch (NumberFormatException e) {
+            return Integer.MAX_VALUE;
+        }
     }
 
     private static Comparator<DuplicateMatchRow> duplicatesComparatorFor(String sortBy) {
@@ -463,7 +493,9 @@ public class SearchController {
                     r -> r.primary().title() != null ? r.primary().title().toLowerCase() : "");
             case "trove" -> Comparator.comparing(
                     r -> r.primary().trove() != null ? r.primary().trove().toLowerCase() : "");
-            case "rerank" -> Comparator.comparingInt(SearchController::duplicateRowRerank);
+                case "rerank" -> Comparator
+                    .comparingInt(SearchController::rerankTier)
+                    .thenComparingInt(SearchController::rerankRank);
             case "score" -> Comparator.comparingDouble(r -> {
                 if (r.matches() == null || r.matches().isEmpty()) {
                     return 0.0;

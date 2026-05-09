@@ -968,15 +968,18 @@ public class SearchDataService {
                 others.add(row);
             }
         }
-        List<DuplicateMatchRow> ordered = new ArrayList<>(rows.size());
-        ordered.addAll(exactFirst);
-        ordered.addAll(yearSuffixSecond);
-        ordered.addAll(others);
-        int total = ordered.size();
-        List<DuplicateMatchRow> out = new ArrayList<>(total);
-        for (int i = 0; i < total; i++) {
-            DuplicateMatchRow row = ordered.get(i);
-            out.add(new DuplicateMatchRow(row.primary(), row.matches(), total - i));
+        List<DuplicateMatchRow> out = new ArrayList<>(rows.size());
+        for (int i = 0; i < exactFirst.size(); i++) {
+            DuplicateMatchRow row = exactFirst.get(i);
+            out.add(new DuplicateMatchRow(row.primary(), row.matches(), "1." + (i + 1)));
+        }
+        for (int i = 0; i < yearSuffixSecond.size(); i++) {
+            DuplicateMatchRow row = yearSuffixSecond.get(i);
+            out.add(new DuplicateMatchRow(row.primary(), row.matches(), "2." + (i + 1)));
+        }
+        for (int i = 0; i < others.size(); i++) {
+            DuplicateMatchRow row = others.get(i);
+            out.add(new DuplicateMatchRow(row.primary(), row.matches(), "9." + (i + 1)));
         }
         return out;
     }
@@ -985,10 +988,13 @@ public class SearchDataService {
         if (row == null || row.primary() == null || row.primary().title() == null || row.primary().title().isBlank()) {
             return false;
         }
-        String primaryTitle = row.primary().title().trim();
+        String primaryTitle = normalizeForRerankComparison(row.primary().title());
+        if (primaryTitle.isEmpty()) {
+            return false;
+        }
         for (ScoredSearchResult match : row.matches() != null ? row.matches() : List.<ScoredSearchResult>of()) {
             if (match != null && match.result() != null && match.result().title() != null
-                    && primaryTitle.equalsIgnoreCase(match.result().title().trim())) {
+                    && primaryTitle.equals(normalizeForRerankComparison(match.result().title()))) {
                 return true;
             }
         }
@@ -1000,7 +1006,8 @@ public class SearchDataService {
             return false;
         }
         TitleWithYear primary = parseTitleWithYear(row.primary().title());
-        String primaryCore = normalizeForComparison(primary.core());
+        String primaryCore = normalizeForRerankComparison(primary.core());
+        String primaryFull = normalizeForRerankComparison(row.primary().title());
         if (primaryCore.isEmpty()) {
             return false;
         }
@@ -1008,16 +1015,36 @@ public class SearchDataService {
             if (match == null || match.result() == null || match.result().title() == null || match.result().title().isBlank()) {
                 continue;
             }
-            String candidateTitle = match.result().title().trim();
-            if (candidateTitle.equalsIgnoreCase(row.primary().title().trim())) {
+            String candidateFull = normalizeForRerankComparison(match.result().title());
+            if (candidateFull.equals(primaryFull)) {
                 continue;
             }
-            TitleWithYear candidate = parseTitleWithYear(candidateTitle);
-            if (primaryCore.equals(normalizeForComparison(candidate.core()))) {
+            TitleWithYear candidate = parseTitleWithYear(match.result().title());
+            if (primaryCore.equals(normalizeForRerankComparison(candidate.core()))) {
                 return true;
             }
         }
         return false;
+    }
+
+    /**
+     * Normalize for rerank exactness checks:
+     * - lowercase
+     * - strip accents
+     * - replace any non-alphanumeric run with a single space
+     */
+    private static String normalizeForRerankComparison(String s) {
+        if (s == null) {
+            return "";
+        }
+        String t = s.trim();
+        if (t.isEmpty()) {
+            return "";
+        }
+        String nfd = Normalizer.normalize(t, Normalizer.Form.NFD);
+        String noAccents = nfd.replaceAll("\\p{M}", "");
+        String alnumSpaced = noAccents.replaceAll("[^\\p{L}\\p{N}]+", " ");
+        return alnumSpaced.replaceAll("\\s+", " ").trim().toLowerCase();
     }
 
     private static boolean coreTextMatch(String a, String b) {

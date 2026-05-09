@@ -45,7 +45,7 @@ describe('DuplicateResultsView copy primary titles', () => {
       <DuplicateResultsView
         rows={[
           {
-            rerank: 2,
+            rerank: '1.2',
             primary: { id: '1', title: "Wayne's World", trove: 'Movies' },
             matches: [
               { result: { id: '2', title: 'Face-Off (1997)', trove: 'Movies' }, score: 1.12 },
@@ -58,7 +58,7 @@ describe('DuplicateResultsView copy primary titles', () => {
     fireEvent.click(screen.getByRole('button', { name: 'CSV' }))
     await waitFor(() => {
       expect(navigator.clipboard.writeText).toHaveBeenCalledWith(
-        "Result Type,Rerank,Title,Trove,Score\nprimary,2,Wayne's World,Movies,1.12\ncompare,,Face-Off (1997),Movies,1.12",
+        "Result Type,Rerank,Title,Trove,Score\nprimary,1.2,Wayne's World,Movies,1.12\ncompare,,Face-Off (1997),Movies,1.12",
       )
     })
     expect(screen.getByRole('status')).toHaveTextContent('Copied a CSV table to the clipboard.')
@@ -66,7 +66,7 @@ describe('DuplicateResultsView copy primary titles', () => {
     fireEvent.click(screen.getByRole('button', { name: 'TSV' }))
     await waitFor(() => {
       expect(navigator.clipboard.writeText).toHaveBeenCalledWith(
-        "Result Type\tRerank\tTitle\tTrove\tScore\nprimary\t2\tWayne's World\tMovies\t1.12\ncompare\t\tFace-Off (1997)\tMovies\t1.12",
+        "Result Type\tRerank\tTitle\tTrove\tScore\nprimary\t1.2\tWayne's World\tMovies\t1.12\ncompare\t\tFace-Off (1997)\tMovies\t1.12",
       )
     })
     expect(screen.getByRole('status')).toHaveTextContent('Copied a TSV table to the clipboard.')
@@ -77,7 +77,7 @@ describe('DuplicateResultsView copy primary titles', () => {
       <DuplicateResultsView
         rows={[
           {
-            rerank: 2,
+            rerank: '1.2',
             primary: { id: '1', title: 'Alpha', trove: 'Movies' },
             matches: [
               { result: { id: '2', title: 'Alpha', trove: 'Movies' }, score: 1.5 },
@@ -89,6 +89,6 @@ describe('DuplicateResultsView copy primary titles', () => {
     )
 
     expect(screen.getByText('Rerank')).toBeInTheDocument()
-    expect(screen.getByText('2')).toBeInTheDocument()
+    expect(screen.getByText('1.2')).toBeInTheDocument()
   })
 })
