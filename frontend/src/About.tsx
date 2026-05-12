@@ -1,9 +1,37 @@
+import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import AboutContent from './AboutContent'
 import { APP_VERSION } from './version'
+import { getApiAuthHeaders } from './apiAuth'
+import { Trove } from './types'
 import './App.css'
 
 export default function About() {
+  const [uploadTimestamp, setUploadTimestamp] = useState<string | null>(null)
+
+  useEffect(() => {
+    fetch('/api/troves', { credentials: 'include', headers: { ...getApiAuthHeaders() } })
+      .then((res) => {
+        if (res.status === 401) { window.location.href = '/login'; return Promise.reject() }
+        return res.ok ? res.json() : Promise.resolve(null)
+      })
+      .then((troves: Trove[]) => {
+        if (!Array.isArray(troves) || troves.length === 0) {
+          setUploadTimestamp(null)
+          return
+        }
+        // Find the most recent uploadTimestamp among all troves
+        const timestamps = troves
+          .filter((t) => t.uploadTimestamp)
+          .map((t) => t.uploadTimestamp)
+          .sort()
+          .reverse()
+        const mostRecent = timestamps.length > 0 ? timestamps[0] : null
+        setUploadTimestamp(mostRecent)
+      })
+      .catch(() => setUploadTimestamp(null))
+  }, [])
+
   return (
     <>
       <svg className="about-viewport-border-svg" aria-hidden="true">
@@ -20,7 +48,7 @@ export default function About() {
       <div className="about-viewport-border" aria-hidden="true" />
       <div className="about-page">
         <article className="about-content">
-          <AboutContent />
+          <AboutContent uploadTimestamp={uploadTimestamp} />
         </article>
       </div>
       <hr className="backend-status-divider" />

@@ -329,6 +329,13 @@
   text-decoration: underline;
 }
 
+.about-content .upload-timestamp {
+  font-size: 0.95em;
+  color: #666;
+  font-style: italic;
+  margin-top: -0.5em;
+}
+
 .sidebar-wrapper {
   flex-shrink: 0;
   align-self: stretch;

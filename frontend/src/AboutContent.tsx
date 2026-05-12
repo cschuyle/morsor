@@ -2,11 +2,35 @@
  * Shared About page content. Used by both desktop (About) and mobile (MobileAbout).
  * Layout and styling are handled by the parent; this component is content-only.
  */
-export default function AboutContent() {
+export default function AboutContent({ uploadTimestamp }: { uploadTimestamp?: string | null }) {
+  function formatTimestamp(ts: string): string {
+    try {
+      // Parse ISO 8601 format or other common formats
+      const date = new Date(ts)
+      if (isNaN(date.getTime())) {
+        return ts
+      }
+      // Format as "2006-05-16 19:57"
+      const year = date.getFullYear()
+      const month = String(date.getMonth() + 1).padStart(2, '0')
+      const day = String(date.getDate()).padStart(2, '0')
+      const hours = String(date.getHours()).padStart(2, '0')
+      const minutes = String(date.getMinutes()).padStart(2, '0')
+      return `${year}-${month}-${day} ${hours}:${minutes}`
+    } catch {
+      return ts
+    }
+  }
+
   return (
     <>
       <h1>Morsor</h1>
       <p>A list of lists navigator</p>
+      {uploadTimestamp && (
+        <p className="upload-timestamp">
+          Data last updated: {formatTimestamp(uploadTimestamp)}
+        </p>
+      )}
       <h2>Why?</h2>
       <p>
         The REAL goal: Vibe-code the whole thing. This is an experiment: 99.999% vibe-coding a nontrivial app from scratch.
