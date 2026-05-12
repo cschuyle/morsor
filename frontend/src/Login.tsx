@@ -59,7 +59,7 @@ async function loginOutcomeFromResponse(res: Response, redirectTo: string): Prom
     // Spring's session-fixation protection issues a new JSESSIONID in the 302 Set-Cookie.
     // With redirect:'manual' some browsers apply that cookie asynchronously, so the first
     // session check may use the old (pre-login) session. Retry twice with short delays.
-    for (const delay of [0, 150, 500]) {
+    for (const delay of [0, 150, 500, 1000]) {
       if (delay > 0) await new Promise<void>((r) => setTimeout(r, delay))
       const check = await fetchAuthSession()
       if (check.status === 503) {
