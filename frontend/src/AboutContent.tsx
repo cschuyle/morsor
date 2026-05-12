@@ -6,6 +6,7 @@ import { useState } from 'react'
 import { Trove } from './types'
 
 export default function AboutContent({ uploadTimestamp, troves }: { uploadTimestamp?: string | null; troves?: Trove[] }) {
+  const [activeTab, setActiveTab] = useState<'about' | 'troves'>('about')
   const [sortColumn, setSortColumn] = useState<'name' | 'timestamp'>('name')
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
 
@@ -62,14 +63,26 @@ export default function AboutContent({ uploadTimestamp, troves }: { uploadTimest
 
   return (
     <>
-      <h1>Morsor</h1>
-      <p>A list of lists navigator</p>
-      {uploadTimestamp && (
-        <p className="upload-timestamp">
-          Data last updated: {formatTimestamp(uploadTimestamp)}
-        </p>
-      )}
-      <h2>Why?</h2>
+      <div className="about-tabs">
+        <button
+          className={`about-tab ${activeTab === 'about' ? 'active' : ''}`}
+          onClick={() => setActiveTab('about')}
+        >
+          About
+        </button>
+        <button
+          className={`about-tab ${activeTab === 'troves' ? 'active' : ''}`}
+          onClick={() => setActiveTab('troves')}
+        >
+          Troves
+        </button>
+      </div>
+
+      {activeTab === 'about' && (
+        <>
+          <h1>Morsor</h1>
+          <p>A list of lists navigator</p>
+          <h2>Why?</h2>
       <p>
         The REAL goal: Vibe-code the whole thing. This is an experiment: 99.999% vibe-coding a nontrivial app from scratch.
       </p>
@@ -133,8 +146,18 @@ export default function AboutContent({ uploadTimestamp, troves }: { uploadTimest
           <li>Between keys on most keyboards</li>
         </ul>
       </ul>
-      <h2>Troves</h2>
-      {troves && troves.length > 0 ? (
+        </>
+      )}
+
+      {activeTab === 'troves' && (
+        <>
+          <h2>Troves</h2>
+          {uploadTimestamp && (
+            <p className="upload-timestamp">
+              Data last updated: {formatTimestamp(uploadTimestamp)}
+            </p>
+          )}
+          {troves && troves.length > 0 ? (
         <table className="about-troves-table">
           <thead>
             <tr>
@@ -157,6 +180,8 @@ export default function AboutContent({ uploadTimestamp, troves }: { uploadTimest
         </table>
       ) : (
         <p>No troves available.</p>
+      )}
+        </>
       )}
     </>
   )
