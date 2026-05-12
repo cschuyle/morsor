@@ -8,6 +8,7 @@ import './App.css'
 
 export default function About() {
   const [uploadTimestamp, setUploadTimestamp] = useState<string | null>(null)
+  const [troves, setTroves] = useState<Trove[]>([])
 
   useEffect(() => {
     fetch('/api/troves', { credentials: 'include', headers: { ...getApiAuthHeaders() } })
@@ -15,21 +16,26 @@ export default function About() {
         if (res.status === 401) { window.location.href = '/login'; return Promise.reject() }
         return res.ok ? res.json() : Promise.resolve(null)
       })
-      .then((troves: Trove[]) => {
-        if (!Array.isArray(troves) || troves.length === 0) {
+      .then((trovesData: Trove[]) => {
+        if (!Array.isArray(trovesData) || trovesData.length === 0) {
           setUploadTimestamp(null)
+          setTroves([])
           return
         }
-        // Find the most recent uploadTimestamp among all troves
-        const timestamps = troves
-          .filter((t) => t.uploadTimestamp)
-          .map((t) => t.uploadTimestamp)
+        setTroves(trovesData)
+        // Find the most recent updateTimestamp among all troves
+        const timestamps = trovesData
+          .filter((t) => t.updateTimestamp)
+          .map((t) => t.updateTimestamp)
           .sort()
           .reverse()
         const mostRecent = timestamps.length > 0 ? timestamps[0] : null
         setUploadTimestamp(mostRecent)
       })
-      .catch(() => setUploadTimestamp(null))
+      .catch(() => {
+        setUploadTimestamp(null)
+        setTroves([])
+      })
   }, [])
 
   return (
@@ -48,7 +54,7 @@ export default function About() {
       <div className="about-viewport-border" aria-hidden="true" />
       <div className="about-page">
         <article className="about-content">
-          <AboutContent uploadTimestamp={uploadTimestamp} />
+          <AboutContent uploadTimestamp={uploadTimestamp} troves={troves} />
         </article>
       </div>
       <hr className="backend-status-divider" />

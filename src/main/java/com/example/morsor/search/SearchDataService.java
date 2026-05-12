@@ -97,7 +97,7 @@ public class SearchDataService {
     private List<SearchResult> persistedResults = List.of();
     private final Map<String, List<SearchResult>> ephemeralTroves = new ConcurrentHashMap<>();
     private final Set<String> cliCreatedEphemeralTroveIds = ConcurrentHashMap.newKeySet();
-    /** Trove metadata: uploadTimestamp by troveId. */
+    /** Trove metadata: updateTimestamp by troveId. */
     private final Map<String, String> troveMetadata = new ConcurrentHashMap<>();
     private final Object mergeLock = new Object();
     private Directory luceneDirectory;
@@ -453,10 +453,10 @@ public class SearchDataService {
                     log.debug("Skipping trove \"{}\" (in moocho.exclude.trove.ids)", troveId);
                     continue;
                 }
-                // Extract and store uploadTimestamp if present
-                String uploadTimestamp = textOrNull(entry, "uploadTimestamp");
-                if (uploadTimestamp != null && !uploadTimestamp.isEmpty()) {
-                    troveMetadata.put(troveId, uploadTimestamp);
+                // Extract and store updateTimestamp if present
+                String updateTimestamp = textOrNull(entry, "updateTimestamp");
+                if (updateTimestamp != null && !updateTimestamp.isEmpty()) {
+                    troveMetadata.put(troveId, updateTimestamp);
                 }
                 String key = bucketPrefix.isEmpty() ? troveId + ".json" : bucketPrefix + "/" + troveId + ".json";
                 toLoad.add(new TroveS3Key(troveId, key));
@@ -1136,8 +1136,8 @@ public class SearchDataService {
                     String id = e.getKey();
                     List<SearchResult> items = e.getValue();
                     String name = items.isEmpty() ? id : (items.get(0).trove() != null ? items.get(0).trove() : id);
-                    String uploadTimestamp = troveMetadata.getOrDefault(id, null);
-                    return new TroveOption(id, name, items.size(), cliCreatedEphemeralTroveIds.contains(id), uploadTimestamp);
+                    String updateTimestamp = troveMetadata.getOrDefault(id, null);
+                    return new TroveOption(id, name, items.size(), cliCreatedEphemeralTroveIds.contains(id), updateTimestamp);
                 })
                 .sorted(java.util.Comparator.comparing(TroveOption::name, String.CASE_INSENSITIVE_ORDER))
                 .toList();

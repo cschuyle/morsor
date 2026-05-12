@@ -2,7 +2,13 @@
  * Shared About page content. Used by both desktop (About) and mobile (MobileAbout).
  * Layout and styling are handled by the parent; this component is content-only.
  */
-export default function AboutContent({ uploadTimestamp }: { uploadTimestamp?: string | null }) {
+import { useState } from 'react'
+import { Trove } from './types'
+
+export default function AboutContent({ uploadTimestamp, troves }: { uploadTimestamp?: string | null; troves?: Trove[] }) {
+  const [sortColumn, setSortColumn] = useState<'name' | 'timestamp'>('name')
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
+
   function formatTimestamp(ts: string): string {
     try {
       // Parse ISO 8601 format or other common formats
@@ -20,6 +26,38 @@ export default function AboutContent({ uploadTimestamp }: { uploadTimestamp?: st
     } catch {
       return ts
     }
+  }
+
+  function handleColumnSort(column: 'name' | 'timestamp') {
+    if (sortColumn === column) {
+      setSortDir(sortDir === 'asc' ? 'desc' : 'asc')
+    } else {
+      setSortColumn(column)
+      setSortDir('asc')
+    }
+  }
+
+  function getSortedTroves(): Trove[] {
+    if (!troves || troves.length === 0) return []
+    const sorted = [...troves].sort((a, b) => {
+      let aVal: string
+      let bVal: string
+      if (sortColumn === 'name') {
+        aVal = a.name || ''
+        bVal = b.name || ''
+      } else {
+        aVal = a.updateTimestamp || ''
+        bVal = b.updateTimestamp || ''
+      }
+      const cmp = aVal.localeCompare(bVal)
+      return sortDir === 'asc' ? cmp : -cmp
+    })
+    return sorted
+  }
+
+  function SortIndicator({ column }: { column: 'name' | 'timestamp' }) {
+    if (sortColumn !== column) return <span className="sort-indicator-none"> ⇅</span>
+    return <span className="sort-indicator">{sortDir === 'asc' ? ' ↑' : ' ↓'}</span>
   }
 
   return (
@@ -95,6 +133,31 @@ export default function AboutContent({ uploadTimestamp }: { uploadTimestamp?: st
           <li>Between keys on most keyboards</li>
         </ul>
       </ul>
+      <h2>Troves</h2>
+      {troves && troves.length > 0 ? (
+        <table className="about-troves-table">
+          <thead>
+            <tr>
+              <th className="sortable-header" onClick={() => handleColumnSort('name')}>
+                Trove <SortIndicator column="name" />
+              </th>
+              <th className="sortable-header" onClick={() => handleColumnSort('timestamp')}>
+                Last Updated <SortIndicator column="timestamp" />
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {getSortedTroves().map((t) => (
+              <tr key={t.id}>
+                <td>{t.name}</td>
+                <td>{t.updateTimestamp ? formatTimestamp(t.updateTimestamp) : '—'}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      ) : (
+        <p>No troves available.</p>
+      )}
     </>
   )
 }

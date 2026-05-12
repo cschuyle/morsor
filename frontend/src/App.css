@@ -336,6 +336,58 @@
   margin-top: -0.5em;
 }
 
+.about-content .about-troves-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 1em;
+  font-size: 0.95em;
+}
+
+.about-content .about-troves-table thead {
+  background-color: #f5f5f5;
+  font-weight: bold;
+}
+
+.about-content .about-troves-table th,
+.about-content .about-troves-table td {
+  border: 1px solid #ddd;
+  padding: 0.75em;
+  text-align: left;
+}
+
+.about-content .about-troves-table th {
+  color: #333;
+}
+
+.about-content .about-troves-table .sortable-header {
+  cursor: pointer;
+  user-select: none;
+}
+
+.about-content .about-troves-table .sortable-header:hover {
+  background-color: #e8e8e8;
+}
+
+.about-content .about-troves-table .sort-indicator {
+  color: #333;
+  font-weight: bold;
+}
+
+.about-content .about-troves-table .sort-indicator-none {
+  color: #ccc;
+  font-size: 0.85em;
+}
+
+.about-content .about-troves-table th:nth-child(2),
+.about-content .about-troves-table td:nth-child(2) {
+  white-space: nowrap;
+  width: 200px;
+}
+
+.about-content .about-troves-table tbody tr:hover {
+  background-color: #f0f0f0;
+}
+
 .sidebar-wrapper {
   flex-shrink: 0;
   align-self: stretch;

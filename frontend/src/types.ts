@@ -39,7 +39,7 @@ export interface Trove {
   name: string
   count: number
   cliCreated?: boolean
-  uploadTimestamp?: string | null
+  updateTimestamp?: string | null
   [key: string]: unknown
 }
 
