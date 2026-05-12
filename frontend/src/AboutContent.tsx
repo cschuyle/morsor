@@ -7,7 +7,7 @@ import { Trove } from './types'
 
 export default function AboutContent({ uploadTimestamp, troves }: { uploadTimestamp?: string | null; troves?: Trove[] }) {
   const [activeTab, setActiveTab] = useState<'about' | 'troves'>('about')
-  const [sortColumn, setSortColumn] = useState<'name' | 'timestamp'>('name')
+  const [sortColumn, setSortColumn] = useState<'id' | 'name' | 'timestamp'>('name')
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
 
   function formatTimestamp(ts: string): string {
@@ -43,7 +43,10 @@ export default function AboutContent({ uploadTimestamp, troves }: { uploadTimest
     const sorted = [...troves].sort((a, b) => {
       let aVal: string
       let bVal: string
-      if (sortColumn === 'name') {
+      if (sortColumn === 'id') {
+        aVal = a.id || ''
+        bVal = b.id || ''
+      } else if (sortColumn === 'name') {
         aVal = a.name || ''
         bVal = b.name || ''
       } else {
@@ -161,7 +164,10 @@ export default function AboutContent({ uploadTimestamp, troves }: { uploadTimest
         <table className="about-troves-table">
           <thead>
             <tr>
-              <th className="sortable-header" onClick={() => handleColumnSort('name')}>
+              <th className="sortable-header" style={{width: '1%', whiteSpace: 'nowrap'}} onClick={() => handleColumnSort('id')}>
+                Trove ID <SortIndicator column="id" />
+              </th>
+              <th style={{minWidth: '250px'}} className="sortable-header" onClick={() => handleColumnSort('name')}>
                 Trove <SortIndicator column="name" />
               </th>
               <th className="sortable-header" onClick={() => handleColumnSort('timestamp')}>
@@ -172,6 +178,7 @@ export default function AboutContent({ uploadTimestamp, troves }: { uploadTimest
           <tbody>
             {getSortedTroves().map((t) => (
               <tr key={t.id}>
+                <td>{t.id}</td>
                 <td>{t.name}</td>
                 <td>{t.updateTimestamp ? formatTimestamp(t.updateTimestamp) : '—'}</td>
               </tr>

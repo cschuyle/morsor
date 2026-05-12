@@ -411,10 +411,15 @@
   font-size: 0.85em;
 }
 
+.about-content .about-troves-table th:nth-child(1),
+.about-content .about-troves-table td:nth-child(1) {
+  white-space: nowrap;
+  width: 1%;
+}
+
 .about-content .about-troves-table th:nth-child(2),
 .about-content .about-troves-table td:nth-child(2) {
-  white-space: nowrap;
-  width: 200px;
+  min-width: 250px;
 }
 
 .about-content .about-troves-table tbody tr:hover {
