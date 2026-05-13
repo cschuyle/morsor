@@ -31,6 +31,14 @@ export interface SearchResultsGridProps {
    * Falls back to the current page if null or on error.
    */
   onFetchAllForCopy?: (() => Promise<SearchResultRow[] | null>) | null
+  /** 0-based current page index, used to label the prev/next-page floating buttons. */
+  currentPage?: number
+  /** Total number of pages, used to decide whether to show the prev/next-page floating buttons. */
+  totalPages?: number
+  /** Called when the floating prev-page button is clicked. */
+  onPrevPage?: (() => void) | null
+  /** Called when the floating next-page button is clicked. */
+  onNextPage?: (() => void) | null
 }
 
 const AMAZON_PLACEHOLDER_THUMB = 'https://m.media-amazon.com/images/I/01RmK+J4pJL._SS135_.gif'
@@ -802,7 +810,7 @@ export function rawSourceDisplay(rawSourceItem: unknown): string {
   return (rawSourceItem != null && rawSourceItem !== '') ? String(rawSourceItem) : RAW_SOURCE_NOT_AVAILABLE
 }
 
-export function SearchResultsGrid({ data, sortBy = null, sortDir = 'asc', onSortChange, showScoreColumn = false, afterFilterSlot = null, viewMode = 'list', hideTroveInGallery = false, hideTroveInList = false, showPdfSashInGallery = false, showGalleryDecorations = true, isMobile = false, visibleExtraFieldKeys = null, onFetchAllForCopy = null }: SearchResultsGridProps) {
+export function SearchResultsGrid({ data, sortBy = null, sortDir = 'asc', onSortChange, showScoreColumn = false, afterFilterSlot = null, viewMode = 'list', hideTroveInGallery = false, hideTroveInList = false, showPdfSashInGallery = false, showGalleryDecorations = true, isMobile = false, visibleExtraFieldKeys = null, onFetchAllForCopy = null, currentPage, totalPages, onPrevPage = null, onNextPage = null }: SearchResultsGridProps) {
   const [globalFilter, setGlobalFilter] = useState('')
   const [lightbox, setLightbox] = useState<LightboxPayload | null>(null)
   const [rawSourceLightbox, setRawSourceLightbox] = useState<{ title: string; rawSourceItem: string } | null>(null)
@@ -1878,20 +1886,46 @@ export function SearchResultsGrid({ data, sortBy = null, sortDir = 'asc', onSort
       </div>
       )}
       {showBackToTop && (
-        <button
-          type="button"
-          className="back-to-top-btn"
+        <div
+          className="floating-nav-group"
           style={backToTopCenterX != null ? { left: backToTopCenterX } : undefined}
-          onClick={() => {
-            const sc = scrollContainerRef.current
-            if (sc && 'scrollTo' in sc) sc.scrollTo({ top: 0, behavior: 'smooth' })
-            else window.scrollTo({ top: 0, behavior: 'smooth' })
-          }}
-          aria-label="Back to top"
-          title="Back to top"
         >
-          <span aria-hidden="true">▲</span>
-        </button>
+          {onPrevPage != null && currentPage != null && currentPage > 0 && (
+            <button
+              type="button"
+              className="prev-page-btn"
+              onClick={onPrevPage}
+              aria-label={`Go to page ${currentPage}`}
+              title={`Go to page ${currentPage}`}
+            >
+              <span aria-hidden="true">◀</span> Page {currentPage}
+            </button>
+          )}
+          <button
+            type="button"
+            className="back-to-top-btn"
+            onClick={() => {
+              const sc = scrollContainerRef.current
+              if (sc && 'scrollTo' in sc) sc.scrollTo({ top: 0, behavior: 'smooth' })
+              else window.scrollTo({ top: 0, behavior: 'smooth' })
+            }}
+            aria-label="Back to top"
+            title="Back to top"
+          >
+            <span aria-hidden="true">▲</span>
+          </button>
+          {onNextPage != null && currentPage != null && totalPages != null && currentPage < totalPages - 1 && (
+            <button
+              type="button"
+              className="next-page-btn"
+              onClick={onNextPage}
+              aria-label={`Go to page ${currentPage + 2}`}
+              title={`Go to page ${currentPage + 2}`}
+            >
+              Page {currentPage + 2} <span aria-hidden="true">▶</span>
+            </button>
+          )}
+        </div>
       )}
     </div>
   )

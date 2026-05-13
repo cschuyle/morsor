@@ -10,12 +10,20 @@
   container-name: search-results;
 }
 
-.back-to-top-btn {
+/* Anchor div — always exactly the width/height of the back-to-top circle,
+   centered on backToTopCenterX. Prev/next buttons hang off it absolutely
+   so the back-to-top position never shifts. */
+.floating-nav-group {
   position: fixed;
   bottom: 5rem;
   left: 50%;
   transform: translateX(-50%);
   z-index: 100;
+  width: 2.75rem;
+  height: 2.75rem;
+}
+
+.back-to-top-btn {
   width: 2.75rem;
   height: 2.75rem;
   display: flex;
@@ -37,6 +45,45 @@
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
 }
 .back-to-top-btn:focus-visible {
+  outline: 2px solid #6633cc;
+  outline-offset: 2px;
+}
+
+.prev-page-btn,
+.next-page-btn {
+  position: absolute;
+  top: 0;
+  height: 2.75rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 0.9rem;
+  gap: 0.3rem;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  border-radius: 1.375rem;
+  background-color: rgba(255, 228, 204, 0.7) !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  cursor: pointer;
+  font-size: 0.95rem;
+  font-weight: 500;
+  color: rgba(0, 0, 0, 0.5);
+  white-space: nowrap;
+  transition: background-color 0.15s, box-shadow 0.15s, color 0.15s;
+}
+.prev-page-btn {
+  right: calc(100% + 0.5rem);
+}
+.next-page-btn {
+  left: calc(100% + 0.5rem);
+}
+.prev-page-btn:hover,
+.next-page-btn:hover {
+  background-color: rgba(255, 212, 168, 0.85) !important;
+  color: rgba(0, 0, 0, 0.75);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+.prev-page-btn:focus-visible,
+.next-page-btn:focus-visible {
   outline: 2px solid #6633cc;
   outline-offset: 2px;
 }

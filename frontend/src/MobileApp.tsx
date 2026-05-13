@@ -2927,6 +2927,10 @@ onClick={() => {
                   isMobile
                   visibleExtraFieldKeys={visibleExtraFieldKeysForGrid}
                   onFetchAllForCopy={async () => fullSearchResultsRef.current}
+                  currentPage={page}
+                  totalPages={totalPages}
+                  onPrevPage={() => goToPage(page - 1)}
+                  onNextPage={() => goToPage(page + 1)}
                 />
               </div>
             )}

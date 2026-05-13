@@ -3170,6 +3170,10 @@ function App() {
                     showGalleryDecorations={galleryDecorate}
                     visibleExtraFieldKeys={visibleExtraFieldKeysForGrid}
                     onFetchAllForCopy={async () => fullSearchResultsRef.current}
+                    currentPage={pageNum}
+                    totalPages={totalPages}
+                    onPrevPage={() => goToPage(pageNum - 1)}
+                    onNextPage={() => goToPage(pageNum + 1)}
                   />
                 </>
               )
