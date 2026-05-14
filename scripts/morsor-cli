@@ -1604,7 +1604,7 @@ ACTIONS
 OPTIONS: -t/--troves <id,...>  comma-delimited trove filter (repeatable)
 
 ENV: MORSOR_CLI_BASE_URL  sets default base if -b/--base is not provided
-     MORSOR_CLI_TOKEN        bearer token (overrides ~/.morsor/session-token.json)
+     MORSOR_CLI_TOKEN        bearer token (used if ~/.morsor/session-token.json is absent)
      MORSOR_PROPERTIES_FILE  required for local sisters commands
 
 Examples:
