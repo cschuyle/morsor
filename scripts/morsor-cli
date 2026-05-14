@@ -1592,30 +1592,38 @@ USAGE SUMMARY
   morsor-cli --help      # This message
   morsor-cli --man       # Full manual (man-page style; use with a pager)
 
-  morsor-cli [OPTIONS] login
-  morsor-cli [OPTIONS] logout
-  morsor-cli [OPTIONS] [<action>] [--<key> <value> ...] [query text]
+AUTH
+  morsor-cli [OPTIONS] login          # saves token to ~/.morsor/session-token.json
+  morsor-cli [OPTIONS] logout         # revokes token and deletes the file
 
-ACTIONS
-  search (default)   dup(s) | duplicate(s)   unique(s)   trove(s)   status
-  local sisters create | list | clear
-  local trove create [FILE]   local trove delete <id>   local trove list
+SEARCH  [-t <trove,...>] [--<param> <value> ...] [query text]
+  search                              # full-text search (default action)
+  dups | duplicates                   # cross-trove duplicate analysis
+  uniques                             # items unique to a trove
+  troves | status                     # list troves / server status
 
-OPTIONS: -t/--troves <id,...>  comma-delimited trove filter (repeatable)
+  -t/--troves <id[,id...]>  limit to these troves (repeatable, comma-delimited)
+  query text                bare words are appended to the search query
 
-ENV: MORSOR_CLI_BASE_URL  sets default base if -b/--base is not provided
-     MORSOR_CLI_TOKEN        bearer token (used if ~/.morsor/session-token.json is absent)
-     MORSOR_PROPERTIES_FILE  required for local sisters commands
+LOCAL
+  local sisters create                # upsert sister ephemeral troves from config
+  local sisters list                  # show configured sisters and upload status
+  local sisters clear                 # delete all sister ephemeral troves
+  local trove create [FILE]           # register a file (or stdin) as an ephemeral trove
+  local trove delete <id>             # delete an ephemeral trove by id
+  local trove list                    # list all CLI-created ephemeral troves
+
+ENV
+  MORSOR_CLI_BASE_URL      default base URL (overridden by -b/--base)
+  MORSOR_CLI_TOKEN         bearer token (used if ~/.morsor/session-token.json absent)
+  MORSOR_PROPERTIES_FILE   required for local sisters commands
 
 Examples:
-  morsor-cli -t vinyl search '*'
-  morsor-cli search --trove=vinyl --query='*'
+  morsor-cli -t vinyl search 'King Gizzard'
+  morsor-cli -t vinyl,jazz dups
   morsor-cli local sisters create
   morsor-cli local trove create /path/to/titles.txt
   cat /path/to/titles.txt | morsor-cli local trove create
-  morsor-cli local trove list
-  morsor-cli local trove delete local-e980f196-ae1c-4c82-9f9f-a3e5b8e06920
-  morsor-cli -v -b http://localhost:8080 GET /api/search -- query=*&page=0&size=10
 """.strip()
     )
 
