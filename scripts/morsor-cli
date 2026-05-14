@@ -11,7 +11,6 @@ import os
 import re
 import sys
 import time
-from datetime import datetime, timezone
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -32,6 +31,11 @@ TROVE_ROW_JSON = re.compile(
 def die(msg: str, code: int = 2) -> None:
     print(f"morsor-cli: {msg}", file=sys.stderr)
     sys.exit(code)
+
+
+def _server_unreachable(base: str, e: URLError) -> str:
+    reason = str(e.reason) if hasattr(e, "reason") and e.reason else str(e)
+    return f"Cannot reach server at {strip_trailing_slash(base)}: {reason}"
 
 
 def strip_trailing_slash(s: str) -> str:
@@ -252,7 +256,7 @@ def print_troves_text(json_str: str) -> None:
         m = TROVE_ROW_JSON.finditer(json_str)
         rows = []
         for x in m:
-            rows.append((x.group(1), x.group(3), x.group(2)))
+            rows.append((x.group(1), x.group(3), x.group(2), ""))
         if not rows:
             return
     else:
@@ -262,11 +266,13 @@ def print_troves_text(json_str: str) -> None:
         for o in arr:
             if not isinstance(o, dict):
                 continue
-            rows.append((str(o.get("id", "")), str(o.get("count", "")), str(o.get("name", ""))))
+            tag = "[local]" if o.get("cliCreated") else ""
+            rows.append((str(o.get("id", "")), str(o.get("count", "")), str(o.get("name", "")), tag))
     max_id = max(len(r[0]) for r in rows) if rows else 0
     max_c = max(len(r[1]) for r in rows) if rows else 0
-    for tid, cnt, name in rows:
-        print(f"{pad_right(tid, max_id)}\t{pad_right(cnt, max_c)}\t{name}")
+    for tid, cnt, name, tag in rows:
+        suffix = f"\t{tag}" if tag else ""
+        print(f"{pad_right(tid, max_id)}\t{pad_right(cnt, max_c)}\t{name}{suffix}")
 
 
 def print_duplicates_text(json_str: str) -> None:
@@ -478,7 +484,7 @@ def run_local_trove(
             print(raw)
         sys.exit(1)
     except URLError as e:
-        die(f"request failed: {e} (POST {url})")
+        die(_server_unreachable(base, e))
 
 
 def _finish_local_trove_response(
@@ -544,6 +550,13 @@ def run_login(base: str) -> None:
         die("username and password are required")
     jar = CookieJar()
     opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(jar))
+    try:
+        _run_login_inner(base, user, pw, jar, opener)
+    except URLError as e:
+        die(_server_unreachable(base, e))
+
+
+def _run_login_inner(base: str, user: str, pw: str, jar: CookieJar, opener: Any) -> None:
 
     def open_req(r: urllib.request.Request) -> Any:
         return opener.open(r, timeout=120)
@@ -676,6 +689,7 @@ def http_request(
                 sys.exit(1)
     except HTTPError as e:
         raw = e.read().decode("utf-8", errors="replace") if e.fp else ""
+        print(f"morsor-cli: HTTP {e.code} {url}", file=sys.stderr)
         if debug:
             print(f"[debug] response: {e.code}", file=sys.stderr)
         if show_headers and e.headers:
@@ -687,7 +701,7 @@ def http_request(
             sys.stdout.write(raw)
         sys.exit(1)
     except URLError as e:
-        die(f"request failed: {e} ({method} {url})")
+        die(_server_unreachable(base, e))
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -749,52 +763,52 @@ def _scan_directory(path: str) -> list[str]:
         die(f"Cannot read directory {path}: {e}")
 
 
-def _state_file_path(props_file: str) -> Path:
-    p = Path(props_file)
-    return p.parent / (p.stem + ".state.json")
-
-
-def _load_state(props_file: str) -> dict:
-    sp = _state_file_path(props_file)
-    if sp.is_file():
-        try:
-            return json.loads(sp.read_text(encoding="utf-8"))
-        except Exception:
-            return {}
-    return {}
-
-
-def _state_ephemeral_id(entry: object) -> str | None:
-    """Extract ephemeral trove ID from a state entry (str for old format, dict for new)."""
-    if isinstance(entry, str):
-        return entry
-    if isinstance(entry, dict):
-        return entry.get("ephemeralId")
-    return None
-
-
-def _state_uploaded_at(entry: object) -> str | None:
-    if isinstance(entry, dict):
-        return entry.get("uploadedAt")
-    return None
-
-
-def _state_content_hash(entry: object) -> str | None:
-    if isinstance(entry, dict):
-        return entry.get("contentHash")
-    return None
-
-
 def _dir_content_hash(entries: list[str]) -> str:
     """SHA-256 of the sorted, newline-joined directory listing."""
-    digest = hashlib.sha256("\n".join(sorted(entries)).encode()).hexdigest()
-    return digest
+    return hashlib.sha256("\n".join(sorted(entries)).encode()).hexdigest()
 
 
-def _save_state(props_file: str, state: dict) -> None:
-    """state maps trove-id -> {"ephemeralId": ..., "uploadedAt": <iso>}"""
-    sp = _state_file_path(props_file)
-    sp.write_text(json.dumps(state, indent=2) + "\n", encoding="utf-8")
+def _get_server_sisters(
+    base: str,
+    bearer: str | None,
+    extra_headers: list[str],
+    debug: bool,
+) -> dict:
+    """Fetch current sister registrations from GET /api/ephemeral-troves/sisters.
+
+    Returns dict: trove_id -> {"ephemeralId": ..., "contentHash": ..., "registeredAt": ...}
+    """
+    token = bearer
+    if (not token or not token.strip()) and is_likely_local_dev_base(base):
+        token = DEV_DEFAULT_TOKEN
+    url = strip_trailing_slash(base) + "/api/ephemeral-troves/sisters"
+    headers: dict[str, str] = {}
+    if token and token.strip():
+        headers["Authorization"] = "Bearer " + token.strip()
+    for h in extra_headers:
+        if ":" not in h or h.index(":") <= 0:
+            die(f"header must be Name: value, got: {h}")
+        name, value = h.split(":", 1)
+        headers[name.strip()] = value.strip()
+    req = urllib.request.Request(url, headers=headers)
+    if debug:
+        print(f"[debug] GET {url}", file=sys.stderr)
+    try:
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            data = json.loads(resp.read().decode("utf-8", errors="replace"))
+            return {
+                item["troveId"]: {
+                    "ephemeralId": item.get("ephemeralTroveId"),
+                    "contentHash": item.get("contentHash"),
+                    "registeredAt": item.get("registeredAt"),
+                }
+                for item in data
+                if isinstance(item, dict) and item.get("troveId")
+            }
+    except HTTPError as e:
+        die(f"GET /api/ephemeral-troves/sisters failed: HTTP {e.code}")
+    except URLError as e:
+        die(_server_unreachable(base, e))
 
 
 def _delete_ephemeral_trove(
@@ -829,7 +843,7 @@ def _delete_ephemeral_trove(
         else:
             print(f"morsor-cli: local: DELETE {ephemeral_id} failed: HTTP {e.code}", file=sys.stderr)
     except URLError as e:
-        print(f"morsor-cli: local: DELETE {ephemeral_id} failed: {e}", file=sys.stderr)
+        die(_server_unreachable(base, e))
 
 
 def _post_sister_trove(
@@ -840,16 +854,19 @@ def _post_sister_trove(
     display_name: str,
     items: list[dict],
     sister_trove_id: str,
+    content_hash: str | None = None,
 ) -> dict | None:
     token = bearer
     if (not token or not token.strip()) and is_likely_local_dev_base(base):
         token = DEV_DEFAULT_TOKEN
-    body_obj = {
+    body_obj: dict = {
         "displayName": display_name,
         "items": items,
         "cliCreated": True,
         "sisterTroveId": sister_trove_id,
     }
+    if content_hash:
+        body_obj["contentHash"] = content_hash
     body_bytes = json.dumps(body_obj).encode("utf-8")
     url = strip_trailing_slash(base) + "/api/ephemeral-troves"
     headers = {"Content-Type": "application/json"}
@@ -877,8 +894,7 @@ def _post_sister_trove(
             print(f"  {raw[:400]}", file=sys.stderr)
         return None
     except URLError as e:
-        print(f"morsor-cli: local: POST /api/ephemeral-troves failed: {e}", file=sys.stderr)
-        return None
+        die(_server_unreachable(base, e))
 
 
 def run_local_sisters_create(
@@ -904,12 +920,12 @@ def run_local_sisters_create(
         if tid:
             configured_ids.add(tid)
 
-    old_state = _load_state(props_file)
+    server_state = _get_server_sisters(base, bearer, extra_headers, debug)
 
-    # Delete orphaned ephemeral troves (in state but no longer in config).
-    for trove_id, entry in old_state.items():
+    # Delete orphaned ephemeral troves (on server but no longer in config).
+    for trove_id, entry in server_state.items():
         if trove_id not in configured_ids:
-            ephemeral_id = _state_ephemeral_id(entry)
+            ephemeral_id = entry.get("ephemeralId")
             if ephemeral_id:
                 print(
                     f"morsor-cli: local sisters create: removing orphan {ephemeral_id}"
@@ -918,7 +934,6 @@ def run_local_sisters_create(
                 )
                 _delete_ephemeral_trove(base, bearer, extra_headers, debug, ephemeral_id)
 
-    new_state: dict[str, str] = {}
     rows: list[tuple[str, str, int, str]] = []  # trove_id, ephemeral_id, count, path
 
     for sister in sisters:
@@ -935,14 +950,13 @@ def run_local_sisters_create(
         entries = _scan_directory(path)
         content_hash = _dir_content_hash(entries)
 
-        old_entry = old_state.get(trove_id)
-        existing_id = _state_ephemeral_id(old_entry)
-        if existing_id and _state_content_hash(old_entry) == content_hash:
+        existing = server_state.get(trove_id, {})
+        existing_id = existing.get("ephemeralId")
+        if existing_id and existing.get("contentHash") == content_hash:
             print(
                 f"morsor-cli: local sisters create:   no change since last upload, skipping {trove_id!r}",
                 file=sys.stderr,
             )
-            new_state[trove_id] = old_entry
             continue
 
         if existing_id:
@@ -955,37 +969,41 @@ def run_local_sisters_create(
         items = [{"id": str(i + 1), "title": name, "files": []} for i, name in enumerate(entries)]
         print(f"morsor-cli: local sisters create:   {len(items)} items", file=sys.stderr)
 
-        reg = _post_sister_trove(base, bearer, extra_headers, debug, path, items, trove_id)
+        reg = _post_sister_trove(base, bearer, extra_headers, debug, path, items, trove_id, content_hash)
         if reg is None:
             die(f"Failed to register sister trove for {trove_id!r}")
 
         ephemeral_id = reg.get("troveId", "")
         count = reg.get("count", len(items))
-        uploaded_at = datetime.now(timezone.utc).astimezone().isoformat(timespec="seconds")
-        new_state[trove_id] = {"ephemeralId": ephemeral_id, "uploadedAt": uploaded_at, "contentHash": content_hash}
         rows.append((trove_id, ephemeral_id, count, path))
         print(
             f"morsor-cli: local sisters create:   registered {ephemeral_id} ({count} items)",
             file=sys.stderr,
         )
 
-    _save_state(props_file, new_state)
-
     if output_mode == "json":
-        print(json.dumps(new_state, indent=2))
+        updated = {t: e for t, e, _, _ in rows}
+        print(json.dumps(updated, indent=2))
     else:
-        max_tid = max((len(r[0]) for r in rows), default=0)
-        max_eid = max((len(r[1]) for r in rows), default=0)
-        for trove_id, ephemeral_id, count, path in rows:
-            print(f"{pad_right(trove_id, max_tid)}\t{pad_right(ephemeral_id, max_eid)}\t{count}\t{path}")
+        if rows:
+            max_tid = max(len(r[0]) for r in rows)
+            max_eid = max(len(r[1]) for r in rows)
+            for trove_id, ephemeral_id, count, path in rows:
+                print(f"{pad_right(trove_id, max_tid)}\t{pad_right(ephemeral_id, max_eid)}\t{count}\t{path}")
 
 
-def run_local_sisters_list(output_mode: str) -> None:
+def run_local_sisters_list(
+    base: str,
+    bearer: str | None,
+    extra_headers: list[str],
+    debug: bool,
+    output_mode: str,
+) -> None:
     """Print all configured sisters with upload status. Troves not in config are not shown."""
     props_file = _morsor_properties_file()
     data = _load_morsor_properties(props_file)
     sisters = _get_sisters(data, props_file)
-    state = _load_state(props_file)
+    server_state = _get_server_sisters(base, bearer, extra_headers, debug)
 
     rows = []
     for s in sisters:
@@ -995,13 +1013,13 @@ def run_local_sisters_list(output_mode: str) -> None:
         path = (s.get("path") or "").strip()
         if not trove_id:
             continue
-        entry = state.get(trove_id)
-        ephemeral_id = _state_ephemeral_id(entry) or "-"
-        uploaded_at = _state_uploaded_at(entry)
-        if entry is None:
+        entry = server_state.get(trove_id, {})
+        ephemeral_id = entry.get("ephemeralId") or "-"
+        registered_at = entry.get("registeredAt")
+        if not entry:
             status = "Not Uploaded"
-        elif uploaded_at:
-            status = f"Uploaded on {uploaded_at}"
+        elif registered_at:
+            status = f"Uploaded on {registered_at}"
         else:
             status = "Uploaded"
         rows.append((trove_id, path, ephemeral_id, status))
@@ -1031,18 +1049,16 @@ def run_local_sisters_clear(
     extra_headers: list[str],
     debug: bool,
 ) -> None:
-    """Delete all ephemeral sister troves recorded in the state file, then clear the state."""
-    props_file = _morsor_properties_file()
-    state = _load_state(props_file)
-    if not state:
+    """Delete all ephemeral sister troves currently registered on the server."""
+    server_state = _get_server_sisters(base, bearer, extra_headers, debug)
+    if not server_state:
         print("morsor-cli: local sisters clear: nothing to clear", file=sys.stderr)
         return
-    for trove_id, entry in state.items():
-        ephemeral_id = _state_ephemeral_id(entry)
+    for trove_id, entry in server_state.items():
+        ephemeral_id = entry.get("ephemeralId")
         if ephemeral_id:
             print(f"morsor-cli: local sisters clear: deleting {ephemeral_id} (sister of {trove_id!r})", file=sys.stderr)
             _delete_ephemeral_trove(base, bearer, extra_headers, debug, ephemeral_id)
-    _save_state(props_file, {})
     print("morsor-cli: local sisters clear: done", file=sys.stderr)
 
 
@@ -1064,7 +1080,7 @@ def run_local_command(
         if sub == "create":
             run_local_sisters_create(base, bearer, extra_headers, debug, output_mode)
         elif sub == "list":
-            run_local_sisters_list(output_mode)
+            run_local_sisters_list(base, bearer, extra_headers, debug, output_mode)
         elif sub == "clear":
             run_local_sisters_clear(base, bearer, extra_headers, debug)
         else:
@@ -1142,11 +1158,10 @@ LOCAL SISTER TROVES (DIRECTORY SCAN)
 
        local sisters list
 
-                   Prints each non-ephemeral trove that currently has a
-                   registered local sister, along with the sister's ephemeral
-                   trove ID and the directory path.  Reads the state file only
-                   — no server call is made.  Troves without a sister are not
-                   shown.
+                   Prints all configured sisters with their upload status
+                   (Not Uploaded / Uploaded on <timestamp>), ephemeral trove
+                   ID, and directory path.  Queries the server for live state.
+                   Troves not in the config are not shown.
 
        local sisters clear
 

@@ -48,6 +48,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.text.Normalizer;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -97,9 +98,9 @@ public class SearchDataService {
     private List<SearchResult> persistedResults = List.of();
     private final Map<String, List<SearchResult>> ephemeralTroves = new ConcurrentHashMap<>();
     private final Set<String> cliCreatedEphemeralTroveIds = ConcurrentHashMap.newKeySet();
-    /** Maps non-ephemeral trove ID → the ephemeral trove ID currently registered as its local sister. */
-    private final Map<String, String> sisterToEphemeral = new ConcurrentHashMap<>();
-    /** Maps ephemeral trove ID → the non-ephemeral trove ID it is a sister of. */
+    /** Maps non-ephemeral trove ID → full sister registration (ephemeral ID, hash, timestamp). */
+    private final Map<String, SisterRegistration> sisterToEphemeral = new ConcurrentHashMap<>();
+    /** Maps ephemeral trove ID → the non-ephemeral trove ID it is a sister of (for cleanup). */
     private final Map<String, String> ephemeralToSister = new ConcurrentHashMap<>();
     /** Trove metadata: updateTimestamp by troveId. */
     private final Map<String, String> troveMetadata = new ConcurrentHashMap<>();
@@ -191,16 +192,21 @@ public class SearchDataService {
     private static final int MAX_EPHEMERAL_DISPLAY_NAME_LEN = 8192;
 
     /**
-     * Register an in-memory trove from uploaded items. Trove id is always {@code local-}{@link UUID}.
+     * Register an in-memory trove from uploaded items. Trove id is {@code sister-1-of-<companionId>}
+     * when a {@code sisterTroveId} is supplied, otherwise {@code local-}{@link UUID}.
      * Rebuilds the merged Lucene index; not persisted across restart.
      *
      * @param displayName required non-blank trove label (CLI sends the scanned directory's full path)
      */
     public EphemeralTroveRegistration registerEphemeralTrove(String displayName, List<EphemeralManifestItem> items, boolean cliCreated) {
-        return registerEphemeralTrove(displayName, items, cliCreated, null);
+        return registerEphemeralTrove(displayName, items, cliCreated, null, null);
     }
 
     public EphemeralTroveRegistration registerEphemeralTrove(String displayName, List<EphemeralManifestItem> items, boolean cliCreated, String sisterTroveId) {
+        return registerEphemeralTrove(displayName, items, cliCreated, sisterTroveId, null);
+    }
+
+    public EphemeralTroveRegistration registerEphemeralTrove(String displayName, List<EphemeralManifestItem> items, boolean cliCreated, String sisterTroveId, String contentHash) {
         if (items == null) {
             throw new IllegalArgumentException("items must not be null");
         }
@@ -214,7 +220,10 @@ public class SearchDataService {
         if (troveLabel.length() > MAX_EPHEMERAL_DISPLAY_NAME_LEN) {
             throw new IllegalArgumentException("displayName exceeds max length " + MAX_EPHEMERAL_DISPLAY_NAME_LEN);
         }
-        String troveId = "local-" + UUID.randomUUID();
+        String sisterTroveIdTrimmed = sisterTroveId != null && !sisterTroveId.isBlank() ? sisterTroveId.trim() : null;
+        String troveId = sisterTroveIdTrimmed != null
+                ? "sister-1-of-" + sisterTroveIdTrimmed
+                : "local-" + UUID.randomUUID();
         List<SearchResult> stamped = new ArrayList<>(items.size());
         for (EphemeralManifestItem item : items) {
             if ((item.title() == null || item.title().isBlank())
@@ -223,26 +232,47 @@ public class SearchDataService {
             }
             stamped.add(ephemeralItemToSearchResult(item, troveId, troveLabel));
         }
-        String sisterTroveIdTrimmed = sisterTroveId != null && !sisterTroveId.isBlank() ? sisterTroveId.trim() : null;
         synchronized (mergeLock) {
-            ephemeralTroves.put(troveId, List.copyOf(stamped));
+            // Deduplicate: drop items whose title already exists in the companion non-ephemeral trove.
+            List<SearchResult> toIndex = stamped;
+            if (sisterTroveIdTrimmed != null) {
+                Set<String> companionTitles = persistedResults.stream()
+                        .filter(r -> sisterTroveIdTrimmed.equals(r.troveId()))
+                        .map(SearchResult::title)
+                        .filter(Objects::nonNull)
+                        .collect(Collectors.toSet());
+                if (!companionTitles.isEmpty()) {
+                    toIndex = stamped.stream()
+                            .filter(r -> r.title() == null || !companionTitles.contains(r.title()))
+                            .toList();
+                    int skipped = stamped.size() - toIndex.size();
+                    if (skipped > 0) {
+                        log.info("Sister trove {}: skipped {} item(s) already present in \"{}\"",
+                                troveId, skipped, sisterTroveIdTrimmed);
+                    }
+                }
+            }
+            ephemeralTroves.put(troveId, List.copyOf(toIndex));
             if (cliCreated) {
                 cliCreatedEphemeralTroveIds.add(troveId);
             } else {
                 cliCreatedEphemeralTroveIds.remove(troveId);
             }
             if (sisterTroveIdTrimmed != null) {
-                String oldEphemeralId = sisterToEphemeral.put(sisterTroveIdTrimmed, troveId);
-                if (oldEphemeralId != null) {
-                    ephemeralToSister.remove(oldEphemeralId);
+                String hashTrimmed = contentHash != null && !contentHash.isBlank() ? contentHash.trim() : null;
+                SisterRegistration old = sisterToEphemeral.put(sisterTroveIdTrimmed,
+                        new SisterRegistration(sisterTroveIdTrimmed, troveId, hashTrimmed, Instant.now().toString()));
+                if (old != null) {
+                    ephemeralToSister.remove(old.ephemeralTroveId());
                 }
                 ephemeralToSister.put(troveId, sisterTroveIdTrimmed);
             }
             rebuildMergedIndexLocked();
+            log.info("Registered ephemeral trove id=\"{}\" name=\"{}\" ({}/{} items indexed) sister=\"{}\"",
+                    troveId, troveLabel, toIndex.size(), stamped.size(),
+                    sisterTroveIdTrimmed != null ? sisterTroveIdTrimmed : "(none)");
+            return new EphemeralTroveRegistration(troveId, troveLabel, toIndex.size());
         }
-        log.info("Registered ephemeral trove id=\"{}\" name=\"{}\" ({} items) sister=\"{}\"",
-                troveId, troveLabel, stamped.size(), sisterTroveIdTrimmed != null ? sisterTroveIdTrimmed : "(none)");
-        return new EphemeralTroveRegistration(troveId, troveLabel, stamped.size());
     }
 
     /** Remove an ephemeral trove by id. Returns true if it existed. */
@@ -258,7 +288,8 @@ public class SearchDataService {
             cliCreatedEphemeralTroveIds.remove(troveId.trim());
             String nonEphemeralSister = ephemeralToSister.remove(troveId.trim());
             if (nonEphemeralSister != null) {
-                sisterToEphemeral.remove(nonEphemeralSister, troveId.trim());
+                sisterToEphemeral.computeIfPresent(nonEphemeralSister, (k, v) ->
+                        troveId.trim().equals(v.ephemeralTroveId()) ? null : v);
             }
             rebuildMergedIndexLocked();
         }
@@ -1156,7 +1187,15 @@ public class SearchDataService {
         if (nonEphemeralTroveId == null || nonEphemeralTroveId.isBlank()) {
             return null;
         }
-        return sisterToEphemeral.get(nonEphemeralTroveId.trim());
+        SisterRegistration reg = sisterToEphemeral.get(nonEphemeralTroveId.trim());
+        return reg != null ? reg.ephemeralTroveId() : null;
+    }
+
+    /** Returns all current sister registrations, sorted by trove ID. */
+    public List<SisterRegistration> getAllSisterRegistrations() {
+        return sisterToEphemeral.values().stream()
+                .sorted(java.util.Comparator.comparing(SisterRegistration::troveId))
+                .toList();
     }
 
     /**

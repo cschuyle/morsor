@@ -5,6 +5,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -45,7 +46,7 @@ public class EphemeralTroveController {
                 items.size(),
                 previewForLog(dn));
         try {
-                EphemeralTroveRegistration reg = searchDataService.registerEphemeralTrove(dn, items, Boolean.TRUE.equals(body.cliCreated()), body.sisterTroveId());
+                EphemeralTroveRegistration reg = searchDataService.registerEphemeralTrove(dn, items, Boolean.TRUE.equals(body.cliCreated()), body.sisterTroveId(), body.contentHash());
             searchCache.clear();
             log.info(
                     "POST /api/ephemeral-troves: registered troveId={} count={} name.preview={}",
@@ -57,6 +58,11 @@ public class EphemeralTroveController {
             log.warn("POST /api/ephemeral-troves: bad request: {}", e.getMessage());
             return ResponseEntity.badRequest().build();
         }
+    }
+
+    @GetMapping("/sisters")
+    public List<SisterRegistration> sisters() {
+        return searchDataService.getAllSisterRegistrations();
     }
 
     @DeleteMapping("/{troveId}")

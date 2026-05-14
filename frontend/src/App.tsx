@@ -3164,8 +3164,8 @@ function App() {
                     showScoreColumn={searchQuery.trim() !== '*'}
                     viewMode={searchResultsViewMode}
                     afterFilterSlot={gallerySortAfterFilterSlot}
-                    hideTroveInGallery={selectedTroveIds.size === 1}
-                    hideTroveInList={selectedTroveIds.size === 1}
+                    hideTroveInGallery={selectedTroveIds.size === 1 && trovesWithResults <= 1}
+                    hideTroveInList={selectedTroveIds.size === 1 && trovesWithResults <= 1}
                     showPdfSashInGallery
                     showGalleryDecorations={galleryDecorate}
                     visibleExtraFieldKeys={visibleExtraFieldKeysForGrid}

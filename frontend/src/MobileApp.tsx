@@ -1452,6 +1452,10 @@ function MobileApp() {
   const count = searchResult?.count ?? 0
   const searchSize = typeof searchResult?.size === 'number' ? searchResult.size : pageSize
   const totalPages = Math.ceil(count / searchSize) || 0
+  const trovesWithResults =
+    searchResult?.troveCounts != null && typeof searchResult.troveCounts === 'object'
+      ? Object.keys(searchResult.troveCounts).length
+      : new Set(results.map((r) => r.troveId).filter(Boolean)).size
   const showMobileViewModeToggle = useMemo(
     () => Array.isArray(results) && results.some((row) => row?.itemType === 'littlePrinceItem' && hasUsableThumbnail(row)),
     [results]
@@ -2920,8 +2924,8 @@ onClick={() => {
                   showScoreColumn={searchQuery.trim() !== '*'}
                   viewMode={effectiveSearchResultsViewMode}
                   afterFilterSlot={mobileGallerySortAfterFilterSlot}
-                  hideTroveInGallery={selectedTroveIds.size === 1}
-                  hideTroveInList={selectedTroveIds.size === 1}
+                  hideTroveInGallery={selectedTroveIds.size === 1 && trovesWithResults <= 1}
+                  hideTroveInList={selectedTroveIds.size === 1 && trovesWithResults <= 1}
                   showPdfSashInGallery
                   showGalleryDecorations={galleryDecorate}
                   isMobile

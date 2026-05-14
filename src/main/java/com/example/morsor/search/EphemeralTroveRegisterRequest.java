@@ -16,4 +16,6 @@ public record EphemeralTroveRegisterRequest(
          * directory mirror of. When set, searches on the non-ephemeral trove automatically
          * include this trove's results as well.
          */
-        String sisterTroveId) {}
+        String sisterTroveId,
+        /** Optional: opaque hash of the directory contents at upload time, for change detection. */
+        String contentHash) {}
