@@ -177,10 +177,13 @@ def parse_shorthand_query(args: list[str], start_idx: int) -> str:
 def resolve_action(token: str) -> tuple[str, str] | None:
     t = token.lower().rstrip(":")
     actions = {
+        "trove": ("GET", "/api/troves"),
         "troves": ("GET", "/api/troves"),
         "status": ("GET", "/api/status"),
         "search": ("GET", "/api/search"),
+        "dup": ("GET", "/api/search/duplicates"),
         "dups": ("GET", "/api/search/duplicates"),
+        "duplicate": ("GET", "/api/search/duplicates"),
         "duplicates": ("GET", "/api/search/duplicates"),
         "dupliicates": ("GET", "/api/search/duplicates"),
         "unique": ("GET", "/api/search/uniques"),
@@ -193,11 +196,6 @@ def resolve_action(token: str) -> tuple[str, str] | None:
 
 def is_http_method(s: str) -> bool:
     return s.upper() in ("GET", "POST", "HEAD")
-
-
-def is_local_trove_action(token: str) -> bool:
-    t = token.lower().rstrip(":")
-    return t in ("local-trove", "register-local-dir")
 
 
 def is_local_command(token: str) -> bool:
@@ -331,7 +329,7 @@ def print_text_for_path(json_str: str, path: str) -> None:
 
 
 def local_trove_err(msg: str) -> None:
-    print(f"morsor-cli: local-trove: {msg}", file=sys.stderr)
+    print(f"morsor-cli: local trove create: {msg}", file=sys.stderr)
 
 
 def json_body_preview(s: str, max_chars: int) -> str:
@@ -360,28 +358,28 @@ def run_local_trove(
         if token.startswith("--name="):
             value = token.split("=", 1)[1].strip()
             if not value:
-                die("local-trove: --name requires a non-empty value")
+                die("local trove create: --name requires a non-empty value")
             if name_override is not None:
-                die("local-trove: --name was provided more than once")
+                die("local trove create: --name was provided more than once")
             name_override = value
             idx += 1
             continue
         if token == "--name":
             idx += 1
             if idx >= len(positional):
-                die("local-trove: --name requires a value")
+                die("local trove create: --name requires a value")
             value = positional[idx].strip()
             if not value:
-                die("local-trove: --name requires a non-empty value")
+                die("local trove create: --name requires a non-empty value")
             if name_override is not None:
-                die("local-trove: --name was provided more than once")
+                die("local trove create: --name was provided more than once")
             name_override = value
             idx += 1
             continue
         if token.startswith("-"):
-            die(f"unknown option for local-trove: {token}")
+            die(f"unknown option for local trove create: {token}")
         if input_file is not None:
-            die("local-trove: unexpected extra arguments (expected at most one filename)")
+            die("local trove create: unexpected extra arguments (expected at most one filename)")
         input_file = Path(token).resolve()
         idx += 1
     if input_file is not None:
@@ -403,7 +401,7 @@ def run_local_trove(
 
     titles = [line.strip() for line in lines if line.strip()]
     if not titles:
-        die("local-trove: no non-empty item titles were provided")
+        die("local trove create: no non-empty item titles were provided")
     if len(titles) > MAX_LOCAL_TROVE_ITEMS:
         die(f"too many items (max {MAX_LOCAL_TROVE_ITEMS}): {len(titles)}")
 
@@ -1062,6 +1060,71 @@ def run_local_sisters_clear(
     print("morsor-cli: local sisters clear: done", file=sys.stderr)
 
 
+def run_local_trove_list(
+    base: str,
+    bearer: str | None,
+    extra_headers: list[str],
+    debug: bool,
+    output_mode: str,
+) -> None:
+    """List all CLI-created ephemeral troves from GET /api/troves."""
+    token = bearer
+    if (not token or not token.strip()) and is_likely_local_dev_base(base):
+        token = DEV_DEFAULT_TOKEN
+    url = strip_trailing_slash(base) + "/api/troves"
+    headers: dict[str, str] = {}
+    if token and token.strip():
+        headers["Authorization"] = "Bearer " + token.strip()
+    for h in extra_headers:
+        if ":" not in h or h.index(":") <= 0:
+            die(f"header must be Name: value, got: {h}")
+        k, v = h.split(":", 1)
+        headers[k.strip()] = v.strip()
+    req = urllib.request.Request(url, headers=headers)
+    if debug:
+        print(f"[debug] GET {url}", file=sys.stderr)
+    try:
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            raw = resp.read().decode("utf-8", errors="replace")
+    except HTTPError as e:
+        die(f"GET /api/troves failed: HTTP {e.code}")
+    except URLError as e:
+        die(_server_unreachable(base, e))
+    if output_mode == "json":
+        sys.stdout.write(raw)
+        if raw and not raw.endswith("\n"):
+            print()
+        return
+    try:
+        arr = json.loads(raw)
+    except json.JSONDecodeError:
+        die("GET /api/troves: could not parse JSON response")
+    rows = [
+        (str(o.get("id", "")), str(o.get("count", "")), str(o.get("name", "")))
+        for o in arr
+        if isinstance(o, dict) and o.get("cliCreated")
+    ]
+    if not rows:
+        print("No local ephemeral troves registered.")
+        return
+    max_id = max(len(r[0]) for r in rows)
+    max_c = max(len(r[1]) for r in rows)
+    for tid, cnt, name in rows:
+        print(f"{pad_right(tid, max_id)}\t{pad_right(cnt, max_c)}\t{name}")
+
+
+def run_local_trove_delete(
+    base: str,
+    bearer: str | None,
+    extra_headers: list[str],
+    debug: bool,
+    trove_id: str,
+) -> None:
+    """Delete a specific ephemeral trove by ID."""
+    _delete_ephemeral_trove(base, bearer, extra_headers, debug, trove_id)
+    print(f"Deleted ephemeral trove: {trove_id}")
+
+
 def run_local_command(
     args: list[str],
     base: str,
@@ -1069,11 +1132,13 @@ def run_local_command(
     extra_headers: list[str],
     debug: bool,
     output_mode: str,
+    show_headers: bool = False,
+    local_trove_name_override: str | None = None,
 ) -> None:
     if not args:
-        die("local requires a subcommand: sisters")
+        die("local requires a subcommand: sisters, trove, troves")
     subcommand = args[0].lower()
-    if subcommand == "sisters":
+    if subcommand in ("sisters", "sister"):
         if len(args) < 2:
             die("local sisters requires a subcommand: create, list, clear")
         sub = args[1].lower()
@@ -1084,9 +1149,27 @@ def run_local_command(
         elif sub == "clear":
             run_local_sisters_clear(base, bearer, extra_headers, debug)
         else:
-            die(f"unknown subcommand: local sisters {sub!r}  (expected: create, list, clear)")
+            die(f"unknown subcommand: local sister(s) {sub!r}  (expected: create, list, clear)")
+    elif subcommand in ("trove", "troves"):
+        if len(args) < 2:
+            die(f"local {subcommand} requires a subcommand: create, delete, list")
+        sub = args[1].lower()
+        if sub == "create":
+            run_local_trove(
+                base, bearer, extra_headers, show_headers, debug, output_mode,
+                ["local trove create"] + args[2:],
+                local_trove_name_override,
+            )
+        elif sub == "delete":
+            if len(args) < 3:
+                die("local trove delete requires a trove ID")
+            run_local_trove_delete(base, bearer, extra_headers, debug, args[2])
+        elif sub == "list":
+            run_local_trove_list(base, bearer, extra_headers, debug, output_mode)
+        else:
+            die(f"unknown subcommand: local {subcommand} {sub!r}  (expected: create, delete, list)")
     else:
-        die(f"unknown local subcommand: {subcommand!r}  (expected: sisters)")
+        die(f"unknown local subcommand: {subcommand!r}  (expected: sisters, trove, troves)")
 
 
 MORSOR_CLI_MAN_PAGE = """
@@ -1107,8 +1190,9 @@ SYNOPSIS
        morsor-cli [OPTIONS] [<action>] [--key value | -k value | --key=value ...]
                   [query text...]
 
-    morsor-cli [OPTIONS] local-trove [FILE]
-    morsor-cli [OPTIONS] register-local-dir [FILE]
+    morsor-cli [OPTIONS] local trove create [FILE]
+    morsor-cli [OPTIONS] local trove delete <trove-id>
+    morsor-cli [OPTIONS] local trove list
 
        morsor-cli [OPTIONS] METHOD PATH [-- querystring]
 
@@ -1184,16 +1268,29 @@ LOCAL SISTER TROVES (DIRECTORY SCAN)
        .state.json) so that the next create knows which ephemeral IDs to replace.
 
 EPHEMERAL TROVES (LINE INPUT)
-    local-trove (alias register-local-dir) reads item titles one-per-line from
-    FILE, or from stdin when FILE is omitted. It POSTs those items to the
-    server as an ephemeral trove, and prints the assigned trove id and display
-    name.
+       local trove create [FILE]
 
-       • Trove id is always server-generated: local-<uuid> (you do not choose it).
-    • Display name is FILE’s absolute path, or "stdin" when reading from stdin.
+                   Reads item titles one-per-line from FILE, or from stdin when
+                   FILE is omitted. POSTs those items to the server as an
+                   ephemeral trove and prints the assigned trove id and display
+                   name. Accepts --name NAME to override the generated display
+                   name.
+
+       local trove delete <trove-id>
+
+                   Deletes the ephemeral trove with the given id. Prints a
+                   confirmation on success.
+
+       local trove list  (alias: local troves list)
+
+                   Lists all CLI-created ephemeral troves currently registered
+                   on the server (id, item count, display name).
+
+       • Trove id is server-generated: local-<uuid> (you do not choose it).
+       • Display name is FILE’s absolute path, or “stdin” when reading from stdin.
        • Ephemeral troves are merged into the index with persisted troves and
          survive reload of trove data on the server; they are in-memory and are
-         lost on JVM restart. DELETE /api/ephemeral-troves/{id} removes one by id.
+         lost on JVM restart.
 
        Use the printed trove id like any other trove: search --trove=local-...,
        dups -p local-... -c some-other-trove, etc.
@@ -1217,7 +1314,7 @@ OPTIONS
               POST body from file (only with POST).
 
     --name NAME
-        local-trove only: override generated display name for the uploaded
+        local trove create only: override generated display name for the uploaded
         ephemeral trove.
 
        -i, --include-headers
@@ -1231,19 +1328,19 @@ ENVIRONMENT
        MORSOR_PROPERTIES_FILE  Path to YAML/JSON config for local init/refresh.
 
 ACTIONS
-       search       GET /api/search (default if the first token is not an action)
-       dups         GET /api/search/duplicates
-       duplicates   same as dups
-       uniques      GET /api/search/uniques
-       unique       same as uniques
-       troves       GET /api/troves
-       status       GET /api/status
-    local sisters create  Reconcile sister troves from config (see above).
-    local sisters list    List troves that have a registered local sister.
-    local sisters clear   Delete all ephemeral sister troves and clear state.
-    local-trove  Register line input as an ephemeral trove (see above).
-              Accepts optional --name NAME.
-       login        Obtain session cookie (no -T/-H)
+       search                           GET /api/search (default)
+       dup, dups, duplicate, duplicates GET /api/search/duplicates
+       unique, uniques                  GET /api/search/uniques
+       trove, troves                    GET /api/troves
+       status                           GET /api/status
+       local sisters create   Reconcile sister troves from config (see above).
+       local sisters list     List configured sisters and their upload status.
+       local sisters clear    Delete all ephemeral sister troves.
+       local trove create     Register line input as an ephemeral trove (see above).
+                              Accepts optional --name NAME.
+       local trove delete <id> Delete an ephemeral trove by id.
+       local trove list        List all CLI-created ephemeral troves.
+       login                  Obtain session cookie (no -T/-H)
 
 SHORTHAND PARAMETERS (after an action)
        Keys are normalized for convenience, e.g. -p → primaryTrove, -c →
@@ -1277,17 +1374,25 @@ EXAMPLES
 
         MORSOR_PROPERTIES_FILE=~/.morsor.yaml ./scripts/morsor-cli local sisters create
 
-    Register from a file (one title per line):
+       Register from a file (one title per line):
 
-        ./scripts/morsor-cli local-trove /path/to/titles.txt
+              ./scripts/morsor-cli local trove create /path/to/titles.txt
 
-    Register from stdin:
+       Register from stdin:
 
-        cat /path/to/titles.txt | ./scripts/morsor-cli local-trove
+              cat /path/to/titles.txt | ./scripts/morsor-cli local trove create
 
-    Override the generated trove name:
+       Override the generated trove name:
 
-        ./scripts/morsor-cli local-trove --name "My Temp List" /path/to/titles.txt
+              ./scripts/morsor-cli local trove create --name "My Temp List" /path/to/titles.txt
+
+       Delete an ephemeral trove:
+
+              ./scripts/morsor-cli local trove delete local-e980f196-ae1c-4c82-9f9f-a3e5b8e06920
+
+       List CLI-created ephemeral troves:
+
+              ./scripts/morsor-cli local trove list
 
        Duplicates: primary is ephemeral local trove; compare against vinyl and CDs;
        large page; JSON to jq (titles of primary rows):
@@ -1320,18 +1425,20 @@ USAGE SUMMARY
   morsor-cli [OPTIONS] [<action>] [--<key> <value> ...] [query text]
 
 ACTIONS
-  search (default)   dups | duplicates   uniques | unique   troves   status
+  search (default)   dup(s) | duplicate(s)   unique(s)   trove(s)   status
   local sisters create | list | clear
-    local-trove [FILE] register-local-dir [FILE]
+  local trove create [FILE]   local trove delete <id>   local trove list
 
-ENV: MORSOR_CLI_BASE_URL sets default base if -b/--base is not provided
-     MORSOR_PROPERTIES_FILE required for local init/refresh
+ENV: MORSOR_CLI_BASE_URL  sets default base if -b/--base is not provided
+     MORSOR_PROPERTIES_FILE  required for local sisters commands
 
 Examples:
   morsor-cli search --trove=vinyl --query='*'
   morsor-cli local sisters create
-    morsor-cli local-trove /path/to/titles.txt
-    cat /path/to/titles.txt | morsor-cli local-trove
+  morsor-cli local trove create /path/to/titles.txt
+  cat /path/to/titles.txt | morsor-cli local trove create
+  morsor-cli local trove list
+  morsor-cli local trove delete local-e980f196-ae1c-4c82-9f9f-a3e5b8e06920
   morsor-cli -v -b http://localhost:8080 GET /api/search -- query=*&page=0&size=10
 """.strip()
     )
@@ -1430,28 +1537,16 @@ def main(argv: list[str]) -> None:
     if is_local_command(positional[0]):
         if body_file:
             die("--file is not valid with local")
-        if local_trove_name_override is not None:
-            die("--name is not valid with local")
-        run_local_command(positional[1:], base, bearer, extra_headers, debug, output_mode)
-        return
-
-    if is_local_trove_action(positional[0]):
-        if body_file:
-            die("--file is not valid with local-trove")
-        run_local_trove(
-            base,
-            bearer,
-            extra_headers,
-            show_headers,
-            debug,
-            output_mode,
-            positional,
-            local_trove_name_override,
+        run_local_command(
+            positional[1:], base, bearer, extra_headers, debug, output_mode,
+            show_headers=show_headers,
+            local_trove_name_override=local_trove_name_override,
         )
         return
 
+
     if local_trove_name_override is not None:
-        die("--name is only valid with local-trove")
+        die("--name is only valid with local trove create")
 
     if positional[0].lower() == "login":
         if len(positional) > 1:
