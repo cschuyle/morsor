@@ -1830,6 +1830,12 @@
   color: #666;
   font-size: 0.95rem;
 }
+.search-count-sister-note {
+  color: #e67e00;
+}
+.trove-name--sister {
+  color: #e67e00;
+}
 .card .search-count,
 .card .search-results-options .view-mode-toggle,
 .card .search-results-options .gallery-decorate-wrap,

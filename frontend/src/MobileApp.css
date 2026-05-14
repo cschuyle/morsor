@@ -1058,6 +1058,9 @@
 .mobile-trove-label span {
   text-align: left;
 }
+.mobile-trove-label span.mobile-trove-name--sister {
+  color: #e67e00;
+}
 
 .mobile-trove-count-suffix {
   color: #6633cc;

@@ -1452,10 +1452,10 @@ function MobileApp() {
   const count = searchResult?.count ?? 0
   const searchSize = typeof searchResult?.size === 'number' ? searchResult.size : pageSize
   const totalPages = Math.ceil(count / searchSize) || 0
-  const trovesWithResults =
+  const hasSisterResults =
     searchResult?.troveCounts != null && typeof searchResult.troveCounts === 'object'
-      ? Object.keys(searchResult.troveCounts).length
-      : new Set(results.map((r) => r.troveId).filter(Boolean)).size
+      ? Object.keys(searchResult.troveCounts).some((id) => !selectedTroveIds.has(id) && ((searchResult.troveCounts as Record<string, number>)[id] ?? 0) > 0)
+      : results.some((r) => r.troveId != null && !selectedTroveIds.has(r.troveId))
   const showMobileViewModeToggle = useMemo(
     () => Array.isArray(results) && results.some((row) => row?.itemType === 'littlePrinceItem' && hasUsableThumbnail(row)),
     [results]
@@ -2716,7 +2716,7 @@ onClick={() => {
                             checked={primaryTroveId === t.id}
                             onChange={() => setPrimary(t.id)}
                           />
-                          <span>{t.name}</span>
+                          <span className={t.id.startsWith('sister-1-of-') ? 'mobile-trove-name--sister' : undefined}>{t.name}</span>
                         </label>
                         <button type="button" className="mobile-trove-only-link" onClick={(e) => { e.preventDefault(); setPrimary(t.id); setShowTrovePicker(false) }} aria-label={`Set primary: ${t.name}`} title="Only this trove"><img src="/target.png" alt="" className="mobile-trove-only-icon" /><span className="trove-booster" aria-hidden="true">↑</span></button>
                       </li>
@@ -2750,7 +2750,7 @@ onClick={() => {
                                 disabled={isPrimaryDisabled}
                                 onChange={() => !isPrimaryDisabled && toggleCompare(t.id)}
                               />
-                              <span>{t.name}</span>
+                              <span className={t.id.startsWith('sister-1-of-') ? 'mobile-trove-name--sister' : undefined}>{t.name}</span>
                             </label>
                             {(compareTroveIds.size !== 1 || !compareTroveIds.has(t.id) || t.id === primaryTroveId) && (
                               <span className="mobile-trove-only-actions">
@@ -2785,7 +2785,7 @@ onClick={() => {
                           <li key={t.id} className={`mobile-trove-item${selectedTroveIds.has(t.id) ? ' mobile-trove-item--selected' : ''}${searchResult != null && resultCount > 0 ? ' mobile-trove-item--has-results' : ''}`}>
                             <label className="mobile-trove-label">
                               <input type="checkbox" checked={selectedTroveIds.has(t.id)} onChange={() => toggleTrove(t.id)} />
-                              <span>
+                              <span className={t.id.startsWith('sister-1-of-') ? 'mobile-trove-name--sister' : undefined}>
                                 {t.name}{' '}
                                 {searchResult != null
                                   ? (resultCount > 0
@@ -2924,8 +2924,8 @@ onClick={() => {
                   showScoreColumn={searchQuery.trim() !== '*'}
                   viewMode={effectiveSearchResultsViewMode}
                   afterFilterSlot={mobileGallerySortAfterFilterSlot}
-                  hideTroveInGallery={selectedTroveIds.size === 1 && trovesWithResults <= 1}
-                  hideTroveInList={selectedTroveIds.size === 1 && trovesWithResults <= 1}
+                  hideTroveInGallery={selectedTroveIds.size === 1 && !hasSisterResults}
+                  hideTroveInList={selectedTroveIds.size === 1 && !hasSisterResults}
                   showPdfSashInGallery
                   showGalleryDecorations={galleryDecorate}
                   isMobile

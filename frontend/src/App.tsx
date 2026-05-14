@@ -1613,7 +1613,7 @@ function App() {
                                   checked={true}
                                   onChange={() => setPrimaryTroveId(primarySelectedTrove.id)}
                                 />
-                                <span className="trove-name">
+                                <span className={`trove-name${primarySelectedTrove.id.startsWith('sister-1-of-') ? ' trove-name--sister' : ''}`}>
                                   {primarySelectedTrove.name} ({formatCount(primarySelectedTrove.count)})
                                 </span>
                               </label>
@@ -1634,7 +1634,7 @@ function App() {
                                   checked={primaryTroveId === t.id}
                                   onChange={() => setPrimaryTroveId(t.id)}
                                 />
-                                <span className="trove-name">
+                                <span className={`trove-name${t.id.startsWith('sister-1-of-') ? ' trove-name--sister' : ''}`}>
                                   {t.name} ({formatCount(t.count)})
                                 </span>
                               </label>
@@ -1727,7 +1727,7 @@ function App() {
                                 disabled={isPrimaryDisabled}
                                 onChange={() => !isPrimaryDisabled && toggleTrove(t.id)}
                               />
-                              <span className="trove-name">
+                              <span className={`trove-name${t.id.startsWith('sister-1-of-') ? ' trove-name--sister' : ''}`}>
                                 {t.name} {searchResult != null ? <span className="trove-count-suffix">({formatCount(t.resultCount)}/{formatCount(t.count)})</span> : `(${formatCount(t.count)})`}
                               </span>
                             </label>
@@ -1766,7 +1766,7 @@ function App() {
                                 disabled={isPrimaryDisabled}
                                 onChange={() => !isPrimaryDisabled && toggleTrove(t.id)}
                               />
-                              <span className="trove-name">
+                              <span className={`trove-name${t.id.startsWith('sister-1-of-') ? ' trove-name--sister' : ''}`}>
                                 {t.name} {searchResult != null ? <span className="trove-count-suffix">({formatCount(t.resultCount)}/{formatCount(t.count)})</span> : `(${formatCount(t.count)})`}
                               </span>
                             </label>
@@ -1862,7 +1862,7 @@ function App() {
                     checked={selectedTroveIds.has(t.id)}
                     onChange={() => toggleTrove(t.id)}
                   />
-                  <span className="trove-name">
+                  <span className={`trove-name${t.id.startsWith('sister-1-of-') ? ' trove-name--sister' : ''}`}>
                     {t.name} {searchResult != null ? <span className="trove-count-suffix">({formatCount(t.resultCount)}/{formatCount(t.count)})</span> : `(${formatCount(t.count)})`}
                   </span>
                 </label>
@@ -1909,7 +1909,7 @@ function App() {
                     checked={selectedTroveIds.has(t.id)}
                     onChange={() => toggleTrove(t.id)}
                   />
-                  <span className="trove-name">
+                  <span className={`trove-name${t.id.startsWith('sister-1-of-') ? ' trove-name--sister' : ''}`}>
                     {t.name} {searchResult != null ? <span className="trove-count-suffix">({formatCount(t.resultCount)}/{formatCount(t.count)})</span> : `(${formatCount(t.count)})`}
                   </span>
                 </label>
@@ -2980,6 +2980,10 @@ function App() {
                 troveCounts != null
                   ? Object.keys(troveCounts).length
                   : new Set(results.map((r) => r.troveId).filter(Boolean)).size
+              const hasSisterResults =
+                troveCounts != null
+                  ? Object.keys(troveCounts).some((id) => !selectedTroveIds.has(id) && (troveCounts[id] ?? 0) > 0)
+                  : results.some((r) => r.troveId != null && !selectedTroveIds.has(r.troveId))
               const trovesInScope =
                 selectedTroveIds.size > 0 ? selectedTroveIds.size : troves.length
               const scopeLabel =
@@ -2989,7 +2993,7 @@ function App() {
               return (
                 <>
                   <p className="search-count search-count-detail">
-                    {formatCount(count)} item{count !== 1 ? 's' : ''} in {formatCount(trovesWithResults)} out of {formatCount(trovesInScope)} {scopeLabel}.
+                    {formatCount(count)} item{count !== 1 ? 's' : ''} in {formatCount(trovesWithResults)} out of {formatCount(trovesInScope)} {scopeLabel}{hasSisterResults && <> <strong><em><span className="search-count-sister-note">{selectedTroveIds.size === 1 ? 'and its sisters' : 'and some sister trove(s)'}</span></em></strong></>}.
                     {totalPages > 1 && ` Showing ${formatCount(from)}–${formatCount(to)}.`}
                     <QueryTimingText timing={searchQueryTiming} />
                   </p>
@@ -3164,8 +3168,8 @@ function App() {
                     showScoreColumn={searchQuery.trim() !== '*'}
                     viewMode={searchResultsViewMode}
                     afterFilterSlot={gallerySortAfterFilterSlot}
-                    hideTroveInGallery={selectedTroveIds.size === 1 && trovesWithResults <= 1}
-                    hideTroveInList={selectedTroveIds.size === 1 && trovesWithResults <= 1}
+                    hideTroveInGallery={selectedTroveIds.size === 1 && !hasSisterResults}
+                    hideTroveInList={selectedTroveIds.size === 1 && !hasSisterResults}
                     showPdfSashInGallery
                     showGalleryDecorations={galleryDecorate}
                     visibleExtraFieldKeys={visibleExtraFieldKeysForGrid}
