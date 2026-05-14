@@ -1466,6 +1466,11 @@ OPTIONS
        -T, --token TOKEN
               Send Authorization: Bearer TOKEN (omit for cookie-only login flow).
 
+       -t, --troves ID[,ID...]
+              Restrict the request to one or more trove IDs (comma-delimited).
+              Repeatable: -t vinyl -t jazz is the same as -t vinyl,jazz.
+              Can appear anywhere on the command line (before or after the action).
+
        -o, --output json|text
               json: raw response body. text: abbreviated tables/lines for search,
               troves, duplicates, uniques.
@@ -1596,11 +1601,14 @@ ACTIONS
   local sisters create | list | clear
   local trove create [FILE]   local trove delete <id>   local trove list
 
+OPTIONS: -t/--troves <id,...>  comma-delimited trove filter (repeatable)
+
 ENV: MORSOR_CLI_BASE_URL  sets default base if -b/--base is not provided
      MORSOR_CLI_TOKEN        bearer token (overrides ~/.morsor/session-token.json)
      MORSOR_PROPERTIES_FILE  required for local sisters commands
 
 Examples:
+  morsor-cli -t vinyl search '*'
   morsor-cli search --trove=vinyl --query='*'
   morsor-cli local sisters create
   morsor-cli local trove create /path/to/titles.txt
@@ -1631,6 +1639,7 @@ def main(argv: list[str]) -> None:
     output_mode = "text"
     show_headers = False
     debug = False
+    trove_filter: list[str] = []
     positional: list[str] = []
     i = 0
     while i < len(argv):
@@ -1676,6 +1685,20 @@ def main(argv: list[str]) -> None:
             if not val:
                 die("--name requires a non-empty value")
             local_trove_name_override = val
+        elif a in ("-t", "--troves", "--trove"):
+            i += 1
+            if i >= len(argv):
+                die(f"missing value for {argv[i - 1]}")
+            for part in argv[i].split(","):
+                t = part.strip()
+                if t:
+                    trove_filter.append(t)
+        elif a.startswith(("-t=", "--troves=", "--trove=")):
+            val = a.split("=", 1)[1]
+            for part in val.split(","):
+                t = part.strip()
+                if t:
+                    trove_filter.append(t)
         elif a in ("-o", "--output"):
             i += 1
             if i >= len(argv):
@@ -1788,6 +1811,13 @@ def main(argv: list[str]) -> None:
             method = "GET"
             path = "/api/search"
         query = parse_shorthand_query(positional, idx)
+
+    if trove_filter:
+        trove_qs = "&".join(
+            urllib.parse.quote("trove", safe="") + "=" + urllib.parse.quote(t, safe="")
+            for t in trove_filter
+        )
+        query = trove_qs + ("&" + query if query else "")
 
     if body_file and method != "POST":
         die("--file is only valid for POST")
