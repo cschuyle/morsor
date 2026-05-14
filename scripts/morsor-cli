@@ -698,6 +698,18 @@ def _run_login_inner(base: str, user: str, pw: str, jar: CookieJar, opener: Any,
     csrf_resp3.read()
     xsrf = _extract_xsrf(jar, csrf_resp3, debug=debug) or xsrf
 
+    # Revoke all previous tokens so re-login rotates the credential.
+    del_req = urllib.request.Request(
+        base_u + "/api/tokens",
+        method="DELETE",
+        headers={"X-XSRF-TOKEN": xsrf},
+    )
+    try:
+        open_req(del_req)
+    except HTTPError as e:
+        if debug:
+            print(f"[debug] DELETE /api/tokens: HTTP {e.code} (ignored)", file=sys.stderr)
+
     tok_req = urllib.request.Request(
         base_u + "/api/tokens",
         data=b"{}",
@@ -1553,6 +1565,7 @@ def main(argv: list[str]) -> None:
     base = "http://localhost:8080"
     base_set_by_arg = False
     bearer: str | None = None
+    bearer_from_arg = False
     body_file: str | None = None
     local_trove_name_override: str | None = None
     output_mode = "text"
@@ -1579,6 +1592,7 @@ def main(argv: list[str]) -> None:
             if i >= len(argv):
                 die(f"missing value for {argv[i - 1]}")
             bearer = argv[i]
+            bearer_from_arg = True
         elif a in ("-H", "--header"):
             i += 1
             if i >= len(argv):
@@ -1653,8 +1667,8 @@ def main(argv: list[str]) -> None:
             die("login takes no arguments (use -b for base URL)")
         if body_file:
             die("--file is not valid with login")
-        if bearer:
-            die("--token is not valid with login")
+        if bearer_from_arg:
+            die("-T/--token is not valid with login")
         if extra_headers:
             die("-H is not valid with login")
         if show_headers:

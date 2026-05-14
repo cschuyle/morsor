@@ -40,4 +40,9 @@ public class JdbcApiTokenRepository implements ApiTokenRepository {
         String sql = "INSERT INTO api_tokens (user_id, token_hash, name, created_at) VALUES (?, ?, ?, ?)";
         jdbc.update(sql, userId, tokenHash, name != null ? name : "", Timestamp.from(Instant.now()));
     }
+
+    @Override
+    public int deleteAllForUser(long userId) {
+        return jdbc.update("DELETE FROM api_tokens WHERE user_id = ?", userId);
+    }
 }

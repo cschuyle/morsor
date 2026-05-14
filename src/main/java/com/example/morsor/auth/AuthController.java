@@ -10,6 +10,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.web.csrf.CsrfToken;
 import org.springframework.security.web.csrf.CsrfTokenRepository;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -112,6 +113,22 @@ public class AuthController {
             "token", plainToken,
             "name", name != null ? name : ""
         ));
+    }
+
+    /** Revokes all API tokens for the authenticated user. Used by the CLI to rotate on re-login. */
+    @DeleteMapping("/tokens")
+    public ResponseEntity<Void> deleteAllTokens() {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null || !auth.isAuthenticated() || auth.getPrincipal() == null) {
+            return ResponseEntity.status(401).build();
+        }
+        String username = auth.getName();
+        User user = userRepository.findByUsername(username).orElse(null);
+        if (user == null) {
+            return ResponseEntity.status(403).build();
+        }
+        apiTokenRepository.deleteAllForUser(user.getId());
+        return ResponseEntity.noContent().build();
     }
 
     private static String generateToken() {
