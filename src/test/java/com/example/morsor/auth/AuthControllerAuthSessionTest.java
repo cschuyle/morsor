@@ -8,6 +8,7 @@ import org.springframework.jdbc.CannotGetJdbcConnectionException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.web.csrf.CsrfTokenRepository;
 
 import java.sql.SQLException;
 import java.util.List;
@@ -34,7 +35,8 @@ class AuthControllerAuthSessionTest {
         AuthController controller = new AuthController(
                 mock(UserRepository.class),
                 mock(ApiTokenRepository.class),
-                mock(TokenHashService.class));
+                mock(TokenHashService.class),
+                mock(CsrfTokenRepository.class));
 
         ResponseEntity<Map<String, Object>> res = controller.authSession();
 
@@ -52,7 +54,8 @@ class AuthControllerAuthSessionTest {
         AuthController controller = new AuthController(
                 users,
                 mock(ApiTokenRepository.class),
-                mock(TokenHashService.class));
+                mock(TokenHashService.class),
+                mock(CsrfTokenRepository.class));
 
         SecurityContextHolder.getContext().setAuthentication(
                 new UsernamePasswordAuthenticationToken(
@@ -74,7 +77,8 @@ class AuthControllerAuthSessionTest {
         AuthController controller = new AuthController(
                 users,
                 mock(ApiTokenRepository.class),
-                mock(TokenHashService.class));
+                mock(TokenHashService.class),
+                mock(CsrfTokenRepository.class));
 
         SecurityContextHolder.getContext().setAuthentication(
                 new UsernamePasswordAuthenticationToken(
@@ -96,7 +100,8 @@ class AuthControllerAuthSessionTest {
         AuthController controller = new AuthController(
                 users,
                 mock(ApiTokenRepository.class),
-                mock(TokenHashService.class));
+                mock(TokenHashService.class),
+                mock(CsrfTokenRepository.class));
 
         SecurityContextHolder.getContext().setAuthentication(
                 new UsernamePasswordAuthenticationToken(
