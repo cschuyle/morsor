@@ -178,4 +178,48 @@ class PrefixSearchTest {
         Query query = SearchQueryBuilder.buildQuery("/other/", analyzer, CONTENT_FIELD);
         assertThat(query).isNull();
     }
+
+    @Test
+    void domainNameIndexedByBasenameIsFoundByBasenameSearch() throws IOException {
+        Directory dir = new ByteBuffersDirectory();
+        IndexWriterConfig config = new IndexWriterConfig(analyzer);
+        config.setOpenMode(IndexWriterConfig.OpenMode.CREATE);
+        try (IndexWriter writer = new IndexWriter(dir, config)) {
+            addDoc(writer, 0, "namecheap", "dumbasstheory.com");
+            addDoc(writer, 1, "namecheap", "unrelatedsite.net");
+            writer.commit();
+        }
+        IndexSearcher search = new IndexSearcher(DirectoryReader.open(dir));
+
+        Query queryBasename = SearchQueryBuilder.buildQuery("dumbasstheory", analyzer, CONTENT_FIELD);
+        assertThat(queryBasename).isNotNull();
+        TopDocs hits = search.search(queryBasename, 10);
+        assertThat(hits.totalHits.value)
+                .as("searching 'dumbasstheory' should find dumbasstheory.com")
+                .isEqualTo(1);
+        int idx = search.storedFields().document(hits.scoreDocs[0].doc).getField(IDX_FIELD).numericValue().intValue();
+        assertThat(idx).isEqualTo(0);
+    }
+
+    @Test
+    void domainNameIndexedIsFoundByFullDomainSearch() throws IOException {
+        Directory dir = new ByteBuffersDirectory();
+        IndexWriterConfig config = new IndexWriterConfig(analyzer);
+        config.setOpenMode(IndexWriterConfig.OpenMode.CREATE);
+        try (IndexWriter writer = new IndexWriter(dir, config)) {
+            addDoc(writer, 0, "namecheap", "dumbasstheory.com");
+            addDoc(writer, 1, "namecheap", "unrelatedsite.net");
+            writer.commit();
+        }
+        IndexSearcher search = new IndexSearcher(DirectoryReader.open(dir));
+
+        Query queryFull = SearchQueryBuilder.buildQuery("dumbasstheory.com", analyzer, CONTENT_FIELD);
+        assertThat(queryFull).isNotNull();
+        TopDocs hits = search.search(queryFull, 10);
+        assertThat(hits.totalHits.value)
+                .as("searching 'dumbasstheory.com' should find dumbasstheory.com")
+                .isGreaterThanOrEqualTo(1);
+        int idx = search.storedFields().document(hits.scoreDocs[0].doc).getField(IDX_FIELD).numericValue().intValue();
+        assertThat(idx).isEqualTo(0);
+    }
 }
