@@ -607,6 +607,27 @@ def _extract_xsrf(jar: CookieJar, resp: Any, debug: bool = False) -> str | None:
     return None
 
 
+def run_logout(base: str, bearer: str | None, debug: bool = False) -> None:
+    if not bearer or not bearer.strip():
+        die("not logged in — no token set (MORSOR_CLI_TOKEN or -T/--token)")
+    url = strip_trailing_slash(base) + "/api/tokens"
+    req = urllib.request.Request(
+        url,
+        method="DELETE",
+        headers={**_DEFAULT_HEADERS, "Authorization": "Bearer " + bearer.strip()},
+    )
+    try:
+        urllib.request.urlopen(req, timeout=30)
+    except HTTPError as e:
+        if e.code == 401:
+            pass  # token already expired or revoked — that's fine, we're logging out
+        else:
+            die(f"logout failed: HTTP {e.code} {e.reason}")
+    except URLError as e:
+        die(_server_unreachable(base, e))
+    print("unset MORSOR_CLI_TOKEN")
+
+
 def run_login(base: str, debug: bool = False) -> None:
     user = input("Username: ").strip()
     pw = getpass.getpass("Password: ")
@@ -1448,7 +1469,8 @@ ACTIONS
                               Accepts optional --name NAME.
        local trove delete <id> Delete an ephemeral trove by id.
        local trove list        List all CLI-created ephemeral troves.
-       login                  Obtain session cookie (no -T/-H)
+       login                  Obtain session cookie, print export MORSOR_CLI_TOKEN=…
+       logout                 Revoke all tokens for the current user; print unset MORSOR_CLI_TOKEN
 
 SHORTHAND PARAMETERS (after an action)
        Keys are normalized for convenience, e.g. -p → primaryTrove, -c →
@@ -1530,6 +1552,7 @@ USAGE SUMMARY
   morsor-cli --man       # Full manual (man-page style; use with a pager)
 
   morsor-cli [OPTIONS] login
+  morsor-cli [OPTIONS] logout
   morsor-cli [OPTIONS] [<action>] [--<key> <value> ...] [query text]
 
 ACTIONS
@@ -1674,6 +1697,16 @@ def main(argv: list[str]) -> None:
         if show_headers:
             die("-i is not valid with login")
         run_login(base, debug=debug)
+        return
+
+    if positional[0].lower() == "logout":
+        if len(positional) > 1:
+            die("logout takes no arguments")
+        if body_file:
+            die("--file is not valid with logout")
+        if extra_headers:
+            die("-H is not valid with logout")
+        run_logout(base, bearer, debug=debug)
         return
 
     idx = 0
