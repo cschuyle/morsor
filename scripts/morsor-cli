@@ -688,6 +688,12 @@ def http_request(
     except HTTPError as e:
         raw = e.read().decode("utf-8", errors="replace") if e.fp else ""
         print(f"morsor-cli: HTTP {e.code} {url}", file=sys.stderr)
+        if e.code in (401, 403):
+            print("morsor-cli: not authenticated — run 'morsor-cli login' or pass -T/--token", file=sys.stderr)
+        elif e.code == 502:
+            print("morsor-cli: bad gateway — backend server may be down", file=sys.stderr)
+        elif e.code == 503:
+            print("morsor-cli: service unavailable — backend server may be down", file=sys.stderr)
         if debug:
             print(f"[debug] response: {e.code}", file=sys.stderr)
         if show_headers and e.headers:
