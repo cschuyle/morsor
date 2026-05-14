@@ -1471,6 +1471,12 @@ OPTIONS
               Repeatable: -t vinyl -t jazz is the same as -t vinyl,jazz.
               Can appear anywhere on the command line (before or after the action).
 
+       -p, --primary ID
+              Primary trove for dups/uniques (sets primaryTrove query parameter).
+
+       -c, --compare ID[,ID...]
+              Compare trove(s) for dups/uniques (sets compareTrove; repeatable).
+
        -o, --output json|text
               json: raw response body. text: abbreviated tables/lines for search,
               troves, duplicates, uniques.
@@ -1596,31 +1602,40 @@ AUTH
   morsor-cli [OPTIONS] login          # saves token to ~/.morsor/session-token.json
   morsor-cli [OPTIONS] logout         # revokes token and deletes the file
 
-SEARCH  [-t <trove,...>] [--<param> <value> ...] [query text]
-  search                              # full-text search (default action)
+INFO
+  troves | status                     # List troves or server status
+
+SEARCH  [-t <trove,...>] [query text]
+  search                              # Full-text search (default action)
+
+  -t/--troves <id[,id...]>   Limit search to these troves (repeatable, comma-delimited)
+  query text                 Search terms for all troves
+
+COMPARE  -p <trove> [-c <trove>...] [query text]
   dups | duplicates                   # cross-trove duplicate analysis
   uniques                             # items unique to a trove
-  troves | status                     # list troves / server status
 
-  -t/--troves <id[,id...]>  limit to these troves (repeatable, comma-delimited)
-  query text                bare words are appended to the search query
+  -p/--primary <id>          Primary trove (required)
+  -c/--compare <id[,id...]>  Compare trove(s) (repeatable, comma-delimited)
+  query text                 Search terms for primary trove
 
-LOCAL
-  local sisters create                # upsert sister ephemeral troves from config
-  local sisters list                  # show configured sisters and upload status
-  local sisters clear                 # delete all sister ephemeral troves
-  local trove create [FILE]           # register a file (or stdin) as an ephemeral trove
-  local trove delete <id>             # delete an ephemeral trove by id
-  local trove list                    # list all CLI-created ephemeral troves
+LOCAL (EPHEMERAL) TROVES
+  local sisters create                # (Re-)create sister ephemeral troves from config
+  local sisters list                  # Show configured sisters and upload status
+  local sisters clear                 # Delete all sister ephemeral troves
+  local trove create [FILE]           # Register a file (or stdin) as an ephemeral trove
+  local trove delete <id>             # Delete an ephemeral trove by id
+  local trove list                    # List all CLI-created ephemeral troves
 
 ENV
-  MORSOR_CLI_BASE_URL      default base URL (overridden by -b/--base)
-  MORSOR_CLI_TOKEN         bearer token (used if ~/.morsor/session-token.json absent)
-  MORSOR_PROPERTIES_FILE   required for local sisters commands
+  MORSOR_CLI_BASE_URL      Default base URL (overridden by -b/--base)
+  MORSOR_CLI_TOKEN         Bearer token (used if ~/.morsor/session-token.json absent)
+  MORSOR_PROPERTIES_FILE   Configuration, required for local sisters commands
 
 Examples:
+  morsor-cli aliens
   morsor-cli -t vinyl search 'King Gizzard'
-  morsor-cli -t vinyl,jazz dups
+  morsor-cli -p vinyl -c jazz dups
   morsor-cli local sisters create
   morsor-cli local trove create /path/to/titles.txt
   cat /path/to/titles.txt | morsor-cli local trove create
@@ -1648,6 +1663,8 @@ def main(argv: list[str]) -> None:
     show_headers = False
     debug = False
     trove_filter: list[str] = []
+    primary_trove: str | None = None
+    compare_troves: list[str] = []
     positional: list[str] = []
     i = 0
     while i < len(argv):
@@ -1707,6 +1724,27 @@ def main(argv: list[str]) -> None:
                 t = part.strip()
                 if t:
                     trove_filter.append(t)
+        elif a in ("-p", "--primary"):
+            i += 1
+            if i >= len(argv):
+                die(f"missing value for {argv[i - 1]}")
+            primary_trove = argv[i].strip()
+        elif a.startswith(("-p=", "--primary=")):
+            primary_trove = a.split("=", 1)[1].strip()
+        elif a in ("-c", "--compare"):
+            i += 1
+            if i >= len(argv):
+                die(f"missing value for {argv[i - 1]}")
+            for part in argv[i].split(","):
+                t = part.strip()
+                if t:
+                    compare_troves.append(t)
+        elif a.startswith(("-c=", "--compare=")):
+            val = a.split("=", 1)[1]
+            for part in val.split(","):
+                t = part.strip()
+                if t:
+                    compare_troves.append(t)
         elif a in ("-o", "--output"):
             i += 1
             if i >= len(argv):
@@ -1820,12 +1858,16 @@ def main(argv: list[str]) -> None:
             path = "/api/search"
         query = parse_shorthand_query(positional, idx)
 
-    if trove_filter:
-        trove_qs = "&".join(
-            urllib.parse.quote("trove", safe="") + "=" + urllib.parse.quote(t, safe="")
-            for t in trove_filter
-        )
-        query = trove_qs + ("&" + query if query else "")
+    extra_qs_parts: list[str] = []
+    for t in trove_filter:
+        extra_qs_parts.append("trove=" + urllib.parse.quote(t, safe=""))
+    if primary_trove:
+        extra_qs_parts.append("primaryTrove=" + urllib.parse.quote(primary_trove, safe=""))
+    for t in compare_troves:
+        extra_qs_parts.append("compareTrove=" + urllib.parse.quote(t, safe=""))
+    if extra_qs_parts:
+        extra_qs = "&".join(extra_qs_parts)
+        query = extra_qs + ("&" + query if query else "")
 
     if body_file and method != "POST":
         die("--file is only valid for POST")
