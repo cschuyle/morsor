@@ -38,6 +38,17 @@ def _server_unreachable(base: str, e: URLError) -> str:
     return f"Cannot reach server at {strip_trailing_slash(base)}: {reason}"
 
 
+# Default User-Agent for all requests — prevents proxies (e.g. Cloudflare) from
+# blocking the default Python-urllib/3.x agent string.
+_DEFAULT_HEADERS: dict[str, str] = {
+    "User-Agent": (
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+        "AppleWebKit/537.36 (KHTML, like Gecko) "
+        "Chrome/124.0.0.0 Safari/537.36"
+    )
+}
+
+
 def strip_trailing_slash(s: str) -> str:
     return s[:-1] if s.endswith("/") and len(s) > 1 else s
 
@@ -434,7 +445,7 @@ def run_local_trove(
             "[verbose] JSON body preview (first 800 chars):\n"
             + json_body_preview(json.dumps(body_obj), 800)
         )
-    headers = {"Content-Type": "application/json"}
+    headers = {**_DEFAULT_HEADERS, "Content-Type": "application/json"}
     if token and token.strip():
         headers["Authorization"] = "Bearer " + token.strip()
     for h in extra_headers:
@@ -541,78 +552,157 @@ def print_ephemeral_register_text(json_str: str, debug: bool) -> None:
     print(json_str.rstrip() + ("\n" if json_str and not json_str.endswith("\n") else ""))
 
 
-def run_login(base: str) -> None:
+def _extract_xsrf(jar: CookieJar, resp: Any, debug: bool = False) -> str | None:
+    """Return the XSRF-TOKEN value from:
+      1. The cookie jar (standard path).
+      2. The raw Set-Cookie response header (if the jar rejected the cookie).
+      3. The X-XSRF-TOKEN response header (server-side fallback when the cookie
+         cannot be set, e.g. Cloudflare stripping Set-Cookie).
+    """
+    if debug:
+        print("[debug] cookie jar after CSRF prime:", file=sys.stderr)
+        found_any = False
+        for c in jar:
+            found_any = True
+            print(f"[debug]   {c.name}={c.value!r} domain={c.domain!r} path={c.path!r} secure={c.secure}", file=sys.stderr)
+        if not found_any:
+            print("[debug]   (empty)", file=sys.stderr)
+        if resp is not None:
+            status = getattr(resp, "status", getattr(resp, "code", "?"))
+            url = getattr(resp, "url", "?")
+            print(f"[debug] CSRF prime response: status={status} url={url}", file=sys.stderr)
+            if hasattr(resp, "headers"):
+                print(f"[debug] All response headers:", file=sys.stderr)
+                for hk, hv in resp.headers.items():
+                    print(f"[debug]   {hk}: {hv}", file=sys.stderr)
+                sc_vals = resp.headers.get_all("Set-Cookie") or []
+                print(f"[debug] Set-Cookie headers ({len(sc_vals)}):", file=sys.stderr)
+                for sc in sc_vals:
+                    print(f"[debug]   {sc}", file=sys.stderr)
+                if not sc_vals:
+                    print("[debug]   (none)", file=sys.stderr)
+        else:
+            print("[debug] no response object from CSRF prime", file=sys.stderr)
+    # 1. Cookie jar
+    for c in jar:
+        if c.name.upper() == "XSRF-TOKEN":
+            return c.value
+    # 2. Raw Set-Cookie header (jar may have rejected due to SameSite/domain policy)
+    if resp is not None and hasattr(resp, "headers"):
+        raw_cookies = resp.headers.get_all("Set-Cookie") or []
+        for sc in raw_cookies:
+            name_val = sc.split(";", 1)[0].strip()
+            if "=" in name_val:
+                cname, cval = name_val.split("=", 1)
+                if cname.strip().upper() == "XSRF-TOKEN":
+                    if debug:
+                        print("[debug] XSRF-TOKEN found in raw Set-Cookie header", file=sys.stderr)
+                    return cval.strip()
+        # 3. X-XSRF-TOKEN response header (server fallback when cookie is stripped by proxy)
+        header_token = resp.headers.get("X-XSRF-TOKEN")
+        if header_token:
+            if debug:
+                print("[debug] XSRF-TOKEN found in X-XSRF-TOKEN response header (proxy fallback)", file=sys.stderr)
+            return header_token.strip()
+    return None
+
+
+def run_login(base: str, debug: bool = False) -> None:
     user = input("Username: ").strip()
     pw = getpass.getpass("Password: ")
     if not user or not pw:
         die("username and password are required")
     jar = CookieJar()
     opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(jar))
+    opener.addheaders = list(_DEFAULT_HEADERS.items())
     try:
-        _run_login_inner(base, user, pw, jar, opener)
+        _run_login_inner(base, user, pw, jar, opener, debug=debug)
+    except HTTPError as e:
+        die(f"login failed: HTTP {e.code} {e.reason} — check the server URL and your credentials")
     except URLError as e:
         die(_server_unreachable(base, e))
 
 
-def _run_login_inner(base: str, user: str, pw: str, jar: CookieJar, opener: Any) -> None:
+def _run_login_inner(base: str, user: str, pw: str, jar: CookieJar, opener: Any, debug: bool = False) -> None:
 
     def open_req(r: urllib.request.Request) -> Any:
         return opener.open(r, timeout=120)
 
     base_u = strip_trailing_slash(base)
-    open_req(urllib.request.Request(base_u + "/api/auth/csrf-prime", method="GET"))
-    xsrf = None
-    for c in jar:
-        if c.name.upper() == "XSRF-TOKEN":
-            xsrf = c.value
-            break
+    csrf_resp = open_req(urllib.request.Request(base_u + "/api/auth/csrf-prime", method="GET"))
+    csrf_resp.read()  # consume body to ensure connection is fully processed
+    xsrf = _extract_xsrf(jar, csrf_resp, debug=debug)
     if not xsrf:
-        die("missing XSRF-TOKEN cookie after CSRF prime; is the server reachable?")
+        die("missing XSRF-TOKEN cookie after CSRF prime; is the server reachable?\n"
+            "  Run with -v for diagnostic output.")
     form = urllib.parse.urlencode({"username": user, "password": pw}).encode("utf-8")
-    login_req = urllib.request.Request(
-        base_u + "/login",
-        data=form,
-        method="POST",
-        headers={
-            "Content-Type": "application/x-www-form-urlencoded",
-            "X-XSRF-TOKEN": xsrf,
-        },
-    )
+
+    def _do_login_post(xsrf_token: str) -> Any:
+        req = urllib.request.Request(
+            base_u + "/login",
+            data=form,
+            method="POST",
+            headers={
+                "Content-Type": "application/x-www-form-urlencoded",
+                "X-XSRF-TOKEN": xsrf_token,
+            },
+        )
+        return open_req(req)
+
+    def _debug_login_response(label: str, resp: Any) -> None:
+        if not debug:
+            return
+        final_url = getattr(resp, "url", "?")
+        print(f"[debug] {label}: final_url={final_url}", file=sys.stderr)
+        print(f"[debug] cookie jar after {label}:", file=sys.stderr)
+        found = False
+        for c in jar:
+            found = True
+            print(f"[debug]   {c.name}={c.value!r} domain={c.domain!r} path={c.path!r}", file=sys.stderr)
+        if not found:
+            print("[debug]   (empty)", file=sys.stderr)
+
     try:
-        open_req(login_req)
+        login_resp = _do_login_post(xsrf)
+        _debug_login_response("login POST", login_resp)
     except HTTPError as e:
         if e.code in (401, 403):
-            open_req(urllib.request.Request(base_u + "/api/auth/csrf-prime", method="GET"))
-            for c in jar:
-                if c.name.upper() == "XSRF-TOKEN":
-                    xsrf = c.value
-                    break
-            login_req = urllib.request.Request(
-                base_u + "/login",
-                data=form,
-                method="POST",
-                headers={
-                    "Content-Type": "application/x-www-form-urlencoded",
-                    "X-XSRF-TOKEN": xsrf,
-                },
-            )
+            csrf_resp2 = open_req(urllib.request.Request(base_u + "/api/auth/csrf-prime", method="GET"))
+            csrf_resp2.read()
+            xsrf = _extract_xsrf(jar, csrf_resp2, debug=debug) or xsrf
             try:
-                open_req(login_req)
+                login_resp = _do_login_post(xsrf)
+                _debug_login_response("login POST retry", login_resp)
             except HTTPError as e2:
                 if e2.code in (401, 403):
                     die("login failed: invalid username or password")
                 raise
         else:
             raise
+
+    # Detect Spring redirect to /login?error (bad credentials or CSRF mismatch)
+    login_final_url = getattr(login_resp, "url", "") or ""
+    if "login" in login_final_url and "error" in login_final_url:
+        die("login failed: invalid username or password")
+
     sess = open_req(urllib.request.Request(base_u + "/api/auth/session", method="GET"))
     sb = sess.read().decode("utf-8", errors="replace")
+    if debug:
+        print(f"[debug] /api/auth/session response: {sb!r}", file=sys.stderr)
     if '"authenticated":true' not in sb and '"authenticated": true' not in sb:
         die("login failed: session not authenticated (check credentials and server)")
+
+    # Spring's session-fixation protection invalidates the CSRF token on login
+    # (CsrfAuthenticationStrategy clears the old cookie). Re-prime to get a fresh token.
+    csrf_resp3 = open_req(urllib.request.Request(base_u + "/api/auth/csrf-prime", method="GET"))
+    csrf_resp3.read()
+    xsrf = _extract_xsrf(jar, csrf_resp3, debug=debug) or xsrf
+
     tok_req = urllib.request.Request(
         base_u + "/api/tokens",
         data=b"{}",
         method="POST",
-        headers={"Content-Type": "application/json"},
+        headers={"Content-Type": "application/json", "X-XSRF-TOKEN": xsrf},
     )
     try:
         tr = open_req(tok_req)
@@ -645,7 +735,7 @@ def http_request(
     if query:
         url += "?" + query
     data = None
-    headers: dict[str, str] = {}
+    headers: dict[str, str] = dict(_DEFAULT_HEADERS)
     if method == "POST" and body_file:
         data = Path(body_file).read_bytes()
         if not any(h.lower().startswith("content-type:") for h in extra_headers):
@@ -786,7 +876,7 @@ def _get_server_sisters(
     if (not token or not token.strip()) and is_likely_local_dev_base(base):
         token = DEV_DEFAULT_TOKEN
     url = strip_trailing_slash(base) + "/api/ephemeral-troves/sisters"
-    headers: dict[str, str] = {}
+    headers: dict[str, str] = dict(_DEFAULT_HEADERS)
     if token and token.strip():
         headers["Authorization"] = "Bearer " + token.strip()
     for h in extra_headers:
@@ -826,7 +916,7 @@ def _delete_ephemeral_trove(
     if (not token or not token.strip()) and is_likely_local_dev_base(base):
         token = DEV_DEFAULT_TOKEN
     url = strip_trailing_slash(base) + "/api/ephemeral-troves/" + urllib.parse.quote(ephemeral_id, safe="")
-    headers: dict[str, str] = {}
+    headers: dict[str, str] = dict(_DEFAULT_HEADERS)
     if token and token.strip():
         headers["Authorization"] = "Bearer " + token.strip()
     for h in extra_headers:
@@ -873,7 +963,7 @@ def _post_sister_trove(
         body_obj["contentHash"] = content_hash
     body_bytes = json.dumps(body_obj).encode("utf-8")
     url = strip_trailing_slash(base) + "/api/ephemeral-troves"
-    headers = {"Content-Type": "application/json"}
+    headers = {**_DEFAULT_HEADERS, "Content-Type": "application/json"}
     if token and token.strip():
         headers["Authorization"] = "Bearer " + token.strip()
     for h in extra_headers:
@@ -1078,7 +1168,7 @@ def run_local_trove_list(
     if (not token or not token.strip()) and is_likely_local_dev_base(base):
         token = DEV_DEFAULT_TOKEN
     url = strip_trailing_slash(base) + "/api/troves"
-    headers: dict[str, str] = {}
+    headers: dict[str, str] = dict(_DEFAULT_HEADERS)
     if token and token.strip():
         headers["Authorization"] = "Bearer " + token.strip()
     for h in extra_headers:
@@ -1540,6 +1630,10 @@ def main(argv: list[str]) -> None:
     if (not base_set_by_arg) and env_base and env_base.strip():
         base = strip_trailing_slash(env_base.strip())
 
+    env_token = os.environ.get("MORSOR_CLI_TOKEN")
+    if (not bearer) and env_token and env_token.strip():
+        bearer = env_token.strip()
+
     if is_local_command(positional[0]):
         if body_file:
             die("--file is not valid with local")
@@ -1565,7 +1659,7 @@ def main(argv: list[str]) -> None:
             die("-H is not valid with login")
         if show_headers:
             die("-i is not valid with login")
-        run_login(base)
+        run_login(base, debug=debug)
         return
 
     idx = 0

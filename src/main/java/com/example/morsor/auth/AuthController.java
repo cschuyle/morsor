@@ -1,5 +1,7 @@
 package com.example.morsor.auth;
 
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.dao.DataAccessException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -7,6 +9,7 @@ import org.springframework.security.authentication.AnonymousAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.web.csrf.CsrfToken;
+import org.springframework.security.web.csrf.CsrfTokenRepository;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -28,26 +31,36 @@ public class AuthController {
     private final UserRepository userRepository;
     private final ApiTokenRepository apiTokenRepository;
     private final TokenHashService tokenHashService;
+    private final CsrfTokenRepository csrfTokenRepository;
 
     public AuthController(UserRepository userRepository,
                           ApiTokenRepository apiTokenRepository,
-                          TokenHashService tokenHashService) {
+                          TokenHashService tokenHashService,
+                          CsrfTokenRepository csrfTokenRepository) {
         this.userRepository = userRepository;
         this.apiTokenRepository = apiTokenRepository;
         this.tokenHashService = tokenHashService;
+        this.csrfTokenRepository = csrfTokenRepository;
     }
 
     /**
      * Anonymous GET so the SPA can create a session and receive the {@code XSRF-TOKEN} cookie before
-     * {@code POST /login}. This endpoint is always permitted and returns 204.
+     * {@code POST /login}. Always permitted; returns 204 with the XSRF-TOKEN cookie set.
      *
-     * Injecting {@code CsrfToken} forces Spring Security's {@code CsrfTokenArgumentResolver} to call
-     * {@code .get()} on the deferred token, which causes {@code CookieCsrfTokenRepository} to generate
-     * the token and write the {@code XSRF-TOKEN} cookie in the response. Without this, safe-method (GET)
-     * requests never eagerly resolve the deferred token, so the cookie is never written.
+     * We call {@code CsrfTokenRepository} directly rather than relying on {@code CsrfToken} argument
+     * injection because in Spring Security 6 the deferred-token mechanism may not invoke
+     * {@code saveToken()} when the argument resolver is used, particularly behind reverse proxies.
+     * Also returns the raw token value in the {@code X-XSRF-TOKEN} response header so CLI clients
+     * that cannot read cookies (e.g. due to proxy stripping) can still obtain it.
      */
     @GetMapping("/auth/csrf-prime")
-    public ResponseEntity<Void> csrfPrime(CsrfToken csrfToken) {
+    public ResponseEntity<Void> csrfPrime(HttpServletRequest request, HttpServletResponse response) {
+        CsrfToken token = csrfTokenRepository.loadToken(request);
+        if (token == null) {
+            token = csrfTokenRepository.generateToken(request);
+        }
+        csrfTokenRepository.saveToken(token, request, response);
+        response.setHeader("X-XSRF-TOKEN", token.getToken());
         return ResponseEntity.noContent().build();
     }
 
