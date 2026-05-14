@@ -32,7 +32,8 @@ public final class AccentInsensitiveAnalyzer extends Analyzer {
         TokenStream stream = new LowerCaseFilter(source);
         stream = new WordDelimiterGraphFilter(
                 stream,
-                WordDelimiterGraphFilter.SPLIT_ON_NUMERICS
+                WordDelimiterGraphFilter.GENERATE_WORD_PARTS
+                        | WordDelimiterGraphFilter.SPLIT_ON_NUMERICS
                         | WordDelimiterGraphFilter.GENERATE_NUMBER_PARTS,
                 null
         );
