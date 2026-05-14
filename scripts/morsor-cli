@@ -33,6 +33,34 @@ def die(msg: str, code: int = 2) -> None:
     sys.exit(code)
 
 
+_SESSION_TOKEN_FILE = Path.home() / ".morsor" / "session-token.json"
+
+
+def _save_session_token(token: str, base: str) -> None:
+    _SESSION_TOKEN_FILE.parent.mkdir(parents=True, exist_ok=True)
+    _SESSION_TOKEN_FILE.write_text(
+        json.dumps({"token": token, "base": base}, indent=2) + "\n",
+        encoding="utf-8",
+    )
+    _SESSION_TOKEN_FILE.chmod(0o600)
+
+
+def _load_session_token(base: str) -> str | None:
+    try:
+        data = json.loads(_SESSION_TOKEN_FILE.read_text(encoding="utf-8"))
+        tok = data.get("token", "").strip()
+        return tok if tok else None
+    except (OSError, json.JSONDecodeError):
+        return None
+
+
+def _delete_session_token() -> None:
+    try:
+        _SESSION_TOKEN_FILE.unlink()
+    except OSError:
+        pass
+
+
 def _server_unreachable(base: str, e: URLError) -> str:
     reason = str(e.reason) if hasattr(e, "reason") and e.reason else str(e)
     return f"Cannot reach server at {strip_trailing_slash(base)}: {reason}"
@@ -609,7 +637,7 @@ def _extract_xsrf(jar: CookieJar, resp: Any, debug: bool = False) -> str | None:
 
 def run_logout(base: str, bearer: str | None, debug: bool = False) -> None:
     if not bearer or not bearer.strip():
-        die("not logged in — no token set (MORSOR_CLI_TOKEN or -T/--token)")
+        die(f"not logged in — no token found in {_SESSION_TOKEN_FILE}, MORSOR_CLI_TOKEN, or -T/--token")
     url = strip_trailing_slash(base) + "/api/tokens"
     req = urllib.request.Request(
         url,
@@ -625,6 +653,9 @@ def run_logout(base: str, bearer: str | None, debug: bool = False) -> None:
             die(f"logout failed: HTTP {e.code} {e.reason}")
     except URLError as e:
         die(_server_unreachable(base, e))
+    _delete_session_token()
+    print(f"morsor-cli: logged out — token revoked and {_SESSION_TOKEN_FILE} deleted", file=sys.stderr)
+    print(f"morsor-cli: run 'eval $(morsor-cli logout)' to also clear MORSOR_CLI_TOKEN from this shell", file=sys.stderr)
     print("unset MORSOR_CLI_TOKEN")
 
 
@@ -746,6 +777,9 @@ def _run_login_inner(base: str, user: str, pw: str, jar: CookieJar, opener: Any,
     tok = m.group(1) if m else None
     if not tok:
         die("token creation failed: no token in response")
+    _save_session_token(tok, base_u)
+    print(f"morsor-cli: logged in — token saved to {_SESSION_TOKEN_FILE}", file=sys.stderr)
+    print(f"morsor-cli: run 'eval $(morsor-cli login)' to also set MORSOR_CLI_TOKEN in this shell", file=sys.stderr)
     print("export MORSOR_CLI_TOKEN=" + shell_single_quoted(tok))
 
 
@@ -1469,8 +1503,10 @@ ACTIONS
                               Accepts optional --name NAME.
        local trove delete <id> Delete an ephemeral trove by id.
        local trove list        List all CLI-created ephemeral troves.
-       login                  Obtain session cookie, print export MORSOR_CLI_TOKEN=…
-       logout                 Revoke all tokens for the current user; print unset MORSOR_CLI_TOKEN
+       login                  Authenticate; save token to ~/.morsor/session-token.json
+                              and print export MORSOR_CLI_TOKEN=… for shell use
+       logout                 Revoke all tokens; delete ~/.morsor/session-token.json
+                              and print unset MORSOR_CLI_TOKEN
 
 SHORTHAND PARAMETERS (after an action)
        Keys are normalized for convenience, e.g. -p → primaryTrove, -c →
@@ -1561,6 +1597,7 @@ ACTIONS
   local trove create [FILE]   local trove delete <id>   local trove list
 
 ENV: MORSOR_CLI_BASE_URL  sets default base if -b/--base is not provided
+     MORSOR_CLI_TOKEN        bearer token (overrides ~/.morsor/session-token.json)
      MORSOR_PROPERTIES_FILE  required for local sisters commands
 
 Examples:
@@ -1667,9 +1704,23 @@ def main(argv: list[str]) -> None:
     if (not base_set_by_arg) and env_base and env_base.strip():
         base = strip_trailing_slash(env_base.strip())
 
-    env_token = os.environ.get("MORSOR_CLI_TOKEN")
-    if (not bearer) and env_token and env_token.strip():
-        bearer = env_token.strip()
+    file_token = _load_session_token(base)
+    env_token = (os.environ.get("MORSOR_CLI_TOKEN") or "").strip()
+    sources_available = sum([bool(bearer), bool(file_token), bool(env_token)])
+
+    bearer_source: str | None = None
+    if bearer:
+        bearer_source = "flag (-T/--token)"
+    elif file_token:
+        bearer = file_token
+        bearer_source = f"session file ({_SESSION_TOKEN_FILE})"
+    elif env_token:
+        bearer = env_token
+        bearer_source = "env (MORSOR_CLI_TOKEN)"
+
+    _first_cmd = positional[0].lower() if positional else ""
+    if bearer and bearer_source and sources_available > 1 and _first_cmd not in ("login", "logout"):
+        print(f"morsor-cli: using token from {bearer_source}", file=sys.stderr)
 
     if is_local_command(positional[0]):
         if body_file:
