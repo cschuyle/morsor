@@ -1288,6 +1288,44 @@ def run_local_trove_delete(
     print(f"Deleted ephemeral trove: {trove_id}")
 
 
+def run_local_rename(
+    base: str,
+    bearer: str | None,
+    extra_headers: list[str],
+    debug: bool,
+    trove_id: str,
+    new_name: str,
+) -> None:
+    """Rename an ephemeral trove (sister or plain local) via PATCH /api/ephemeral-troves/{id}."""
+    if not trove_id or not trove_id.strip():
+        die("local rename requires a trove ID")
+    if not new_name or not new_name.strip():
+        die("local rename requires a new name")
+    token = bearer
+    if (not token or not token.strip()) and is_likely_local_dev_base(base):
+        token = DEV_DEFAULT_TOKEN
+    url = strip_trailing_slash(base) + "/api/ephemeral-troves/" + urllib.parse.quote(trove_id.strip(), safe="")
+    body = json.dumps({"displayName": new_name.strip()}).encode("utf-8")
+    headers: dict[str, str] = {**_DEFAULT_HEADERS, "Content-Type": "application/json"}
+    if token and token.strip():
+        headers["Authorization"] = "Bearer " + token.strip()
+    for h in extra_headers:
+        if ":" not in h or h.index(":") <= 0:
+            die(f"header must be Name: value, got: {h}")
+        k, v = h.split(":", 1)
+        headers[k.strip()] = v.strip()
+    req = urllib.request.Request(url, data=body, method="PATCH", headers=headers)
+    try:
+        urllib.request.urlopen(req, timeout=30)
+    except HTTPError as e:
+        if e.code == 404:
+            die(f"ephemeral trove not found: {trove_id}")
+        die(f"rename failed: HTTP {e.code} {e.read().decode(errors='replace')}")
+    except URLError as e:
+        die(_server_unreachable(base, e))
+    print(f"Renamed {trove_id!r} → {new_name.strip()!r}")
+
+
 def run_local_command(
     args: list[str],
     base: str,
@@ -1299,7 +1337,7 @@ def run_local_command(
     local_trove_name_override: str | None = None,
 ) -> None:
     if not args:
-        die("local requires a subcommand: sisters, trove, troves")
+        die("local requires a subcommand: sisters, trove, list, rename")
     subcommand = args[0].lower()
     if subcommand in ("sisters", "sister"):
         if len(args) < 2:
@@ -1315,7 +1353,7 @@ def run_local_command(
             die(f"unknown subcommand: local sister(s) {sub!r}  (expected: create, list, clear)")
     elif subcommand in ("trove", "troves"):
         if len(args) < 2:
-            die(f"local {subcommand} requires a subcommand: create, delete, list")
+            die(f"local {subcommand} requires a subcommand: create, delete")
         sub = args[1].lower()
         if sub == "create":
             run_local_trove(
@@ -1327,12 +1365,16 @@ def run_local_command(
             if len(args) < 3:
                 die("local trove delete requires a trove ID")
             run_local_trove_delete(base, bearer, extra_headers, debug, args[2])
-        elif sub == "list":
-            run_local_trove_list(base, bearer, extra_headers, debug, output_mode)
         else:
-            die(f"unknown subcommand: local {subcommand} {sub!r}  (expected: create, delete, list)")
+            die(f"unknown subcommand: local {subcommand} {sub!r}  (expected: create, delete)")
+    elif subcommand == "list":
+        run_local_trove_list(base, bearer, extra_headers, debug, output_mode)
+    elif subcommand == "rename":
+        if len(args) < 3:
+            die("local rename requires a trove ID and a new name")
+        run_local_rename(base, bearer, extra_headers, debug, args[1], args[2])
     else:
-        die(f"unknown local subcommand: {subcommand!r}  (expected: sisters, trove, troves)")
+        die(f"unknown local subcommand: {subcommand!r}  (expected: sisters, trove, troves, list, rename)")
 
 
 MORSOR_CLI_MAN_PAGE = """
@@ -1355,7 +1397,7 @@ SYNOPSIS
 
     morsor-cli [OPTIONS] local trove create [FILE]
     morsor-cli [OPTIONS] local trove delete <trove-id>
-    morsor-cli [OPTIONS] local trove list
+    morsor-cli [OPTIONS] local list
 
        morsor-cli [OPTIONS] METHOD PATH [-- querystring]
 
@@ -1444,7 +1486,7 @@ EPHEMERAL TROVES (LINE INPUT)
                    Deletes the ephemeral trove with the given id. Prints a
                    confirmation on success.
 
-       local trove list  (alias: local troves list)
+       local list
 
                    Lists all CLI-created ephemeral troves currently registered
                    on the server (id, item count, display name).
@@ -1513,7 +1555,8 @@ ACTIONS
        local trove create     Register line input as an ephemeral trove (see above).
                               Accepts optional --name NAME.
        local trove delete <id> Delete an ephemeral trove by id.
-       local trove list        List all CLI-created ephemeral troves.
+       local list              List all CLI-created ephemeral troves.
+       local rename <id> <name> Rename any ephemeral trove (sister or local).
        login                  Authenticate; save token to ~/.morsor/session-token.json
                               and print export MORSOR_CLI_TOKEN=… for shell use
        logout                 Revoke all tokens; delete ~/.morsor/session-token.json
@@ -1569,7 +1612,7 @@ EXAMPLES
 
        List CLI-created ephemeral troves:
 
-              ./scripts/morsor-cli local trove list
+              ./scripts/morsor-cli local list
 
        Duplicates: primary is ephemeral local trove; compare against vinyl and CDs;
        large page; JSON to jq (titles of primary rows):
@@ -1625,7 +1668,8 @@ LOCAL (EPHEMERAL) TROVES
   local sisters clear                 # Delete all sister ephemeral troves
   local trove create [FILE]           # Register a file (or stdin) as an ephemeral trove
   local trove delete <id>             # Delete an ephemeral trove by id
-  local trove list                    # List all CLI-created ephemeral troves
+  local list                          # List all CLI-created ephemeral troves
+  local rename <id> <new-name>        # Rename any ephemeral trove (sister or local)
 
 ENV
   MORSOR_CLI_BASE_URL      Default base URL (overridden by -b/--base)

@@ -297,6 +297,38 @@ public class SearchDataService {
         return true;
     }
 
+    /**
+     * Renames an ephemeral trove by re-stamping all its items with the new display name.
+     * Returns {@code false} if no ephemeral trove with that id exists.
+     */
+    public boolean renameEphemeralTrove(String troveId, String newDisplayName) {
+        if (troveId == null || troveId.isBlank()) {
+            return false;
+        }
+        String label = newDisplayName == null ? "" : newDisplayName.trim();
+        if (label.isEmpty()) {
+            throw new IllegalArgumentException("newDisplayName is required");
+        }
+        if (label.length() > MAX_EPHEMERAL_DISPLAY_NAME_LEN) {
+            throw new IllegalArgumentException("newDisplayName exceeds max length " + MAX_EPHEMERAL_DISPLAY_NAME_LEN);
+        }
+        synchronized (mergeLock) {
+            List<SearchResult> existing = ephemeralTroves.get(troveId.trim());
+            if (existing == null) {
+                return false;
+            }
+            List<SearchResult> renamed = existing.stream()
+                    .map(r -> new SearchResult(r.id(), r.itemType(), r.title(), r.snippet(),
+                            label, r.troveId(), r.hasThumbnail(), r.thumbnailUrl(),
+                            r.largeImageUrl(), r.rawSourceItem(), r.files(), r.itemUrl(), r.extraFields()))
+                    .toList();
+            ephemeralTroves.put(troveId.trim(), renamed);
+            rebuildMergedIndexLocked();
+        }
+        log.info("Renamed ephemeral trove \"{}\" → \"{}\"", troveId, label);
+        return true;
+    }
+
     private void rebuildMergedIndexLocked() {
         int extra = 0;
         for (List<SearchResult> list : ephemeralTroves.values()) {

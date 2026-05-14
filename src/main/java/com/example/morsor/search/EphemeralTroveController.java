@@ -6,6 +6,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -63,6 +64,27 @@ public class EphemeralTroveController {
     @GetMapping("/sisters")
     public List<SisterRegistration> sisters() {
         return searchDataService.getAllSisterRegistrations();
+    }
+
+    @PatchMapping("/{troveId}")
+    public ResponseEntity<Void> rename(@PathVariable String troveId,
+                                       @RequestBody java.util.Map<String, String> body) {
+        String newName = body == null ? null : body.get("displayName");
+        if (newName == null || newName.isBlank()) {
+            return ResponseEntity.badRequest().build();
+        }
+        log.info("PATCH /api/ephemeral-troves/{}: displayName={}", troveId, newName);
+        try {
+            boolean found = searchDataService.renameEphemeralTrove(troveId, newName);
+            if (!found) {
+                return ResponseEntity.notFound().build();
+            }
+        } catch (IllegalArgumentException e) {
+            log.warn("PATCH /api/ephemeral-troves/{}: bad request: {}", troveId, e.getMessage());
+            return ResponseEntity.badRequest().build();
+        }
+        searchCache.clear();
+        return ResponseEntity.noContent().build();
     }
 
     @DeleteMapping("/{troveId}")
