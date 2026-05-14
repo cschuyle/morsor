@@ -388,6 +388,7 @@ def run_local_trove(
     output_mode: str,
     positional: list[str],
     preparsed_name_override: str | None = None,
+    sister_trove_id: str | None = None,
 ) -> None:
     idx = 1
     input_file: Path | None = None
@@ -454,7 +455,9 @@ def run_local_trove(
                 "files": [],
             }
         )
-    body_obj = {"displayName": display_name, "items": items, "cliCreated": True}
+    body_obj: dict = {"displayName": display_name, "items": items, "cliCreated": True}
+    if sister_trove_id:
+        body_obj["sisterTroveId"] = sister_trove_id
     body_bytes = json.dumps(body_obj).encode("utf-8")
     token = bearer
     if (not token or not token.strip()) and is_likely_local_dev_base(base):
@@ -904,6 +907,64 @@ def _load_morsor_properties(props_file: str) -> dict:
         die(f"Failed to parse {p} as YAML: {e}")
 
 
+def _get_trove_aliases(data: dict) -> dict[str, list[str]]:
+    """Return {alias: [trove-id, ...]} from morsor.trove-aliases in the config."""
+    aliases: dict[str, list[str]] = {}
+    try:
+        entries = data["morsor"]["trove-aliases"]
+    except (KeyError, TypeError):
+        return aliases
+    if not isinstance(entries, list):
+        return aliases
+    for entry in entries:
+        if not isinstance(entry, dict):
+            continue
+        alias = entry.get("alias", "").strip()
+        raw_ids = entry.get("trove-ids", "")
+        if not alias:
+            continue
+        if isinstance(raw_ids, list):
+            ids = [str(t).strip() for t in raw_ids if str(t).strip()]
+        else:
+            ids = [t.strip() for t in str(raw_ids).split(",") if t.strip()]
+        if ids:
+            aliases[alias] = ids
+    return aliases
+
+
+def _load_trove_aliases() -> dict[str, list[str]]:
+    """Load trove aliases from MORSOR_PROPERTIES_FILE, returning {} if unset or missing."""
+    v = os.environ.get("MORSOR_PROPERTIES_FILE", "").strip()
+    if not v:
+        return {}
+    p = Path(v)
+    if not p.is_file():
+        return {}
+    content = p.read_text(encoding="utf-8")
+    try:
+        if p.suffix.lower() == ".json" or content.lstrip().startswith("{"):
+            data = json.loads(content)
+        else:
+            import yaml  # type: ignore
+            data = yaml.safe_load(content)
+        if not isinstance(data, dict):
+            return {}
+        return _get_trove_aliases(data)
+    except Exception:
+        return {}
+
+
+def _expand_trove_aliases(ids: list[str], aliases: dict[str, list[str]]) -> list[str]:
+    """Expand any alias in ids to its constituent trove IDs, preserving non-alias ids as-is."""
+    result: list[str] = []
+    for t in ids:
+        if t in aliases:
+            result.extend(aliases[t])
+        else:
+            result.append(t)
+    return result
+
+
 def _get_sisters(data: dict, props_file: str) -> list:
     try:
         sisters = data["morsor"]["local"]["sisters"]
@@ -1056,6 +1117,30 @@ def _post_sister_trove(
         return None
     except URLError as e:
         die(_server_unreachable(base, e))
+
+
+def run_local_sister_of(
+    base: str,
+    bearer: str | None,
+    extra_headers: list[str],
+    show_headers: bool,
+    debug: bool,
+    output_mode: str,
+    positional: list[str],
+    preparsed_name_override: str | None = None,
+) -> None:
+    """Like local trove create but marks the new ephemeral trove as a sister of a companion trove."""
+    # positional[0] = sister_trove_id, positional[1:] = optional file / --name args
+    if not positional or not positional[0].strip():
+        die("local sister-of requires a companion trove ID")
+    sister_trove_id = positional[0].strip()
+    # Reuse run_local_trove with the sister_trove_id injected into the body.
+    run_local_trove(
+        base, bearer, extra_headers, show_headers, debug, output_mode,
+        ["local sister-of"] + positional[1:],
+        preparsed_name_override,
+        sister_trove_id=sister_trove_id,
+    )
 
 
 def run_local_sisters_create(
@@ -1341,16 +1426,16 @@ def run_local_command(
     subcommand = args[0].lower()
     if subcommand in ("sisters", "sister"):
         if len(args) < 2:
-            die("local sisters requires a subcommand: create, list, clear")
-        sub = args[1].lower()
-        if sub == "create":
+            die("local sisters requires a subcommand: refresh-all, list, clear")
+        sub = args[1].lower().replace("_", "-")
+        if sub == "refresh-all":
             run_local_sisters_create(base, bearer, extra_headers, debug, output_mode)
         elif sub == "list":
             run_local_sisters_list(base, bearer, extra_headers, debug, output_mode)
         elif sub == "clear":
             run_local_sisters_clear(base, bearer, extra_headers, debug)
         else:
-            die(f"unknown subcommand: local sister(s) {sub!r}  (expected: create, list, clear)")
+            die(f"unknown subcommand: local sister(s) {sub!r}  (expected: refresh-all, list, clear)")
     elif subcommand in ("trove", "troves"):
         if len(args) < 2:
             die(f"local {subcommand} requires a subcommand: create, delete")
@@ -1369,12 +1454,27 @@ def run_local_command(
             die(f"unknown subcommand: local {subcommand} {sub!r}  (expected: create, delete)")
     elif subcommand == "list":
         run_local_trove_list(base, bearer, extra_headers, debug, output_mode)
+    elif subcommand == "sister-of":
+        if len(args) < 2:
+            die("local sister-of requires a companion trove ID")
+        run_local_sister_of(
+            base, bearer, extra_headers, show_headers, debug, output_mode,
+            args[1:],
+            local_trove_name_override,
+        )
+    elif subcommand in ("aliases", "alias"):
+        aliases = _load_trove_aliases()
+        if not aliases:
+            print("(no trove aliases configured — check MORSOR_PROPERTIES_FILE)")
+        else:
+            for alias, ids in sorted(aliases.items()):
+                print(f"{alias}\t{', '.join(ids)}")
     elif subcommand == "rename":
         if len(args) < 3:
             die("local rename requires a trove ID and a new name")
         run_local_rename(base, bearer, extra_headers, debug, args[1], args[2])
     else:
-        die(f"unknown local subcommand: {subcommand!r}  (expected: sisters, trove, troves, list, rename)")
+        die(f"unknown local subcommand: {subcommand!r}  (expected: sisters, trove, troves, list, aliases, rename)")
 
 
 MORSOR_CLI_MAN_PAGE = """
@@ -1429,7 +1529,7 @@ THREE WAYS TO SEARCH
               compare parameters as duplicates (same 500 cap on page size).
 
 LOCAL SISTER TROVES (DIRECTORY SCAN)
-       local sisters create
+       local sisters refresh-all
 
                    Reconciles the server index with the directories listed in
                    MORSOR_PROPERTIES_FILE (a YAML or JSON config file).  For
@@ -1541,7 +1641,8 @@ OPTIONS
 
 ENVIRONMENT
        MORSOR_CLI_BASE_URL     Default base URL (-b overrides).
-       MORSOR_PROPERTIES_FILE  Path to YAML/JSON config for local init/refresh.
+       MORSOR_PROPERTIES_FILE  Path to YAML/JSON config. Used for local sisters and
+                              for trove aliases (morsor.trove-aliases).
 
 ACTIONS
        search                           GET /api/search (default)
@@ -1549,13 +1650,14 @@ ACTIONS
        unique, uniques                  GET /api/search/uniques
        trove, troves                    GET /api/troves
        status                           GET /api/status
-       local sisters create   Reconcile sister troves from config (see above).
+       local sisters refresh-all  Reconcile sister troves from config (see above).
        local sisters list     List configured sisters and their upload status.
        local sisters clear    Delete all ephemeral sister troves.
        local trove create     Register line input as an ephemeral trove (see above).
                               Accepts optional --name NAME.
        local trove delete <id> Delete an ephemeral trove by id.
        local list              List all CLI-created ephemeral troves.
+       local aliases           Print trove aliases from MORSOR_PROPERTIES_FILE.
        local rename <id> <name> Rename any ephemeral trove (sister or local).
        login                  Authenticate; save token to ~/.morsor/session-token.json
                               and print export MORSOR_CLI_TOKEN=… for shell use
@@ -1592,7 +1694,7 @@ EXAMPLES
 
     Reconcile local sister troves from config (MORSOR_PROPERTIES_FILE must be set):
 
-        MORSOR_PROPERTIES_FILE=~/.morsor.yaml ./scripts/morsor-cli local sisters create
+        MORSOR_PROPERTIES_FILE=~/.morsor.yaml ./scripts/morsor-cli local sisters refresh-all
 
        Register from a file (one title per line):
 
@@ -1663,24 +1765,26 @@ COMPARE  -p <trove> [-c <trove>...] [query text]
   query text                 Search terms for primary trove
 
 LOCAL (EPHEMERAL) TROVES
-  local sisters create                # (Re-)create sister ephemeral troves from config
+  local sisters refresh-all           # Reconcile all config-defined sisters with server
   local sisters list                  # Show configured sisters and upload status
   local sisters clear                 # Delete all sister ephemeral troves
+  local sister-of <trove-id> [FILE]   # Create an ad-hoc sister trove (no config needed)
   local trove create [FILE]           # Register a file (or stdin) as an ephemeral trove
   local trove delete <id>             # Delete an ephemeral trove by id
   local list                          # List all CLI-created ephemeral troves
+  local aliases                       # Print configured trove aliases
   local rename <id> <new-name>        # Rename any ephemeral trove (sister or local)
 
 ENV
   MORSOR_CLI_BASE_URL      Default base URL (overridden by -b/--base)
   MORSOR_CLI_TOKEN         Bearer token (used if ~/.morsor/session-token.json absent)
-  MORSOR_PROPERTIES_FILE   Configuration, required for local sisters commands
+  MORSOR_PROPERTIES_FILE   Config file; required for local sisters; also defines trove aliases
 
 Examples:
   morsor-cli aliens
   morsor-cli -t vinyl search 'King Gizzard'
   morsor-cli -p vinyl -c jazz dups
-  morsor-cli local sisters create
+  morsor-cli local sisters refresh-all
   morsor-cli local trove create /path/to/titles.txt
   cat /path/to/titles.txt | morsor-cli local trove create
 """.strip()
@@ -1901,6 +2005,18 @@ def main(argv: list[str]) -> None:
             method = "GET"
             path = "/api/search"
         query = parse_shorthand_query(positional, idx)
+
+    # Expand trove aliases from config before building the query string.
+    _aliases = _load_trove_aliases()
+    if _aliases:
+        trove_filter = _expand_trove_aliases(trove_filter, _aliases)
+        compare_troves = _expand_trove_aliases(compare_troves, _aliases)
+        if primary_trove:
+            expanded_primary = _expand_trove_aliases([primary_trove], _aliases)
+            if len(expanded_primary) > 1:
+                die(f"-p/--primary alias {primary_trove!r} expands to multiple troves "
+                    f"({', '.join(expanded_primary)}) — primary must be a single trove")
+            primary_trove = expanded_primary[0] if expanded_primary else primary_trove
 
     extra_qs_parts: list[str] = []
     for t in trove_filter:

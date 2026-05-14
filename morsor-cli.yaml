@@ -7,3 +7,7 @@ morsor:
       path: "/Volumes/cschuyle/Noncloud-Data/video/Movies"
     - trove-id: books
       path: "/Volumes/cschuyle/Dropbox/curated/Books"
+
+  trove-aliases:
+  - alias: videos
+    trove-ids: synology-movies,synology-series,synology-music-videos,synology-handbreakme,synology-other-videos,synology-documentaries
