@@ -1755,6 +1755,7 @@ SEARCH  [-t <trove,...>] [query text]
 
   -t/--troves <id[,id...]>   Limit search to these troves (repeatable, comma-delimited)
   query text                 Search terms for all troves
+  -o json                    Raw JSON output (pipe to jq); default: text
 
 COMPARE  -p <trove> [-c <trove>...] [query text]
   dups | duplicates                   # cross-trove duplicate analysis
@@ -1763,6 +1764,7 @@ COMPARE  -p <trove> [-c <trove>...] [query text]
   -p/--primary <id>          Primary trove (required)
   -c/--compare <id[,id...]>  Compare trove(s) (repeatable, comma-delimited)
   query text                 Search terms for primary trove
+  -o json                    Raw JSON output (pipe to jq); default: text
 
 LOCAL (EPHEMERAL) TROVES
   local sisters refresh-all           # Reconcile all config-defined sisters with server
@@ -1783,6 +1785,7 @@ ENV
 Examples:
   morsor-cli aliens
   morsor-cli -t vinyl search 'King Gizzard'
+  morsor-cli -t vinyl -o json 'King Gizzard' | jq -r '.results[].title'
   morsor-cli -p vinyl -c jazz dups
   morsor-cli local sisters refresh-all
   morsor-cli local trove create /path/to/titles.txt
