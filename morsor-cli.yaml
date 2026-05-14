@@ -1,0 +1,9 @@
+morsor:
+  local:
+    sisters:
+    - trove-id: synology-series
+      path: "/Volumes/cschuyle/Noncloud-Data/video/Series"
+    - trove-id: synology-movies
+      path: "/Volumes/cschuyle/Noncloud-Data/video/Movies"
+    - trove-id: books
+      path: "/Volumes/cschuyle/Dropbox/curated/Books"

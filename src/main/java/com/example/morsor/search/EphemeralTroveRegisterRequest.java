@@ -10,4 +10,10 @@ public record EphemeralTroveRegisterRequest(
         String displayName,
         List<EphemeralManifestItem> items,
         /** True when this request comes from the CLI local-trove flow. */
-        Boolean cliCreated) {}
+        Boolean cliCreated,
+        /**
+         * Optional: the ID of the non-ephemeral trove this ephemeral trove is a local
+         * directory mirror of. When set, searches on the non-ephemeral trove automatically
+         * include this trove's results as well.
+         */
+        String sisterTroveId) {}

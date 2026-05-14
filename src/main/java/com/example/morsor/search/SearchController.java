@@ -12,6 +12,7 @@ import org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBo
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.concurrent.atomic.AtomicBoolean;
 import org.springframework.http.HttpHeaders;
@@ -120,11 +121,41 @@ public class SearchController {
         page = Math.max(0, page);
         size = Math.min(MAX_PAGE_SIZE, Math.max(1, size));
         String boostVal = boostTrove != null && !boostTrove.isBlank() ? boostTrove.trim() : "";
+
+        // Expand explicitly requested troves to include any registered local sister ephemeral troves.
+        final List<String> effectiveTroves;
+        final List<String> caveats;
+        if (trove != null && !trove.isEmpty()) {
+            List<String> expanded = new ArrayList<>(trove);
+            List<String> caveatMessages = new ArrayList<>();
+            for (String t : trove) {
+                if (t == null) {
+                    continue;
+                }
+                String sisterEphemeralId = searchDataService.getSisterEphemeralTroveId(t);
+                if (sisterEphemeralId != null) {
+                    expanded.add(sisterEphemeralId);
+                    String sisterName = searchDataService.getEphemeralTroveDisplayName(sisterEphemeralId);
+                    caveatMessages.add("Also searched local directory \"" + sisterName + "\" as sister of \"" + t + "\"");
+                }
+            }
+            if (!caveatMessages.isEmpty()) {
+                effectiveTroves = List.copyOf(expanded);
+                caveats = List.copyOf(caveatMessages);
+            } else {
+                effectiveTroves = trove;
+                caveats = null;
+            }
+        } else {
+            effectiveTroves = trove;
+            caveats = null;
+        }
+
         String cacheKey = "s:" + (query != null ? query.trim() : "") + ":"
-                + (trove != null ? trove.stream().filter(t -> t != null).sorted().collect(Collectors.joining(",")) : "") + ":b:" + boostVal;
+                + (effectiveTroves != null ? effectiveTroves.stream().filter(t -> t != null).sorted().collect(Collectors.joining(",")) : "") + ":b:" + boostVal;
         String queryVal = query != null ? query.trim() : "";
         boolean isWildcard = "*".equals(queryVal) || queryVal.isEmpty();
-        SearchCache.CacheResult<ScoredSearchResult> cacheResult = searchCache.getOrCompute(cacheKey, () -> searchDataService.search(trove, query, boostVal.isEmpty() ? null : boostVal));
+        SearchCache.CacheResult<ScoredSearchResult> cacheResult = searchCache.getOrCompute(cacheKey, () -> searchDataService.search(effectiveTroves, query, boostVal.isEmpty() ? null : boostVal));
         List<ScoredSearchResult> scored = cacheResult.data();
         List<SearchResultWithScore> all = scored.stream()
                 .map(ss -> new SearchResultWithScore(ss.result(), isWildcard ? null : ss.score()))
@@ -195,7 +226,7 @@ public class SearchController {
         int to = (int) Math.min(from + size, total);
         List<SearchResultWithScore> pageResults = from < to ? all.subList(from, to) : List.of();
         String warning = cacheResult.cached() ? null : "Result not cached (cache memory limit reached). Pagination may be slower.";
-        return new SearchResponse(total, pageResults, page, size, troveCounts, availableFileTypes, fileTypeCounts, availableExtraFieldKeys, warning);
+        return new SearchResponse(total, pageResults, page, size, troveCounts, availableFileTypes, fileTypeCounts, availableExtraFieldKeys, warning, caveats);
     }
 
     /** Distinct {@link SearchResult#extraFields()} keys across the full filtered result set (before pagination), for gallery sort. */

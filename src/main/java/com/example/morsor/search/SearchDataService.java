@@ -97,6 +97,10 @@ public class SearchDataService {
     private List<SearchResult> persistedResults = List.of();
     private final Map<String, List<SearchResult>> ephemeralTroves = new ConcurrentHashMap<>();
     private final Set<String> cliCreatedEphemeralTroveIds = ConcurrentHashMap.newKeySet();
+    /** Maps non-ephemeral trove ID → the ephemeral trove ID currently registered as its local sister. */
+    private final Map<String, String> sisterToEphemeral = new ConcurrentHashMap<>();
+    /** Maps ephemeral trove ID → the non-ephemeral trove ID it is a sister of. */
+    private final Map<String, String> ephemeralToSister = new ConcurrentHashMap<>();
     /** Trove metadata: updateTimestamp by troveId. */
     private final Map<String, String> troveMetadata = new ConcurrentHashMap<>();
     private final Object mergeLock = new Object();
@@ -193,6 +197,10 @@ public class SearchDataService {
      * @param displayName required non-blank trove label (CLI sends the scanned directory's full path)
      */
     public EphemeralTroveRegistration registerEphemeralTrove(String displayName, List<EphemeralManifestItem> items, boolean cliCreated) {
+        return registerEphemeralTrove(displayName, items, cliCreated, null);
+    }
+
+    public EphemeralTroveRegistration registerEphemeralTrove(String displayName, List<EphemeralManifestItem> items, boolean cliCreated, String sisterTroveId) {
         if (items == null) {
             throw new IllegalArgumentException("items must not be null");
         }
@@ -215,6 +223,7 @@ public class SearchDataService {
             }
             stamped.add(ephemeralItemToSearchResult(item, troveId, troveLabel));
         }
+        String sisterTroveIdTrimmed = sisterTroveId != null && !sisterTroveId.isBlank() ? sisterTroveId.trim() : null;
         synchronized (mergeLock) {
             ephemeralTroves.put(troveId, List.copyOf(stamped));
             if (cliCreated) {
@@ -222,9 +231,17 @@ public class SearchDataService {
             } else {
                 cliCreatedEphemeralTroveIds.remove(troveId);
             }
+            if (sisterTroveIdTrimmed != null) {
+                String oldEphemeralId = sisterToEphemeral.put(sisterTroveIdTrimmed, troveId);
+                if (oldEphemeralId != null) {
+                    ephemeralToSister.remove(oldEphemeralId);
+                }
+                ephemeralToSister.put(troveId, sisterTroveIdTrimmed);
+            }
             rebuildMergedIndexLocked();
         }
-        log.info("Registered ephemeral trove id=\"{}\" name=\"{}\" ({} items)", troveId, troveLabel, stamped.size());
+        log.info("Registered ephemeral trove id=\"{}\" name=\"{}\" ({} items) sister=\"{}\"",
+                troveId, troveLabel, stamped.size(), sisterTroveIdTrimmed != null ? sisterTroveIdTrimmed : "(none)");
         return new EphemeralTroveRegistration(troveId, troveLabel, stamped.size());
     }
 
@@ -239,6 +256,10 @@ public class SearchDataService {
                 return false;
             }
             cliCreatedEphemeralTroveIds.remove(troveId.trim());
+            String nonEphemeralSister = ephemeralToSister.remove(troveId.trim());
+            if (nonEphemeralSister != null) {
+                sisterToEphemeral.remove(nonEphemeralSister, troveId.trim());
+            }
             rebuildMergedIndexLocked();
         }
         log.info("Removed ephemeral trove \"{}\"", troveId);
@@ -1125,6 +1146,33 @@ public class SearchDataService {
             log.debug("Similar search failed for primary \"{}\": {}", similarTo.title(), e.getMessage());
             return List.of();
         }
+    }
+
+    /**
+     * Returns the ephemeral trove ID currently registered as the local sister of the given
+     * non-ephemeral trove ID, or {@code null} if none is registered.
+     */
+    public String getSisterEphemeralTroveId(String nonEphemeralTroveId) {
+        if (nonEphemeralTroveId == null || nonEphemeralTroveId.isBlank()) {
+            return null;
+        }
+        return sisterToEphemeral.get(nonEphemeralTroveId.trim());
+    }
+
+    /**
+     * Returns the display name for an ephemeral trove (the first item's {@code trove()} label),
+     * or the trove ID itself if the trove is not found or has no items.
+     */
+    public String getEphemeralTroveDisplayName(String ephemeralTroveId) {
+        if (ephemeralTroveId == null) {
+            return null;
+        }
+        List<SearchResult> items = ephemeralTroves.get(ephemeralTroveId);
+        if (items == null || items.isEmpty()) {
+            return ephemeralTroveId;
+        }
+        String name = items.get(0).trove();
+        return name != null ? name : ephemeralTroveId;
     }
 
     public List<TroveOption> getTroveOptions() {
