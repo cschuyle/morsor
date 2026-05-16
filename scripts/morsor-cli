@@ -1143,6 +1143,46 @@ def run_local_sister_of(
     )
 
 
+def _fetch_non_ephemeral_trove_ids(
+    base: str,
+    bearer: str | None,
+    extra_headers: list[str],
+    debug: bool,
+) -> set[str]:
+    """Return the set of non-ephemeral trove IDs currently known to the server."""
+    token = bearer
+    if (not token or not token.strip()) and is_likely_local_dev_base(base):
+        token = DEV_DEFAULT_TOKEN
+    url = strip_trailing_slash(base) + "/api/troves"
+    headers: dict[str, str] = dict(_DEFAULT_HEADERS)
+    if token and token.strip():
+        headers["Authorization"] = "Bearer " + token.strip()
+    for h in extra_headers:
+        if ":" not in h or h.index(":") <= 0:
+            die(f"header must be Name: value, got: {h}")
+        k, v = h.split(":", 1)
+        headers[k.strip()] = v.strip()
+    req = urllib.request.Request(url, headers=headers)
+    if debug:
+        print(f"[debug] GET {url}", file=sys.stderr)
+    try:
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            raw = resp.read().decode("utf-8", errors="replace")
+    except HTTPError as e:
+        die(f"GET /api/troves failed: HTTP {e.code}")
+    except URLError as e:
+        die(_server_unreachable(base, e))
+    try:
+        arr = json.loads(raw)
+    except json.JSONDecodeError:
+        die("GET /api/troves: could not parse JSON response")
+    return {
+        str(o["id"])
+        for o in arr
+        if isinstance(o, dict) and o.get("id") and not o.get("cliCreated")
+    }
+
+
 def run_local_sisters_create(
     base: str,
     bearer: str | None,
@@ -1165,6 +1205,15 @@ def run_local_sisters_create(
         tid = (s.get("trove-id") or "").strip() if isinstance(s, dict) else ""
         if tid:
             configured_ids.add(tid)
+
+    server_trove_ids = _fetch_non_ephemeral_trove_ids(base, bearer, extra_headers, debug)
+    unknown = sorted(configured_ids - server_trove_ids)
+    if unknown:
+        die(
+            "local sisters load: the following configured trove-id(s) do not exist on the server:\n"
+            + "".join(f"  {tid}\n" for tid in unknown)
+            + "Check your MORSOR_PROPERTIES_FILE or run 'morsor-cli troves' to see available troves."
+        )
 
     server_state = _get_server_sisters(base, bearer, extra_headers, debug)
 
