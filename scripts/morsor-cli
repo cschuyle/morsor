@@ -1357,6 +1357,38 @@ def run_local_sisters_clear(
     print("morsor-cli: local sisters clear: done", file=sys.stderr)
 
 
+def run_troves_reload(
+    base: str,
+    bearer: str | None,
+    extra_headers: list[str],
+    debug: bool,
+) -> None:
+    """POST /api/troves/reload — trigger a full trove data reload on the server."""
+    token = bearer
+    if (not token or not token.strip()) and is_likely_local_dev_base(base):
+        token = DEV_DEFAULT_TOKEN
+    url = strip_trailing_slash(base) + "/api/troves/reload"
+    headers: dict[str, str] = dict(_DEFAULT_HEADERS)
+    if token and token.strip():
+        headers["Authorization"] = "Bearer " + token.strip()
+    for h in extra_headers:
+        if ":" not in h or h.index(":") <= 0:
+            die(f"header must be Name: value, got: {h}")
+        k, v = h.split(":", 1)
+        headers[k.strip()] = v.strip()
+    req = urllib.request.Request(url, data=b"", headers=headers, method="POST")
+    if debug:
+        print(f"[debug] POST {url}", file=sys.stderr)
+    try:
+        with urllib.request.urlopen(req, timeout=120) as resp:
+            _ = resp.read()
+        print("morsor-cli: troves reload: done")
+    except HTTPError as e:
+        die(f"troves reload failed: HTTP {e.code}")
+    except URLError as e:
+        die(_server_unreachable(base, e))
+
+
 def run_local_trove_list(
     base: str,
     bearer: str | None,
@@ -1698,6 +1730,7 @@ ACTIONS
        dup, dups, duplicate, duplicates GET /api/search/duplicates
        unique, uniques                  GET /api/search/uniques
        trove, troves                    GET /api/troves
+       troves reload                    POST /api/troves/reload (reload trove data)
        status                           GET /api/status
        local sisters load          Reconcile sister troves from config (see above).
        local sisters list     List configured sisters and their upload status.
@@ -1798,6 +1831,7 @@ AUTH
 
 INFO
   troves | status                     # List troves or server status
+  troves reload                       # Trigger a full trove data reload on the server
 
 SEARCH  [-t <trove,...>] [query text]
   search                              # Full-text search (default action)
@@ -2004,6 +2038,10 @@ def main(argv: list[str]) -> None:
 
     if local_trove_name_override is not None:
         die("--name is only valid with local trove create")
+
+    if positional[0].lower() in ("trove", "troves") and len(positional) > 1 and positional[1].lower() == "reload":
+        run_troves_reload(base, bearer, extra_headers, debug)
+        return
 
     if positional[0].lower() == "login":
         if len(positional) > 1:
