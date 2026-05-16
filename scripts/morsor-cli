@@ -1426,16 +1426,16 @@ def run_local_command(
     subcommand = args[0].lower()
     if subcommand in ("sisters", "sister"):
         if len(args) < 2:
-            die("local sisters requires a subcommand: refresh-all, list, clear")
+            die("local sisters requires a subcommand: load, list, clear")
         sub = args[1].lower().replace("_", "-")
-        if sub == "refresh-all":
+        if sub in ("load", "refresh-all"):
             run_local_sisters_create(base, bearer, extra_headers, debug, output_mode)
         elif sub == "list":
             run_local_sisters_list(base, bearer, extra_headers, debug, output_mode)
         elif sub == "clear":
             run_local_sisters_clear(base, bearer, extra_headers, debug)
         else:
-            die(f"unknown subcommand: local sister(s) {sub!r}  (expected: refresh-all, list, clear)")
+            die(f"unknown subcommand: local sister(s) {sub!r}  (expected: load, list, clear)")
     elif subcommand in ("trove", "troves"):
         if len(args) < 2:
             die(f"local {subcommand} requires a subcommand: create, delete")
@@ -1529,7 +1529,7 @@ THREE WAYS TO SEARCH
               compare parameters as duplicates (same 500 cap on page size).
 
 LOCAL SISTER TROVES (DIRECTORY SCAN)
-       local sisters refresh-all
+       local sisters load
 
                    Reconciles the server index with the directories listed in
                    MORSOR_PROPERTIES_FILE (a YAML or JSON config file).  For
@@ -1650,7 +1650,7 @@ ACTIONS
        unique, uniques                  GET /api/search/uniques
        trove, troves                    GET /api/troves
        status                           GET /api/status
-       local sisters refresh-all  Reconcile sister troves from config (see above).
+       local sisters load          Reconcile sister troves from config (see above).
        local sisters list     List configured sisters and their upload status.
        local sisters clear    Delete all ephemeral sister troves.
        local trove create     Register line input as an ephemeral trove (see above).
@@ -1694,7 +1694,7 @@ EXAMPLES
 
     Reconcile local sister troves from config (MORSOR_PROPERTIES_FILE must be set):
 
-        MORSOR_PROPERTIES_FILE=~/.morsor.yaml ./scripts/morsor-cli local sisters refresh-all
+        MORSOR_PROPERTIES_FILE=~/.morsor.yaml ./scripts/morsor-cli local sisters load
 
        Register from a file (one title per line):
 
@@ -1767,7 +1767,7 @@ COMPARE  -p <trove> [-c <trove>...] [query text]
   -o json                    Raw JSON output (pipe to jq); default: text
 
 LOCAL (EPHEMERAL) TROVES
-  local sisters refresh-all           # Reconcile all config-defined sisters with server
+  local sisters load                   # Reconcile all config-defined sisters with server
   local sisters list                  # Show configured sisters and upload status
   local sisters clear                 # Delete all sister ephemeral troves
   local sister-of <trove-id> [FILE]   # Create an ad-hoc sister trove (no config needed)
@@ -1787,7 +1787,7 @@ Examples:
   morsor-cli -t vinyl search 'King Gizzard'
   morsor-cli -t vinyl -o json 'King Gizzard' | jq -r '.results[].title'
   morsor-cli -p vinyl -c jazz dups
-  morsor-cli local sisters refresh-all
+  morsor-cli local sisters load
   morsor-cli local trove create /path/to/titles.txt
   cat /path/to/titles.txt | morsor-cli local trove create
 """.strip()
