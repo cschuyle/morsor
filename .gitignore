@@ -37,3 +37,5 @@ frontend/dist/
 # Python (morsor-cli)
 **/__pycache__/
 *.pyc
+
+morsor-cli.yaml

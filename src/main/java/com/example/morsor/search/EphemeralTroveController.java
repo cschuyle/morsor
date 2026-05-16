@@ -47,7 +47,16 @@ public class EphemeralTroveController {
                 items.size(),
                 previewForLog(dn));
         try {
-                EphemeralTroveRegistration reg = searchDataService.registerEphemeralTrove(dn, items, Boolean.TRUE.equals(body.cliCreated()), body.sisterTroveId(), body.contentHash());
+                // Resolve effective companion list: prefer sisterTroveIds if present, else fall back to sisterTroveId.
+                List<String> companions;
+                if (body.sisterTroveIds() != null && !body.sisterTroveIds().isEmpty()) {
+                    companions = body.sisterTroveIds();
+                } else if (body.sisterTroveId() != null && !body.sisterTroveId().isBlank()) {
+                    companions = List.of(body.sisterTroveId().trim());
+                } else {
+                    companions = List.of();
+                }
+                EphemeralTroveRegistration reg = searchDataService.registerEphemeralTrove(dn, items, Boolean.TRUE.equals(body.cliCreated()), companions, body.contentHash(), body.explicitTroveId());
             searchCache.clear();
             log.info(
                     "POST /api/ephemeral-troves: registered troveId={} count={} name.preview={}",

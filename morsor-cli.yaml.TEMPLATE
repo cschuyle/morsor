@@ -1,0 +1,21 @@
+# morsor-cli configuration template.
+# Copy this file to morsor-cli.yaml (or any path, then set MORSOR_PROPERTIES_FILE)
+# and fill in your own trove IDs and paths.
+#
+# morsor-cli.yaml is gitignored — keep your personal copy out of source control.
+
+morsor:
+  local:
+    sisters:
+    - trove-id: my-trove-id   # trove ID or alias defined below
+      path: "/path/to/local/directory"
+    # Add more entries as needed:
+    # - trove-id: another-trove
+    #   path: "/path/to/another/directory"
+
+  trove-aliases:
+  - alias: my-alias
+    trove-ids: trove-id-1,trove-id-2
+  # Add more aliases as needed:
+  # - alias: all-video
+  #   trove-ids: movies,series,documentaries

@@ -132,8 +132,8 @@ public class SearchController {
                 if (t == null) {
                     continue;
                 }
-                String sisterEphemeralId = searchDataService.getSisterEphemeralTroveId(t);
-                if (sisterEphemeralId != null) {
+                List<String> sisterIds = searchDataService.getSisterEphemeralTroveIds(t);
+                for (String sisterEphemeralId : sisterIds) {
                     expanded.add(sisterEphemeralId);
                     String sisterName = searchDataService.getEphemeralTroveDisplayName(sisterEphemeralId);
                     caveatMessages.add("Also searched local directory \"" + sisterName + "\" as sister of \"" + t + "\"");

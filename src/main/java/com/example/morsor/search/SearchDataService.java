@@ -98,10 +98,35 @@ public class SearchDataService {
     private List<SearchResult> persistedResults = List.of();
     private final Map<String, List<SearchResult>> ephemeralTroves = new ConcurrentHashMap<>();
     private final Set<String> cliCreatedEphemeralTroveIds = ConcurrentHashMap.newKeySet();
-    /** Maps non-ephemeral trove ID → full sister registration (ephemeral ID, hash, timestamp). */
-    private final Map<String, SisterRegistration> sisterToEphemeral = new ConcurrentHashMap<>();
-    /** Maps ephemeral trove ID → the non-ephemeral trove ID it is a sister of (for cleanup). */
-    private final Map<String, String> ephemeralToSister = new ConcurrentHashMap<>();
+    /*
+     * Sister-trove model (many-to-many):
+     *
+     * A "sister" ephemeral trove mirrors a local directory and is linked to one or more
+     * non-ephemeral "companion" troves. Searches on any companion automatically include
+     * the sister's results (via SearchController expanding effectiveTroves).
+     *
+     * Relationships:
+     *   - One companion can have many sisters  (sisterToEphemeral: companion → [SisterRegistration…])
+     *   - One sister can have many companions  (ephemeralToSister:  ephemeral  → [companionId…])
+     *
+     * Deterministic ephemeral ID (assigned by the CLI, sent as explicitTroveId):
+     *   local-sister_<hostname>:<directory-path><=<raw-trove-id-or-alias>
+     * The raw trove-id/alias component means two config entries for the same directory but
+     * different companions produce distinct ephemeral troves.  This is intentional: although
+     * content is currently indexed identically for all troves (see below), having a distinct
+     * ephemeral ID per (path, companion) permits changing the Lucene indexing and/or querying
+     * strategy on a per-companion basis in the future (e.g. applying the companion trove's
+     * tokenization rules when indexing its sister) without any structural change to the model.
+     *
+     * All troves — persisted and ephemeral, sister and non-sister — are indexed with the
+     * same AccentInsensitiveAnalyzer and merged into a single Lucene index.  The query string
+     * is parsed once and evaluated identically regardless of which troves are selected; trove
+     * selection is a post-parse FILTER clause and never affects tokenization or scoring.
+     */
+    /** Maps non-ephemeral trove ID → all sister registrations for that companion. */
+    private final Map<String, List<SisterRegistration>> sisterToEphemeral = new ConcurrentHashMap<>();
+    /** Maps ephemeral trove ID → all companion non-ephemeral trove IDs it is a sister of (for cleanup). */
+    private final Map<String, List<String>> ephemeralToSister = new ConcurrentHashMap<>();
     /** Trove metadata: updateTimestamp by troveId. */
     private final Map<String, String> troveMetadata = new ConcurrentHashMap<>();
     private final Object mergeLock = new Object();
@@ -192,21 +217,35 @@ public class SearchDataService {
     private static final int MAX_EPHEMERAL_DISPLAY_NAME_LEN = 8192;
 
     /**
-     * Register an in-memory trove from uploaded items. Trove id is {@code sister-1-of-<companionId>}
-     * when a {@code sisterTroveId} is supplied, otherwise {@code local-}{@link UUID}.
+     * Register an in-memory trove from uploaded items.
+     * <p>
+     * Trove ID priority: {@code explicitTroveId} (when non-blank) → {@code sister-1-of-<companionId>}
+     * (legacy fallback when only sisterTroveId is given) → {@code local-<UUID>}.
      * Rebuilds the merged Lucene index; not persisted across restart.
      *
      * @param displayName required non-blank trove label (CLI sends the scanned directory's full path)
      */
     public EphemeralTroveRegistration registerEphemeralTrove(String displayName, List<EphemeralManifestItem> items, boolean cliCreated) {
-        return registerEphemeralTrove(displayName, items, cliCreated, null, null);
+        return registerEphemeralTrove(displayName, items, cliCreated, List.of(), null, null);
     }
 
     public EphemeralTroveRegistration registerEphemeralTrove(String displayName, List<EphemeralManifestItem> items, boolean cliCreated, String sisterTroveId) {
-        return registerEphemeralTrove(displayName, items, cliCreated, sisterTroveId, null);
+        return registerEphemeralTrove(displayName, items, cliCreated,
+                sisterTroveId != null && !sisterTroveId.isBlank() ? List.of(sisterTroveId.trim()) : List.of(),
+                null, null);
     }
 
     public EphemeralTroveRegistration registerEphemeralTrove(String displayName, List<EphemeralManifestItem> items, boolean cliCreated, String sisterTroveId, String contentHash) {
+        return registerEphemeralTrove(displayName, items, cliCreated,
+                sisterTroveId != null && !sisterTroveId.isBlank() ? List.of(sisterTroveId.trim()) : List.of(),
+                contentHash, null);
+    }
+
+    /**
+     * Full registration: accepts a list of companion trove IDs, optional content hash, and an
+     * optional explicit trove ID. Use this overload directly from the controller.
+     */
+    public EphemeralTroveRegistration registerEphemeralTrove(String displayName, List<EphemeralManifestItem> items, boolean cliCreated, List<String> companionTroveIds, String contentHash, String explicitTroveId) {
         if (items == null) {
             throw new IllegalArgumentException("items must not be null");
         }
@@ -220,10 +259,21 @@ public class SearchDataService {
         if (troveLabel.length() > MAX_EPHEMERAL_DISPLAY_NAME_LEN) {
             throw new IllegalArgumentException("displayName exceeds max length " + MAX_EPHEMERAL_DISPLAY_NAME_LEN);
         }
-        String sisterTroveIdTrimmed = sisterTroveId != null && !sisterTroveId.isBlank() ? sisterTroveId.trim() : null;
-        String troveId = sisterTroveIdTrimmed != null
-                ? "sister-1-of-" + sisterTroveIdTrimmed
-                : "local-" + UUID.randomUUID();
+        // Deduplicate and normalise companion IDs.
+        List<String> companions = companionTroveIds == null ? List.of() : companionTroveIds.stream()
+                .filter(id -> id != null && !id.isBlank())
+                .map(String::trim)
+                .distinct()
+                .toList();
+        String explicitIdTrimmed = explicitTroveId != null && !explicitTroveId.isBlank() ? explicitTroveId.trim() : null;
+        String troveId;
+        if (explicitIdTrimmed != null) {
+            troveId = explicitIdTrimmed;
+        } else if (!companions.isEmpty()) {
+            troveId = "sister-1-of-" + companions.get(0);
+        } else {
+            troveId = "local-" + UUID.randomUUID();
+        }
         List<SearchResult> stamped = new ArrayList<>(items.size());
         for (EphemeralManifestItem item : items) {
             if ((item.title() == null || item.title().isBlank())
@@ -233,22 +283,22 @@ public class SearchDataService {
             stamped.add(ephemeralItemToSearchResult(item, troveId, troveLabel));
         }
         synchronized (mergeLock) {
-            // Deduplicate: drop items whose title already exists in the companion non-ephemeral trove.
+            // Deduplicate items: for each companion, drop titles already in that companion trove.
             List<SearchResult> toIndex = stamped;
-            if (sisterTroveIdTrimmed != null) {
-                Set<String> companionTitles = persistedResults.stream()
-                        .filter(r -> sisterTroveIdTrimmed.equals(r.troveId()))
+            if (!companions.isEmpty()) {
+                Set<String> allCompanionTitles = persistedResults.stream()
+                        .filter(r -> r.troveId() != null && companions.contains(r.troveId()))
                         .map(SearchResult::title)
                         .filter(Objects::nonNull)
                         .collect(Collectors.toSet());
-                if (!companionTitles.isEmpty()) {
+                if (!allCompanionTitles.isEmpty()) {
                     toIndex = stamped.stream()
-                            .filter(r -> r.title() == null || !companionTitles.contains(r.title()))
+                            .filter(r -> r.title() == null || !allCompanionTitles.contains(r.title()))
                             .toList();
                     int skipped = stamped.size() - toIndex.size();
                     if (skipped > 0) {
-                        log.info("Sister trove {}: skipped {} item(s) already present in \"{}\"",
-                                troveId, skipped, sisterTroveIdTrimmed);
+                        log.info("Sister trove {}: skipped {} item(s) already present in companions {}",
+                                troveId, skipped, companions);
                     }
                 }
             }
@@ -258,19 +308,24 @@ public class SearchDataService {
             } else {
                 cliCreatedEphemeralTroveIds.remove(troveId);
             }
-            if (sisterTroveIdTrimmed != null) {
+            if (!companions.isEmpty()) {
                 String hashTrimmed = contentHash != null && !contentHash.isBlank() ? contentHash.trim() : null;
-                SisterRegistration old = sisterToEphemeral.put(sisterTroveIdTrimmed,
-                        new SisterRegistration(sisterTroveIdTrimmed, troveId, hashTrimmed, Instant.now().toString()));
-                if (old != null) {
-                    ephemeralToSister.remove(old.ephemeralTroveId());
+                String now = Instant.now().toString();
+                for (String companionId : companions) {
+                    SisterRegistration reg = new SisterRegistration(companionId, troveId, hashTrimmed, now);
+                    sisterToEphemeral.compute(companionId, (k, existing) -> {
+                        List<SisterRegistration> list = existing != null ? new ArrayList<>(existing) : new ArrayList<>();
+                        list.removeIf(r -> troveId.equals(r.ephemeralTroveId()));
+                        list.add(reg);
+                        return List.copyOf(list);
+                    });
                 }
-                ephemeralToSister.put(troveId, sisterTroveIdTrimmed);
+                ephemeralToSister.put(troveId, List.copyOf(companions));
             }
             rebuildMergedIndexLocked();
-            log.info("Registered ephemeral trove id=\"{}\" name=\"{}\" ({}/{} items indexed) sister=\"{}\"",
+            log.info("Registered ephemeral trove id=\"{}\" name=\"{}\" ({}/{} items indexed) companions={}",
                     troveId, troveLabel, toIndex.size(), stamped.size(),
-                    sisterTroveIdTrimmed != null ? sisterTroveIdTrimmed : "(none)");
+                    companions.isEmpty() ? "(none)" : companions);
             return new EphemeralTroveRegistration(troveId, troveLabel, toIndex.size());
         }
     }
@@ -286,10 +341,17 @@ public class SearchDataService {
                 return false;
             }
             cliCreatedEphemeralTroveIds.remove(troveId.trim());
-            String nonEphemeralSister = ephemeralToSister.remove(troveId.trim());
-            if (nonEphemeralSister != null) {
-                sisterToEphemeral.computeIfPresent(nonEphemeralSister, (k, v) ->
-                        troveId.trim().equals(v.ephemeralTroveId()) ? null : v);
+            final String idTrimmed = troveId.trim();
+            List<String> companions = ephemeralToSister.remove(idTrimmed);
+            if (companions != null) {
+                for (String companionId : companions) {
+                    sisterToEphemeral.computeIfPresent(companionId, (k, list) -> {
+                        List<SisterRegistration> updated = list.stream()
+                                .filter(r -> !idTrimmed.equals(r.ephemeralTroveId()))
+                                .toList();
+                        return updated.isEmpty() ? null : updated;
+                    });
+                }
             }
             rebuildMergedIndexLocked();
         }
@@ -1215,18 +1277,24 @@ public class SearchDataService {
      * Returns the ephemeral trove ID currently registered as the local sister of the given
      * non-ephemeral trove ID, or {@code null} if none is registered.
      */
-    public String getSisterEphemeralTroveId(String nonEphemeralTroveId) {
+    /** Returns the ephemeral trove IDs for all sisters of the given non-ephemeral trove. */
+    public List<String> getSisterEphemeralTroveIds(String nonEphemeralTroveId) {
         if (nonEphemeralTroveId == null || nonEphemeralTroveId.isBlank()) {
-            return null;
+            return List.of();
         }
-        SisterRegistration reg = sisterToEphemeral.get(nonEphemeralTroveId.trim());
-        return reg != null ? reg.ephemeralTroveId() : null;
+        List<SisterRegistration> regs = sisterToEphemeral.get(nonEphemeralTroveId.trim());
+        if (regs == null || regs.isEmpty()) {
+            return List.of();
+        }
+        return regs.stream().map(SisterRegistration::ephemeralTroveId).toList();
     }
 
-    /** Returns all current sister registrations, sorted by trove ID. */
+    /** Returns all current sister registrations, sorted by companion trove ID then ephemeral ID. */
     public List<SisterRegistration> getAllSisterRegistrations() {
         return sisterToEphemeral.values().stream()
-                .sorted(java.util.Comparator.comparing(SisterRegistration::troveId))
+                .flatMap(List::stream)
+                .sorted(java.util.Comparator.comparing(SisterRegistration::troveId)
+                        .thenComparing(SisterRegistration::ephemeralTroveId))
                 .toList();
     }
 
