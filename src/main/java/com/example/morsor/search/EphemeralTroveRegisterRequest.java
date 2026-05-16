@@ -21,7 +21,7 @@ public record EphemeralTroveRegisterRequest(
         /**
          * Optional: if provided, the server uses this exact string as the ephemeral trove ID
          * instead of generating one. Used by the CLI to assign stable, deterministic IDs like
-         * {@code local-sister_hostname:/path/to/dir}.
+         * {@code local-sister_hostname:/path/to/dir∈trove-id}.
          */
         String explicitTroveId,
         /**

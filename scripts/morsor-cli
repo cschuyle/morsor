@@ -1028,11 +1028,11 @@ def _dir_content_hash(entries: list[str]) -> str:
 def _sister_trove_id(path: str, trove_id: str) -> str:
     """Return a deterministic ephemeral trove ID for a sister config entry.
 
-    Format: local-sister_<hostname>:<path><=<trove-id-or-alias>
-    Example: local-sister_myMac.local:/Volumes/Movies<=synology-movies
+    Format: local-sister_<hostname>:<path>∈<trove-id-or-alias>
+    Example: local-sister_myMac.local:/Volumes/Movies∈synology-movies
     """
     hostname = socket.gethostname()
-    return f"local-sister_{hostname}:{path}<={trove_id}"
+    return f"local-sister_{hostname}:{path}∈{trove_id}"
 
 
 def _get_server_sisters(

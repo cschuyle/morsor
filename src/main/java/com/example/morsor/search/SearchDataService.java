@@ -110,7 +110,7 @@ public class SearchDataService {
      *   - One sister can have many companions  (ephemeralToSister:  ephemeral  → [companionId…])
      *
      * Deterministic ephemeral ID (assigned by the CLI, sent as explicitTroveId):
-     *   local-sister_<hostname>:<directory-path><=<raw-trove-id-or-alias>
+     *   local-sister_<hostname>:<directory-path>∈<raw-trove-id-or-alias>
      * The raw trove-id/alias component means two config entries for the same directory but
      * different companions produce distinct ephemeral troves.  This is intentional: although
      * content is currently indexed identically for all troves (see below), having a distinct
