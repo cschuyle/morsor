@@ -1190,13 +1190,13 @@ def run_local_sister_of(
     )
 
 
-def _fetch_non_ephemeral_trove_ids(
+def _fetch_troves_list(
     base: str,
     bearer: str | None,
     extra_headers: list[str],
     debug: bool,
-) -> set[str]:
-    """Return the set of non-ephemeral trove IDs currently known to the server."""
+) -> list[dict]:
+    """Return the raw list of trove objects from GET /api/troves."""
     token = bearer
     if (not token or not token.strip()) and is_likely_local_dev_base(base):
         token = DEV_DEFAULT_TOKEN
@@ -1223,11 +1223,31 @@ def _fetch_non_ephemeral_trove_ids(
         arr = json.loads(raw)
     except json.JSONDecodeError:
         die("GET /api/troves: could not parse JSON response")
+    return [o for o in arr if isinstance(o, dict) and o.get("id")]
+
+
+def _fetch_non_ephemeral_trove_ids(
+    base: str,
+    bearer: str | None,
+    extra_headers: list[str],
+    debug: bool,
+) -> set[str]:
+    """Return the set of non-ephemeral trove IDs currently known to the server."""
     return {
         str(o["id"])
-        for o in arr
-        if isinstance(o, dict) and o.get("id") and not o.get("cliCreated")
+        for o in _fetch_troves_list(base, bearer, extra_headers, debug)
+        if not o.get("cliCreated")
     }
+
+
+def _fetch_all_trove_ids(
+    base: str,
+    bearer: str | None,
+    extra_headers: list[str],
+    debug: bool,
+) -> set[str]:
+    """Return the set of all trove IDs (including ephemeral) currently known to the server."""
+    return {str(o["id"]) for o in _fetch_troves_list(base, bearer, extra_headers, debug)}
 
 
 def run_local_sisters_create(
@@ -2177,6 +2197,22 @@ def main(argv: list[str]) -> None:
                 die(f"-p/--primary alias {primary_trove!r} expands to multiple troves "
                     f"({', '.join(expanded_primary)}) — primary must be a single trove")
             primary_trove = expanded_primary[0] if expanded_primary else primary_trove
+
+    # Validate -t / -p / -c trove IDs against the server for search-type endpoints.
+    _search_paths = {"/api/search", "/api/search/duplicates", "/api/search/uniques"}
+    _ids_to_validate = (
+        list(trove_filter)
+        + ([primary_trove] if primary_trove else [])
+        + list(compare_troves)
+    )
+    if _ids_to_validate and path in _search_paths:
+        _known = _fetch_all_trove_ids(base, bearer, extra_headers, debug)
+        _unknown = sorted(t for t in _ids_to_validate if t not in _known)
+        if _unknown:
+            die(
+                "unknown trove ID(s): " + ", ".join(_unknown) + "\n"
+                "Run 'morsor-cli troves' to see available troves."
+            )
 
     extra_qs_parts: list[str] = []
     for t in trove_filter:
