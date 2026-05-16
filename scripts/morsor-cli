@@ -849,7 +849,14 @@ def http_request(
     except HTTPError as e:
         raw = e.read().decode("utf-8", errors="replace") if e.fp else ""
         print(f"morsor-cli: HTTP {e.code} {url}", file=sys.stderr)
-        if e.code in (401, 403):
+        if e.code == 400:
+            try:
+                err_obj = json.loads(raw)
+                if isinstance(err_obj, dict) and err_obj.get("error"):
+                    print(f"morsor-cli: {err_obj['error']}", file=sys.stderr)
+            except (json.JSONDecodeError, KeyError):
+                pass
+        elif e.code in (401, 403):
             print("morsor-cli: not authenticated — run 'morsor-cli login' or pass -T/--token", file=sys.stderr)
         elif e.code == 502:
             print("morsor-cli: bad gateway — backend server may be down", file=sys.stderr)
@@ -1239,15 +1246,6 @@ def _fetch_non_ephemeral_trove_ids(
         if not o.get("cliCreated")
     }
 
-
-def _fetch_all_trove_ids(
-    base: str,
-    bearer: str | None,
-    extra_headers: list[str],
-    debug: bool,
-) -> set[str]:
-    """Return the set of all trove IDs (including ephemeral) currently known to the server."""
-    return {str(o["id"]) for o in _fetch_troves_list(base, bearer, extra_headers, debug)}
 
 
 def run_local_sisters_create(
@@ -2197,22 +2195,6 @@ def main(argv: list[str]) -> None:
                 die(f"-p/--primary alias {primary_trove!r} expands to multiple troves "
                     f"({', '.join(expanded_primary)}) — primary must be a single trove")
             primary_trove = expanded_primary[0] if expanded_primary else primary_trove
-
-    # Validate -t / -p / -c trove IDs against the server for search-type endpoints.
-    _search_paths = {"/api/search", "/api/search/duplicates", "/api/search/uniques"}
-    _ids_to_validate = (
-        list(trove_filter)
-        + ([primary_trove] if primary_trove else [])
-        + list(compare_troves)
-    )
-    if _ids_to_validate and path in _search_paths:
-        _known = _fetch_all_trove_ids(base, bearer, extra_headers, debug)
-        _unknown = sorted(t for t in _ids_to_validate if t not in _known)
-        if _unknown:
-            die(
-                "unknown trove ID(s): " + ", ".join(_unknown) + "\n"
-                "Run 'morsor-cli troves' to see available troves."
-            )
 
     extra_qs_parts: list[str] = []
     for t in trove_filter:

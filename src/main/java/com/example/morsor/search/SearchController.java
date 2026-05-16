@@ -103,6 +103,31 @@ public class SearchController {
         searchCache.clear();
     }
 
+    private static class UnknownTroveException extends RuntimeException {
+        UnknownTroveException(String msg) { super(msg); }
+    }
+
+    @org.springframework.web.bind.annotation.ExceptionHandler(UnknownTroveException.class)
+    public ResponseEntity<Map<String, String>> handleUnknownTrove(UnknownTroveException ex) {
+        return ResponseEntity.badRequest().body(Map.of("error", ex.getMessage()));
+    }
+
+    private void validateTroveIds(java.util.Collection<String> ids) {
+        if (ids == null || ids.isEmpty()) {
+            return;
+        }
+        Set<String> known = searchDataService.getAllKnownTroveIds();
+        List<String> unknown = ids.stream()
+                .filter(id -> id != null && !id.isBlank() && !known.contains(id.trim()))
+                .map(String::trim)
+                .distinct()
+                .sorted()
+                .toList();
+        if (!unknown.isEmpty()) {
+            throw new UnknownTroveException("unknown trove ID(s): " + String.join(", ", unknown));
+        }
+    }
+
     private static final int DEFAULT_PAGE_SIZE = 500;
     private static final int MAX_PAGE_SIZE = 10_000;
 
@@ -120,6 +145,7 @@ public class SearchController {
             @RequestParam(required = false) String sortDir) {
         page = Math.max(0, page);
         size = Math.min(MAX_PAGE_SIZE, Math.max(1, size));
+        validateTroveIds(trove);
         String boostVal = boostTrove != null && !boostTrove.isBlank() ? boostTrove.trim() : "";
 
         // Expand explicitly requested troves to include any registered local sister ephemeral troves.
@@ -272,6 +298,9 @@ public class SearchController {
                 .filter(t -> t != null && !t.isBlank())
                 .collect(Collectors.toUnmodifiableSet());
         final String primaryTrimmed = primaryTrove.trim();
+        List<String> allTroveIds = new ArrayList<>(compareSet);
+        allTroveIds.add(primaryTrimmed);
+        validateTroveIds(allTroveIds);
         final String queryVal = query != null ? query : "*";
         String cacheKey = dupUniqCacheKey(primaryTrimmed, compareSet, queryVal);
         SearchCache.DupUniqCacheResult cacheResult = searchCache.getOrComputeDupUniq(cacheKey,
@@ -312,6 +341,9 @@ public class SearchController {
                 .filter(t -> t != null && !t.isBlank())
                 .collect(Collectors.toUnmodifiableSet());
         final String primaryTrimmed = primaryTrove.trim();
+        List<String> allTroveIds = new ArrayList<>(compareSet);
+        allTroveIds.add(primaryTrimmed);
+        validateTroveIds(allTroveIds);
         final String queryVal = query != null ? query : "*";
         String cacheKey = dupUniqCacheKey(primaryTrimmed, compareSet, queryVal);
         final boolean descending = "desc".equalsIgnoreCase(sortDir != null ? sortDir : "asc");
@@ -379,6 +411,9 @@ public class SearchController {
                 .filter(t -> t != null && !t.isBlank())
                 .collect(Collectors.toUnmodifiableSet());
         final String primaryTrimmed = primaryTrove.trim();
+        List<String> allTroveIdsU = new ArrayList<>(compareSet);
+        allTroveIdsU.add(primaryTrimmed);
+        validateTroveIds(allTroveIdsU);
         final String queryVal = query != null ? query : "*";
         String cacheKey = dupUniqCacheKey(primaryTrimmed, compareSet, queryVal);
         SearchCache.DupUniqCacheResult cacheResult = searchCache.getOrComputeDupUniq(cacheKey,
@@ -417,6 +452,9 @@ public class SearchController {
                 .filter(t -> t != null && !t.isBlank())
                 .collect(Collectors.toUnmodifiableSet());
         final String primaryTrimmed = primaryTrove.trim();
+        List<String> allTroveIdsUS = new ArrayList<>(compareSet);
+        allTroveIdsUS.add(primaryTrimmed);
+        validateTroveIds(allTroveIdsUS);
         final String queryVal = query != null ? query : "*";
         String cacheKey = dupUniqCacheKey(primaryTrimmed, compareSet, queryVal);
         ObjectMapper om = this.objectMapper;

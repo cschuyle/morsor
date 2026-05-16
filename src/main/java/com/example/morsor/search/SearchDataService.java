@@ -1314,6 +1314,17 @@ public class SearchDataService {
         return name != null ? name : ephemeralTroveId;
     }
 
+    /** Returns every trove ID currently searchable: all non-ephemeral IDs plus all ephemeral IDs. */
+    public Set<String> getAllKnownTroveIds() {
+        Set<String> ids = new java.util.HashSet<>();
+        allResults.stream()
+                .filter(r -> r.troveId() != null && !r.troveId().isBlank())
+                .map(SearchResult::troveId)
+                .forEach(ids::add);
+        ids.addAll(ephemeralTroves.keySet());
+        return Set.copyOf(ids);
+    }
+
     public List<TroveOption> getTroveOptions() {
         return allResults.stream()
                 .filter(r -> r.troveId() != null && !r.troveId().isBlank())
