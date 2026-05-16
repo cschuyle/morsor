@@ -1509,7 +1509,7 @@ def run_local_command(
         if len(args) < 2:
             die("local sisters requires a subcommand: load, list, clear")
         sub = args[1].lower().replace("_", "-")
-        if sub in ("load", "refresh-all"):
+        if sub in ("load", "reload", "refresh-all"):
             run_local_sisters_create(base, bearer, extra_headers, debug, output_mode)
         elif sub == "list":
             run_local_sisters_list(base, bearer, extra_headers, debug, output_mode)
