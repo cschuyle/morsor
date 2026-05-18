@@ -1,7 +1,10 @@
 package com.example.morsor.search;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.apache.lucene.document.Document;
 import org.apache.lucene.document.Field;
 import org.apache.lucene.document.StoredField;
@@ -129,6 +132,8 @@ public class SearchDataService {
     private final Map<String, List<String>> ephemeralToSister = new ConcurrentHashMap<>();
     /** Trove metadata: updateTimestamp by troveId. */
     private final Map<String, String> troveMetadata = new ConcurrentHashMap<>();
+    /** Full trove JSON as loaded from file or S3 (before indexing flattening). */
+    private final Map<String, String> troveSourceDocuments = new ConcurrentHashMap<>();
     private final Object mergeLock = new Object();
     private Directory luceneDirectory;
     private IndexSearcher luceneSearcher;
@@ -161,6 +166,7 @@ public class SearchDataService {
     public void reloadData(BiConsumer<Integer, Integer> progress, AtomicBoolean cancelled) {
         log.info("SearchDataService.reloadData() started");
         troveMetadata.clear();
+        troveSourceDocuments.clear();
         Set<String> onlyIds = parseTroveIds(onlyTroveIds);
         Set<String> excludeIds = parseTroveIds(excludeTroveIds);
         Set<String> loadedTroveIds = java.util.Collections.synchronizedSet(new TreeSet<>());
@@ -303,6 +309,12 @@ public class SearchDataService {
                 }
             }
             ephemeralTroves.put(troveId, List.copyOf(toIndex));
+            try {
+                troveSourceDocuments.put(troveId, objectMapper.writeValueAsString(
+                        buildEphemeralTroveDocumentNode(troveId, troveLabel, toIndex)));
+            } catch (JsonProcessingException e) {
+                log.warn("Failed to store ephemeral trove source document for {}: {}", troveId, e.getMessage());
+            }
             if (cliCreated) {
                 cliCreatedEphemeralTroveIds.add(troveId);
             } else {
@@ -341,6 +353,7 @@ public class SearchDataService {
                 return false;
             }
             cliCreatedEphemeralTroveIds.remove(troveId.trim());
+            troveSourceDocuments.remove(troveId.trim());
             final String idTrimmed = troveId.trim();
             List<String> companions = ephemeralToSister.remove(idTrimmed);
             if (companions != null) {
@@ -617,6 +630,7 @@ public class SearchDataService {
                                 .key(tk.key)
                                 .build())) {
                             JsonNode root2 = objectMapper.readTree(in);
+                            storeTroveSourceDocuments(root2, tk.troveId);
                             List<SearchResult> results = CollectionToSearchResultMapper.mapRootToSearchResults(root2);
                             log.info("Loaded trove \"{}\": {} records", tk.troveId, results.size());
                             loadedTroveIds.add(tk.troveId);
@@ -665,9 +679,10 @@ public class SearchDataService {
                 Resource resource = resources[i];
                 try (InputStream in = resource.getInputStream()) {
                     JsonNode root = objectMapper.readTree(in);
-                    String troveId = root.has("id") && root.get("id").isTextual()
-                            ? root.get("id").asText()
-                            : (resource.getFilename() != null ? resource.getFilename() : "unknown");
+                    String troveId = troveIdFromCollectionNode(root);
+                    if (troveId == null || troveId.isEmpty()) {
+                        troveId = resource.getFilename() != null ? resource.getFilename() : "unknown";
+                    }
                     if (!onlyIds.isEmpty() && !onlyIds.contains(troveId)) {
                         log.debug("Skipping trove \"{}\" (not in moocho.only.trove.ids)", troveId);
                         if (progress != null) {
@@ -682,6 +697,7 @@ public class SearchDataService {
                         }
                         continue;
                     }
+                    storeTroveSourceDocuments(root, troveId);
                     List<SearchResult> results = CollectionToSearchResultMapper.mapRootToSearchResults(root);
                     log.info("Loaded trove \"{}\": {} records", troveId, results.size());
                     loadedTroveIds.add(troveId);
@@ -703,6 +719,7 @@ public class SearchDataService {
 
     /** Boost factor for the preferred (booster) trove so its hits outrank others. */
     private static final float TROVE_BOOST_FACTOR = 1.2f;
+
 
     public List<ScoredSearchResult> search(List<String> troveIds, String query) {
         return search(troveIds, query, null);
@@ -1325,6 +1342,90 @@ public class SearchDataService {
         return Set.copyOf(ids);
     }
 
+    /**
+     * Returns the full trove document as originally loaded (id, name, items/titles, etc.),
+     * plus {@code updateTimestamp} from the troves manifest when present.
+     * Returns {@code null} if the trove is unknown.
+     */
+    public JsonNode getTroveSourceDocument(String troveId) {
+        if (troveId == null || troveId.isBlank()) {
+            return null;
+        }
+        String id = troveId.trim();
+        String stored = troveSourceDocuments.get(id);
+        if (stored != null) {
+            try {
+                JsonNode doc = objectMapper.readTree(stored);
+                if (doc.isObject()) {
+                    mergeTroveMetadataInto(id, (ObjectNode) doc);
+                }
+                return doc;
+            } catch (JsonProcessingException e) {
+                log.warn("Failed to parse stored trove document for {}: {}", id, e.getMessage());
+            }
+        }
+        List<SearchResult> ephemeral = ephemeralTroves.get(id);
+        if (ephemeral != null) {
+            ObjectNode doc = buildEphemeralTroveDocumentNode(id, ephemeral.isEmpty() ? id : ephemeral.get(0).trove(), ephemeral);
+            mergeTroveMetadataInto(id, doc);
+            return doc;
+        }
+        List<SearchResult> persisted = allResults.stream()
+                .filter(r -> id.equals(r.troveId()))
+                .toList();
+        if (persisted.isEmpty()) {
+            return null;
+        }
+        ObjectNode doc = buildReconstructedTroveDocumentNode(id, persisted);
+        mergeTroveMetadataInto(id, doc);
+        return doc;
+    }
+
+    /**
+     * Returns the items for the given trove ID, or {@code null} if the trove is not known.
+     * Ephemeral troves are checked first; falls back to persisted results.
+     */
+    public List<SearchResult> getTroveItems(String troveId) {
+        if (troveId == null || troveId.isBlank()) {
+            return null;
+        }
+        List<SearchResult> ephemeral = ephemeralTroves.get(troveId.trim());
+        if (ephemeral != null) {
+            return ephemeral;
+        }
+        List<SearchResult> persisted = allResults.stream()
+                .filter(r -> troveId.trim().equals(r.troveId()))
+                .toList();
+        return persisted.isEmpty() ? null : persisted;
+    }
+
+    /** Reconstruct source-style JSON for items that have no stored rawSourceItem (e.g. CLI ephemeral troves). */
+    public Map<String, Object> searchResultToSourceJson(SearchResult r) {
+        Map<String, Object> m = new java.util.LinkedHashMap<>();
+        if (r.id() != null) {
+            m.put("id", r.id());
+        }
+        if (r.title() != null) {
+            m.put("title", r.title());
+        }
+        if (r.itemType() != null) {
+            m.put("itemType", r.itemType());
+        }
+        if (r.snippet() != null) {
+            m.put("snippet", r.snippet());
+        }
+        if (r.files() != null && !r.files().isEmpty()) {
+            m.put("files", r.files());
+        }
+        if (r.itemUrl() != null) {
+            m.put("itemUrl", r.itemUrl());
+        }
+        if (r.extraFields() != null && !r.extraFields().isEmpty()) {
+            m.putAll(r.extraFields());
+        }
+        return m;
+    }
+
     public List<TroveOption> getTroveOptions() {
         return allResults.stream()
                 .filter(r -> r.troveId() != null && !r.troveId().isBlank())
@@ -1345,6 +1446,103 @@ public class SearchDataService {
         if (node == null || !node.has(field)) return null;
         JsonNode v = node.get(field);
         return (v != null && v.isTextual()) ? v.asText() : null;
+    }
+
+    private static String troveIdFromCollectionNode(JsonNode collectionNode) {
+        if (collectionNode == null || !collectionNode.isObject()) {
+            return null;
+        }
+        String id = textOrNull(collectionNode, "id");
+        if (id != null && !id.isEmpty()) {
+            return id;
+        }
+        id = textOrNull(collectionNode, "troveId");
+        if (id != null && !id.isEmpty()) {
+            return id;
+        }
+        return textOrNull(collectionNode, "trove_id");
+    }
+
+    private void storeTroveSourceDocuments(JsonNode root, String fallbackTroveId) {
+        if (root == null || root.isNull()) {
+            return;
+        }
+        if (root.isArray()) {
+            for (JsonNode node : root) {
+                storeOneTroveSourceDocument(node, fallbackTroveId);
+            }
+        } else {
+            storeOneTroveSourceDocument(root, fallbackTroveId);
+        }
+    }
+
+    private void storeOneTroveSourceDocument(JsonNode collectionNode, String fallbackTroveId) {
+        String troveId = troveIdFromCollectionNode(collectionNode);
+        if (troveId == null || troveId.isEmpty()) {
+            troveId = fallbackTroveId;
+        }
+        if (troveId == null || troveId.isEmpty()) {
+            return;
+        }
+        try {
+            troveSourceDocuments.put(troveId, objectMapper.writerWithDefaultPrettyPrinter()
+                    .writeValueAsString(collectionNode));
+        } catch (JsonProcessingException e) {
+            log.warn("Failed to store trove source document for {}: {}", troveId, e.getMessage());
+        }
+    }
+
+    private void mergeTroveMetadataInto(String troveId, ObjectNode doc) {
+        if (!doc.hasNonNull("id") || doc.get("id").asText().isBlank()) {
+            doc.put("id", troveId);
+        }
+        String updateTimestamp = troveMetadata.get(troveId);
+        if (updateTimestamp != null && !updateTimestamp.isBlank() && !doc.has("updateTimestamp")) {
+            doc.put("updateTimestamp", updateTimestamp);
+        }
+    }
+
+    private ObjectNode buildEphemeralTroveDocumentNode(String troveId, String displayName, List<SearchResult> items) {
+        ObjectNode root = objectMapper.createObjectNode();
+        root.put("id", troveId);
+        root.put("name", displayName != null && !displayName.isBlank() ? displayName : troveId);
+        ArrayNode itemsArr = root.putArray("items");
+        for (SearchResult r : items) {
+            itemsArr.add(objectMapper.valueToTree(searchResultToSourceJson(r)));
+        }
+        return root;
+    }
+
+    /** Best-effort rebuild when no stored source document exists (should be rare). */
+    private ObjectNode buildReconstructedTroveDocumentNode(String troveId, List<SearchResult> items) {
+        ObjectNode root = objectMapper.createObjectNode();
+        root.put("id", troveId);
+        String name = items.isEmpty() ? troveId : (items.get(0).trove() != null ? items.get(0).trove() : troveId);
+        root.put("name", name);
+        boolean titleOnly = items.stream().allMatch(r ->
+                r.itemType() == null && r.snippet() != null && r.snippet().equals(r.title()));
+        if (titleOnly) {
+            ArrayNode titles = root.putArray("titles");
+            for (SearchResult r : items) {
+                if (r.title() != null) {
+                    titles.add(r.title());
+                }
+            }
+        } else {
+            ArrayNode itemsArr = root.putArray("items");
+            for (SearchResult r : items) {
+                if (r.rawSourceItem() != null && !r.rawSourceItem().isBlank()) {
+                    try {
+                        itemsArr.add(objectMapper.readTree(r.rawSourceItem()));
+                    } catch (JsonProcessingException e) {
+                        itemsArr.add(objectMapper.valueToTree(searchResultToSourceJson(r)));
+                    }
+                } else {
+                    itemsArr.add(objectMapper.valueToTree(searchResultToSourceJson(r)));
+                }
+            }
+        }
+        return root;
     }
 
     private record TroveS3Key(String troveId, String key) {}

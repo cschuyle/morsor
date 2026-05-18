@@ -1,5 +1,6 @@
 package com.example.morsor.search;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.security.core.context.SecurityContext;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -40,6 +41,16 @@ public class SearchController {
     @GetMapping("/troves")
     public List<TroveOption> troves() {
         return searchDataService.getTroveOptions();
+    }
+
+    @GetMapping("/troves/{id}")
+    public ResponseEntity<Object> getTrove(@org.springframework.web.bind.annotation.PathVariable String id) {
+        JsonNode doc = searchDataService.getTroveSourceDocument(id);
+        if (doc == null) {
+            return ResponseEntity.notFound().build();
+        }
+        // JsonNode inside ResponseEntity serializes as Jackson node metadata on Boot 4; convert to Map/List.
+        return ResponseEntity.ok(objectMapper.convertValue(doc, Object.class));
     }
 
     @PostMapping("/troves/reload")

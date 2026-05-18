@@ -51,6 +51,54 @@ class SearchControllerTest {
     }
 
     @Test
+    void trovesGetReturnsRawSourceJsonForKnownTrove() {
+        ResponseEntity<Map<String, Object>> response = restTemplate.exchange(
+                "http://localhost:" + port + "/api/troves/favorites",
+                HttpMethod.GET,
+                null,
+                new ParameterizedTypeReference<Map<String, Object>>() {}
+        );
+        assertThat(response.getStatusCode().is2xxSuccessful()).isTrue();
+        assertThat(response.getBody()).isNotNull();
+        assertThat(response.getBody()).containsKey("id");
+        assertThat(response.getBody().get("id")).isEqualTo("favorites");
+        assertThat(
+                response.getBody().containsKey("titles") || response.getBody().containsKey("items")
+        ).isTrue();
+    }
+
+    @Test
+    void trovesGetReturnsFullDocumentForTitlesTrove() {
+        ResponseEntity<Map<String, Object>> response = restTemplate.exchange(
+                "http://localhost:" + port + "/api/troves/vinyl",
+                HttpMethod.GET,
+                null,
+                new ParameterizedTypeReference<Map<String, Object>>() {}
+        );
+        assertThat(response.getStatusCode().is2xxSuccessful()).isTrue();
+        assertThat(response.getBody()).isNotNull();
+        assertThat(response.getBody().get("id")).isEqualTo("vinyl");
+        assertThat(response.getBody()).containsKey("name");
+        assertThat(response.getBody()).containsKey("titles");
+    }
+
+    @Test
+    void trovesGetReturns404ForUnknownTrove() {
+        try {
+            restTemplate.exchange(
+                    "http://localhost:" + port + "/api/troves/no-such-trove-xyz",
+                    HttpMethod.GET,
+                    null,
+                    String.class
+            );
+        } catch (org.springframework.web.client.HttpClientErrorException.NotFound e) {
+            assertThat(e.getStatusCode().value()).isEqualTo(404);
+            return;
+        }
+        throw new AssertionError("expected 404 for unknown trove");
+    }
+
+    @Test
     void searchReturnsDataFromJson() {
         // With no filters we get all loaded results (verifies data is loaded from JSON)
         ResponseEntity<SearchResponse> allResponse = restTemplate.exchange(
