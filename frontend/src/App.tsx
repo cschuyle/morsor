@@ -2956,22 +2956,56 @@ function App() {
                 </>
               )
             })()}
-            {showCompareBackToTop && (
-              <button
-                type="button"
-                className="back-to-top-btn"
-                style={compareBackToTopCenterX != null ? { left: compareBackToTopCenterX } : undefined}
-                onClick={() => {
-                  const sc = compareScrollContainerRef.current
-                  if (sc && 'scrollTo' in sc) sc.scrollTo({ top: 0, behavior: 'smooth' })
-                  else window.scrollTo({ top: 0, behavior: 'smooth' })
-                }}
-                aria-label="Back to top"
-                title="Back to top"
-              >
-                <span aria-hidden="true">▲</span>
-              </button>
-            )}
+            {showCompareBackToTop && (() => {
+              const scrollToTop = () => {
+                const sc = compareScrollContainerRef.current
+                if (sc && 'scrollTo' in sc) sc.scrollTo({ top: 0, behavior: 'smooth' })
+                else window.scrollTo({ top: 0, behavior: 'smooth' })
+              }
+              let cPageNum = 0
+              let cTotalPages = 0
+              let onPrev: (() => void) | null = null
+              let onNext: (() => void) | null = null
+              if (searchMode === 'duplicates' && duplicatesResult != null) {
+                cPageNum = duplicatesResult.page ?? 0
+                const size = duplicatesResult.size ?? 50
+                cTotalPages = size > 0 ? Math.ceil((duplicatesResult.total ?? 0) / size) : 0
+                onPrev = cPageNum > 0 ? () => fetchDuplicates(cPageNum - 1) : null
+                onNext = cPageNum < cTotalPages - 1 ? () => fetchDuplicates(cPageNum + 1) : null
+              } else if (searchMode === 'uniques' && uniquesResult != null) {
+                cPageNum = uniquesResult.page ?? 0
+                const size = uniquesResult.size ?? 50
+                cTotalPages = size > 0 ? Math.ceil((uniquesResult.total ?? 0) / size) : 0
+                onPrev = cPageNum > 0 ? () => fetchUniques(cPageNum - 1) : null
+                onNext = cPageNum < cTotalPages - 1 ? () => fetchUniques(cPageNum + 1) : null
+              }
+              return (
+                <div
+                  className="floating-nav-group"
+                  style={compareBackToTopCenterX != null ? { left: compareBackToTopCenterX } : undefined}
+                >
+                  {onPrev != null && (
+                    <button type="button" className="prev-page-btn" onClick={onPrev} aria-label={`Go to page ${cPageNum}`} title={`Page ${cPageNum}`}>
+                      <span aria-hidden="true">◀</span> Page {cPageNum}
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    className="back-to-top-btn"
+                    onClick={scrollToTop}
+                    aria-label="Back to top"
+                    title="Back to top"
+                  >
+                    <span aria-hidden="true">▲</span>
+                  </button>
+                  {onNext != null && (
+                    <button type="button" className="next-page-btn" onClick={onNext} aria-label={`Go to page ${cPageNum + 2}`} title={`Page ${cPageNum + 2}`}>
+                      Page {cPageNum + 2} <span aria-hidden="true">▶</span>
+                    </button>
+                  )}
+                </div>
+              )
+            })()}
             </div>
             {searchMode === 'search' && searchResult != null && (() => {
               const results = Array.isArray(searchResult.results) ? searchResult.results : []
