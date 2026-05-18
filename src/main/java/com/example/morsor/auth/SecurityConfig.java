@@ -3,6 +3,7 @@ package com.example.morsor.auth;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Profile;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
@@ -37,6 +38,7 @@ import java.util.List;
 
 @Configuration
 @EnableWebSecurity
+@Profile("!no-auth")
 public class SecurityConfig {
 
     @Value("${app.cors.allowed-origins:}")
@@ -123,6 +125,15 @@ public class SecurityConfig {
                     String encodedNext = UriUtils.encode(next, StandardCharsets.UTF_8);
                     new LoginUrlAuthenticationEntryPoint("/login?next=" + encodedNext)
                             .commence(request, response, authException);
+                })
+                .accessDeniedHandler((request, response, accessDeniedException) -> {
+                    if (isApiRequestPath(request)) {
+                        response.setStatus(HttpStatus.FORBIDDEN.value());
+                        response.setContentType("application/json");
+                        response.getWriter().write("{\"error\":\"forbidden\"}");
+                        return;
+                    }
+                    response.sendError(HttpStatus.FORBIDDEN.value());
                 }))
             .formLogin(form -> form
                 .loginPage("/login")
