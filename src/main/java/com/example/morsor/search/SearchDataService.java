@@ -1568,4 +1568,87 @@ public class SearchDataService {
     }
 
     private record TroveS3Key(String troveId, String key) {}
+
+    /**
+     * Returns a snapshot of (troveId → change token) for change-detection polling.
+     * <ul>
+     *   <li>S3 mode: reads {@code troves.json} and extracts each entry's {@code updateTimestamp}.</li>
+     *   <li>Classpath mode: resolves {@code moocho.data.location} resources and uses each file's
+     *       last-modified timestamp (milliseconds as string) as the token.</li>
+     * </ul>
+     * Returns an empty map on any error (poller treats it as "no change").
+     */
+    public Map<String, String> readTroveManifestTimestamps() {
+        boolean useS3 = environment.acceptsProfiles(Profiles.of("s3troves"));
+        if (useS3) {
+            return readS3ManifestTimestamps();
+        } else {
+            return readClasspathTimestamps();
+        }
+    }
+
+    private Map<String, String> readS3ManifestTimestamps() {
+        String region = System.getenv().getOrDefault("AWS_REGION", "us-west-2");
+        try (S3Client s3 = S3Client.builder().region(Region.of(region)).build()) {
+            String trovesContent;
+            try (ResponseInputStream<GetObjectResponse> stream = s3.getObject(
+                    GetObjectRequest.builder().bucket(bucketName).key(TROVES_LIST_KEY).build())) {
+                trovesContent = new String(stream.readAllBytes(), StandardCharsets.UTF_8);
+            }
+            JsonNode root = objectMapper.readTree(trovesContent);
+            List<JsonNode> troveEntries;
+            if (root.has("troves") && root.get("troves").isArray()) {
+                troveEntries = StreamSupport.stream(root.get("troves").spliterator(), false).toList();
+            } else if (root.isArray()) {
+                troveEntries = StreamSupport.stream(root.spliterator(), false).toList();
+            } else {
+                troveEntries = List.of(root);
+            }
+            Map<String, String> result = new HashMap<>();
+            for (JsonNode entry : troveEntries) {
+                String troveId = troveIdFromCollectionNode(entry);
+                if (troveId == null || troveId.isEmpty()) {
+                    continue;
+                }
+                String ts = textOrNull(entry, "updateTimestamp");
+                result.put(troveId, ts != null ? ts : "");
+            }
+            return result;
+        } catch (Exception e) {
+            log.warn("readTroveManifestTimestamps (S3): could not read manifest: {}", e.getMessage());
+            return Map.of();
+        }
+    }
+
+    private Map<String, String> readClasspathTimestamps() {
+        try {
+            Resource[] resources = resourceResolver.getResources(dataLocation);
+            Map<String, String> result = new HashMap<>();
+            for (Resource resource : resources) {
+                try (InputStream in = resource.getInputStream()) {
+                    JsonNode root = objectMapper.readTree(in);
+                    String troveId = troveIdFromCollectionNode(root);
+                    if (troveId == null || troveId.isEmpty()) {
+                        troveId = resource.getFilename() != null ? resource.getFilename() : null;
+                    }
+                    if (troveId == null || troveId.isEmpty()) {
+                        continue;
+                    }
+                    long lastMod;
+                    try {
+                        lastMod = resource.lastModified();
+                    } catch (IOException ex) {
+                        lastMod = 0L;
+                    }
+                    result.put(troveId, Long.toString(lastMod));
+                } catch (Exception e) {
+                    log.warn("readClasspathTimestamps: skipping resource {}: {}", resource.getDescription(), e.getMessage());
+                }
+            }
+            return result;
+        } catch (Exception e) {
+            log.warn("readTroveManifestTimestamps (classpath): could not resolve resources: {}", e.getMessage());
+            return Map.of();
+        }
+    }
 }

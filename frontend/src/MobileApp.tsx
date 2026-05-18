@@ -46,6 +46,7 @@ import {
   type DuplicatesTabSession,
   type UniquesTabSession,
 } from './sessionTabState'
+import { fetchTroveSyncState } from './troveSyncStateApi'
 import './MobileApp.css'
 
 const MOBILE_PAGE_SIZE = 100
@@ -140,6 +141,8 @@ function MobileApp() {
   const [compareRawSourceLightbox, setCompareRawSourceLightbox] = useState<{ title: string; rawSourceItem: string } | null>(null)
   const [reloadTrovesInProgress, setReloadTrovesInProgress] = useState(false)
   const [reloadTrovesProgress, setReloadTrovesProgress] = useState({ current: 0, total: 0 })
+  const [trovesStale, setTrovesStale] = useState(false)
+  const [staleTroveIds, setStaleTroveIds] = useState<string>('')
   const [fileTypeFilters, setFileTypeFilters] = useState<Set<string>>(() => {
     const ftAll = new URLSearchParams(window.location.search).getAll('fileTypes')
     return new Set(parseFileTypesQueryValues(ftAll))
@@ -184,6 +187,7 @@ function MobileApp() {
   const reloadAbortControllerRef = useRef<AbortController | null>(null)
   const reloadRunIdRef = useRef(0)
   const reloadInProgressRef = useRef(false)
+  const skipNextStalePollRef = useRef(false)
   const compareTimerStartRef = useRef<number | null>(null)
   const compareIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const compareEtaHistoryRef = useRef<number[]>([])
@@ -498,6 +502,30 @@ function MobileApp() {
       uniqCompare: uc,
     })
   }
+
+  useEffect(() => {
+    let cancelled = false
+    function pollSyncState() {
+      fetchTroveSyncState(undefined, getApiAuthHeaders())
+        .then((state) => {
+          if (cancelled) return
+          // Suppress results while a reload is in flight (however long it takes).
+          if (reloadInProgressRef.current) return
+          // Suppress the one tick immediately after the reload finishes to avoid
+          // re-showing the banner before the backend clears the stale flag.
+          if (skipNextStalePollRef.current) {
+            skipNextStalePollRef.current = false
+            return
+          }
+          setTrovesStale(state.stale)
+          setStaleTroveIds(state.stale && state.staleTroveIds ? state.staleTroveIds : '')
+        })
+        .catch(() => { /* ignore */ })
+    }
+    pollSyncState()
+    const id = setInterval(pollSyncState, 15000)
+    return () => { cancelled = true; clearInterval(id) }
+  }, [])
 
   // Persist **active tab only** to the URL.
   useEffect(() => {
@@ -3043,10 +3071,11 @@ onClick={() => {
             )}
             <button
               type="button"
-              className="mobile-footer-link mobile-clear-cache-btn"
+              className="mobile-footer-link mobile-clear-cache-btn mobile-reload-troves-btn"
               aria-label="Reload troves"
               onClick={async () => {
                 if (reloadInProgressRef.current) return
+                setTrovesStale(false)
                 reloadInProgressRef.current = true
                 const runId = ++reloadRunIdRef.current
                 setReloadTrovesInProgress(true)
@@ -3135,6 +3164,33 @@ onClick={() => {
             Logout
           </button>
         </div>
+      {trovesStale && !reloadTrovesInProgress && createPortal(
+        <div className="troves-stale-banner mobile-troves-stale-banner" role="alert">
+          <span className="troves-stale-message">
+            Trove data has changed{staleTroveIds ? `: ${staleTroveIds}` : ''}.
+          </span>
+          <button
+            type="button"
+            className="troves-stale-reload-btn"
+            onClick={() => {
+              setTrovesStale(false)
+              skipNextStalePollRef.current = true
+              document.querySelector<HTMLButtonElement>('.mobile-reload-troves-btn')?.click()
+            }}
+          >
+            Reload
+          </button>
+          <button
+            type="button"
+            className="troves-stale-dismiss-btn"
+            aria-label="Dismiss"
+            onClick={() => setTrovesStale(false)}
+          >
+            ✕
+          </button>
+        </div>,
+        document.body
+      )}
       {reloadTrovesInProgress && (
         <div className="reload-troves-overlay" role="dialog" aria-modal="true" aria-label="Reloading troves">
           <div className="reload-troves-popup">

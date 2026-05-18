@@ -3250,3 +3250,61 @@
   margin: 0;
   color: #666;
 }
+
+/* Trove staleness banner */
+.troves-stale-banner {
+  position: fixed;
+  bottom: 56px; /* sit just above the footer */
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 2000;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 18px;
+  border-radius: 8px;
+  background: #fff3cd;
+  border: 1px solid #e6c300;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.15);
+  font-size: 0.9rem;
+  color: #6b5900;
+  white-space: nowrap;
+  max-width: 90vw;
+  overflow: hidden;
+}
+
+.troves-stale-message {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.troves-stale-reload-btn {
+  background: #e6a800;
+  color: #fff;
+  border: none;
+  border-radius: 5px;
+  padding: 5px 12px;
+  cursor: pointer;
+  font-size: 0.85rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.troves-stale-reload-btn:hover {
+  background: #c99200;
+}
+
+.troves-stale-dismiss-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #6b5900;
+  font-size: 1rem;
+  padding: 0 2px;
+  line-height: 1;
+}
+
+.troves-stale-dismiss-btn:hover {
+  color: #333;
+}

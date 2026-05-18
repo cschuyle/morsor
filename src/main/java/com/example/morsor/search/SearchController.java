@@ -31,11 +31,16 @@ public class SearchController {
     private final SearchDataService searchDataService;
     private final SearchCache searchCache;
     private final ObjectMapper objectMapper;
+    private final TroveStalenessRepository stalenessRepository;
+    private final TrovePollerService trovePollerService;
 
-    public SearchController(SearchDataService searchDataService, SearchCache searchCache, ObjectMapper objectMapper) {
+    public SearchController(SearchDataService searchDataService, SearchCache searchCache, ObjectMapper objectMapper,
+                            TroveStalenessRepository stalenessRepository, TrovePollerService trovePollerService) {
         this.searchDataService = searchDataService;
         this.searchCache = searchCache;
         this.objectMapper = objectMapper;
+        this.stalenessRepository = stalenessRepository;
+        this.trovePollerService = trovePollerService;
     }
 
     @GetMapping("/troves")
@@ -53,10 +58,21 @@ public class SearchController {
         return ResponseEntity.ok(objectMapper.convertValue(doc, Object.class));
     }
 
+    @GetMapping("/troves/sync-state")
+    public SyncStateResponse troveSyncState() {
+        return stalenessRepository.findCurrent()
+                .map(s -> new SyncStateResponse(true, s.detectedAt().toString(), s.staleTroveIds()))
+                .orElse(new SyncStateResponse(false, null, null));
+    }
+
+    public record SyncStateResponse(boolean stale, String detectedAt, String staleTroveIds) {}
+
     @PostMapping("/troves/reload")
     public void reloadTroves() {
         searchDataService.reloadData();
         searchCache.clear();
+        stalenessRepository.clear();
+        trovePollerService.resume();
     }
 
     /** Streams NDJSON progress (current, total) during reload; total may be 0 when unknown. Use for UI progress bar. */
@@ -82,6 +98,8 @@ public class SearchController {
                 }, cancelled);
                 if (cancelled.get()) return;
                 searchCache.clear();
+                stalenessRepository.clear();
+                trovePollerService.resume();
                 out.write(om.writeValueAsBytes(Map.of("type", "done")));
                 out.write('\n');
                 out.flush();

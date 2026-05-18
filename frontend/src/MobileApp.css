@@ -2778,3 +2778,9 @@
 .search-extra-fields-separator .sidebar-separator {
   margin: 0.25rem 0.75rem;
 }
+
+/* Mobile stale banner: sit near the bottom of the viewport, above the native footer */
+.mobile-troves-stale-banner {
+  bottom: 72px;
+  font-size: 0.82rem;
+}

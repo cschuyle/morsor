@@ -104,6 +104,7 @@ public class SecurityConfig {
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers(HttpMethod.GET, "/api/auth/csrf-prime").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/auth/session").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/troves/sync-state").permitAll()
                 .requestMatchers("/login", "/favicon.ico", "/favicon.png", "/apple-touch-icon.png").permitAll()
                 .requestMatchers("/assets/**").permitAll() // Because, Vite.
                 .requestMatchers("/@vite/**").permitAll() // Because, Vite.

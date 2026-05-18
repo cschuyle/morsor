@@ -51,6 +51,7 @@ import {
   type UniquesTabSession,
 } from './sessionTabState'
 import { paginationPageWindow } from './paginationPageWindow'
+import { fetchTroveSyncState } from './troveSyncStateApi'
 import './App.css'
 
 const DEFAULT_DUP_SESSION: DuplicatesTabSession = {
@@ -142,6 +143,8 @@ function App() {
   const [compareRawSourceLightbox, setCompareRawSourceLightbox] = useState<{ title: string; rawSourceItem: string } | null>(null)
   const [reloadTrovesInProgress, setReloadTrovesInProgress] = useState(false)
   const [reloadTrovesProgress, setReloadTrovesProgress] = useState({ current: 0, total: 0 })
+  const [trovesStale, setTrovesStale] = useState(false)
+  const [staleTroveIds, setStaleTroveIds] = useState<string>('')
   const queryRef = useRef('')
   const skipCheckboxSearchRef = useRef(true)
   const skipFileTypeSearchRef = useRef(false)
@@ -153,6 +156,7 @@ function App() {
   const reloadAbortControllerRef = useRef<AbortController | null>(null)
   const reloadRunIdRef = useRef(0)
   const reloadInProgressRef = useRef(false)
+  const skipNextStalePollRef = useRef(false)
   const compareTimerStartRef = useRef<number | null>(null)
   const compareIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const compareEtaHistoryRef = useRef<number[]>([])
@@ -412,6 +416,30 @@ function App() {
 
   useEffect(() => {
     refreshStatusMessage()
+  }, [])
+
+  useEffect(() => {
+    let cancelled = false
+    function pollSyncState() {
+      fetchTroveSyncState(undefined, getApiAuthHeaders())
+        .then((state) => {
+          if (cancelled) return
+          // Suppress results while a reload is in flight (however long it takes).
+          if (reloadInProgressRef.current) return
+          // Suppress the one tick immediately after the reload finishes to avoid
+          // re-showing the banner before the backend clears the stale flag.
+          if (skipNextStalePollRef.current) {
+            skipNextStalePollRef.current = false
+            return
+          }
+          setTrovesStale(state.stale)
+          setStaleTroveIds(state.stale && state.staleTroveIds ? state.staleTroveIds : '')
+        })
+        .catch(() => { /* ignore — backend may be unreachable */ })
+    }
+    pollSyncState()
+    const id = setInterval(pollSyncState, 15000)
+    return () => { cancelled = true; clearInterval(id) }
   }, [])
 
   useEffect(() => {
@@ -3248,9 +3276,10 @@ function App() {
               {' · '}
               <button
                 type="button"
-                className="app-footer-link app-footer-clear-cache"
+                className="app-footer-link app-footer-clear-cache app-footer-reload-btn"
                 onClick={async () => {
                   if (reloadInProgressRef.current) return
+                  setTrovesStale(false)
                   reloadInProgressRef.current = true
                   const runId = ++reloadRunIdRef.current
                   setReloadTrovesInProgress(true)
@@ -3337,6 +3366,32 @@ function App() {
           </button>
         </div>
       </footer>
+      {trovesStale && !reloadTrovesInProgress && (
+        <div className="troves-stale-banner" role="alert">
+          <span className="troves-stale-message">
+            Trove data has changed{staleTroveIds ? `: ${staleTroveIds}` : ''}.
+          </span>
+          <button
+            type="button"
+            className="troves-stale-reload-btn"
+            onClick={() => {
+              setTrovesStale(false)
+              skipNextStalePollRef.current = true
+              document.querySelector<HTMLButtonElement>('.app-footer-reload-btn')?.click()
+            }}
+          >
+            Reload now
+          </button>
+          <button
+            type="button"
+            className="troves-stale-dismiss-btn"
+            aria-label="Dismiss"
+            onClick={() => setTrovesStale(false)}
+          >
+            ✕
+          </button>
+        </div>
+      )}
       {reloadTrovesInProgress && (
         <div className="reload-troves-overlay" role="dialog" aria-modal="true" aria-label="Reloading troves">
           <div className="reload-troves-popup">
