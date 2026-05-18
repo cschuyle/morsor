@@ -70,6 +70,7 @@ def _server_unreachable(base: str, e: URLError) -> str:
 # Default User-Agent for all requests — prevents proxies (e.g. Cloudflare) from
 # blocking the default Python-urllib/3.x agent string.
 _DEFAULT_HEADERS: dict[str, str] = {
+    "Accept": "application/json",
     "User-Agent": (
         "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
         "AppleWebKit/537.36 (KHTML, like Gecko) "
@@ -99,9 +100,41 @@ def normalize_output_mode(raw: str) -> str:
     v = (raw or "").strip().lower()
     if v in ("json", "j"):
         return "json"
+    if v in ("yaml", "y"):
+        return "yaml"
     if v in ("text", "txt", "t"):
         return "text"
-    die(f"invalid output mode: {raw} (expected json/j or text/txt/t)")
+    die(f"invalid output mode: {raw} (expected json/j, yaml/y, or text/txt/t)")
+
+
+def dump_parsed_body(data: object, output_mode: str) -> None:
+    if output_mode == "yaml":
+        try:
+            import yaml  # type: ignore
+        except ImportError:
+            die(
+                "YAML output requires PyYAML. Install it with: pip install pyyaml\n"
+                "Or use -o json or -o text."
+            )
+        print(yaml.dump(data, default_flow_style=False, allow_unicode=True, sort_keys=False))
+    else:
+        print(json.dumps(data, indent=2, ensure_ascii=False))
+        print()
+
+
+def print_document_body(json_str: str, output_mode: str) -> None:
+    """Print a trove document (full object) as YAML or pretty JSON."""
+    try:
+        data = json.loads(json_str)
+    except json.JSONDecodeError:
+        sys.stdout.write(json_str)
+        if json_str and not json_str.endswith("\n"):
+            print()
+        return
+    if output_mode == "text":
+        dump_parsed_body(data, "yaml")
+    else:
+        dump_parsed_body(data, output_mode)
 
 
 def map_shorthand_key(key: str) -> str:
@@ -360,6 +393,8 @@ def print_uniques_text(json_str: str) -> None:
 def print_text_for_path(json_str: str, path: str) -> None:
     if "/api/troves" == path:
         print_troves_text(json_str)
+    elif path.startswith("/api/troves/"):
+        print_document_body(json_str, "text")
     elif "/duplicates" in path:
         print_duplicates_text(json_str)
     elif "/uniques" in path:
@@ -840,6 +875,8 @@ def http_request(
                 print(f"{resp.status} {resp.url}", file=sys.stderr)
             if output_mode == "text":
                 print_text_for_path(raw, path)
+            elif output_mode == "yaml" and path.startswith("/api/troves/"):
+                print_document_body(raw, "yaml")
             else:
                 sys.stdout.write(raw)
                 if raw and not raw.endswith("\n"):
@@ -856,6 +893,16 @@ def http_request(
                     print(f"morsor-cli: {err_obj['error']}", file=sys.stderr)
             except (json.JSONDecodeError, KeyError):
                 pass
+        elif 300 <= e.code < 400:
+            loc = e.headers.get("Location") if e.headers else None
+            if loc:
+                print(f"morsor-cli: redirect to {loc}", file=sys.stderr)
+            print(
+                "morsor-cli: not authenticated — run 'morsor-cli login' or pass -T/--token",
+                file=sys.stderr,
+            )
+        elif e.code == 404:
+            print("morsor-cli: not found — check the trove id (run 'morsor-cli troves')", file=sys.stderr)
         elif e.code in (401, 403):
             print("morsor-cli: not authenticated — run 'morsor-cli login' or pass -T/--token", file=sys.stderr)
         elif e.code == 502:
@@ -1788,7 +1835,7 @@ OPTIONS
        -c, --compare ID[,ID...]
               Compare trove(s) for dups/uniques (sets compareTrove; repeatable).
 
-       -o, --output json|text
+       -o, --output json|yaml|text
               json: raw response body. text: abbreviated tables/lines for search,
               troves, duplicates, uniques.
 
@@ -1818,6 +1865,7 @@ ACTIONS
        dup, dups, duplicate, duplicates GET /api/search/duplicates
        unique, uniques                  GET /api/search/uniques
        trove, troves                    GET /api/troves
+       troves get <id>                  GET /api/troves/{id} (full trove document; text mode prints YAML)
        troves reload                    POST /api/troves/reload (reload trove data)
        status                           GET /api/status
        local sisters load          Reconcile sister troves from config (see above).
@@ -1919,6 +1967,7 @@ AUTH
 
 INFO
   troves | status                     # List troves or server status
+  troves get <trove-id>               # Trove items as native JSON (from S3 source)
   troves reload                       # Trigger a full trove data reload on the server
 
 SEARCH  [-t <trove,...>] [query text]
@@ -1926,7 +1975,7 @@ SEARCH  [-t <trove,...>] [query text]
 
   -t/--troves <id[,id...]>   Limit search to these troves (repeatable, comma-delimited)
   query text                 Search terms for all troves
-  -o json                    Raw JSON output (pipe to jq); default: text
+  -o json|yaml               JSON or YAML output; troves get defaults to YAML in text mode
 
 COMPARE  -p <trove> [-c <trove>...] [query text]
   dups | duplicates                   # cross-trove duplicate analysis
@@ -1935,7 +1984,7 @@ COMPARE  -p <trove> [-c <trove>...] [query text]
   -p/--primary <id>          Primary trove (required)
   -c/--compare <id[,id...]>  Compare trove(s) (repeatable, comma-delimited)
   query text                 Search terms for primary trove
-  -o json                    Raw JSON output (pipe to jq); default: text
+  -o json|yaml               JSON or YAML output; troves get defaults to YAML in text mode
 
 LOCAL (EPHEMERAL) TROVES
   local sisters load                   # Reconcile all config-defined sisters with server
@@ -2097,10 +2146,13 @@ def main(argv: list[str]) -> None:
 
     file_token = _load_session_token(base)
     env_token = (os.environ.get("MORSOR_CLI_TOKEN") or "").strip()
-    sources_available = sum([bool(bearer), bool(file_token), bool(env_token)])
-
+    # On localhost dev, match the Vite app: use the hardwired dev-token unless -T was passed.
+    # A stale ~/.morsor/session-token.json must not override that (common cause of 401 in dev).
     bearer_source: str | None = None
-    if bearer:
+    if is_likely_local_dev_base(base) and not bearer_from_arg:
+        bearer = DEV_DEFAULT_TOKEN
+        bearer_source = "dev default token (localhost)"
+    elif bearer:
         bearer_source = "flag (-T/--token)"
     elif file_token:
         bearer = file_token
@@ -2109,6 +2161,11 @@ def main(argv: list[str]) -> None:
         bearer = env_token
         bearer_source = "env (MORSOR_CLI_TOKEN)"
 
+    sources_available = sum([
+        bool(bearer_from_arg),
+        bool(file_token) and not (is_likely_local_dev_base(base) and not bearer_from_arg),
+        bool(env_token) and not (is_likely_local_dev_base(base) and not bearer_from_arg),
+    ])
     _first_cmd = positional[0].lower() if positional else ""
     if bearer and bearer_source and sources_available > 1 and _first_cmd not in ("login", "logout"):
         print(f"morsor-cli: using token from {bearer_source}", file=sys.stderr)
@@ -2129,6 +2186,16 @@ def main(argv: list[str]) -> None:
 
     if positional[0].lower() in ("trove", "troves") and len(positional) > 1 and positional[1].lower() == "reload":
         run_troves_reload(base, bearer, extra_headers, debug)
+        return
+
+    if positional[0].lower() in ("trove", "troves") and len(positional) > 1 and positional[1].lower() == "get":
+        if len(positional) < 3:
+            die("usage: morsor-cli troves get <trove-id>")
+        trove_id = positional[2]
+        http_request(
+            base, "GET", "/api/troves/" + urllib.parse.quote(trove_id, safe=""),
+            "", bearer, extra_headers, None, show_headers, debug, output_mode,
+        )
         return
 
     if positional[0].lower() == "login":
