@@ -67,6 +67,7 @@ import java.util.regex.Pattern;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
 import org.apache.lucene.util.BytesRef;
@@ -720,6 +721,8 @@ public class SearchDataService {
     /** Boost factor for the preferred (booster) trove so its hits outrank others. */
     private static final float TROVE_BOOST_FACTOR = 1.2f;
 
+    /** Below this primary-item count, dup/uniq analysis stays sequential (parallel overhead not worth it). */
+    private static final int DUP_UNIQ_PARALLEL_MIN_ITEMS = 32;
 
     public List<ScoredSearchResult> search(List<String> troveIds, String query) {
         return search(troveIds, query, null);
@@ -901,24 +904,9 @@ public class SearchDataService {
         }
 
         int maxMatch = Math.max(1, Math.min(maxMatchesPerPrimary, 50));
-        List<DuplicateMatchRow> rows = new ArrayList<>(primaryScored.size());
-        for (int i = 0; i < primaryScored.size(); i++) {
-            ScoredSearchResult ss = primaryScored.get(i);
-            SearchResult primary = ss.result();
-            List<ScoredSearchResult> matches = findSimilarInTroves(primary, compareSet, maxMatch);
-            matches = filterMatchesByYearHeuristic(primary, matches);
-            matches = matches.stream().limit(5).toList();
-            if (!matches.isEmpty()) {
-                rows.add(new DuplicateMatchRow(primary, matches));
-            }
-            if (progress != null && ((i + 1) % 31 == 0 || i + 1 == total)) {
-                progress.accept(i + 1, total);
-            }
-            if ((i + 1) % 500 == 0) {
-                log.info("Duplicates analysis: {}/{} items", i + 1, total);
-            }
-        }
-        List<DuplicateMatchRow> deduped = deduplicateDuplicateRowsByGroup(rows);
+        DupUniqCollected collected = analyzePrimariesForDupUniq(
+                primaryScored, compareSet, maxMatch, 5, progress, "Duplicates");
+        List<DuplicateMatchRow> deduped = deduplicateDuplicateRowsByGroup(collected.duplicates());
         return rerankDuplicateRows(deduped);
     }
 
@@ -984,30 +972,9 @@ public class SearchDataService {
             progress.accept(0, total);
         }
 
-        List<UniqueResult> uniquesWithScore = new ArrayList<>(primaryScored.size());
-        for (int i = 0; i < primaryScored.size(); i++) {
-            ScoredSearchResult ss = primaryScored.get(i);
-            SearchResult primary = ss.result();
-            List<ScoredSearchResult> rawMatches = findSimilarInTroves(primary, compareSet, 50);
-            List<ScoredSearchResult> filtered = filterMatchesByYearHeuristic(primary, rawMatches);
-            if (filtered.isEmpty()) {
-                double nearestMiss = rawMatches.isEmpty() ? 0.0
-                        : rawMatches.stream().mapToDouble(ScoredSearchResult::score).max().orElse(0.0);
-                TitleWithYear primaryParsed = parseTitleWithYear(primary.title() != null ? primary.title() : "");
-                List<ScoredSearchResult> topNearMisses = rawMatches.stream()
-                        .sorted(java.util.Comparator.comparingDouble(ScoredSearchResult::score).reversed())
-                        .filter(m -> !isYearOnlyMatch(primaryParsed, m.result().title() != null ? m.result().title() : ""))
-                        .limit(5)
-                        .toList();
-                uniquesWithScore.add(new UniqueResult(primary, nearestMiss, topNearMisses));
-            }
-            if (progress != null && ((i + 1) % 31 == 0 || i + 1 == total)) {
-                progress.accept(i + 1, total);
-            }
-            if ((i + 1) % 500 == 0) {
-                log.info("Uniques analysis: {}/{} items", i + 1, total);
-            }
-        }
+        DupUniqCollected collected = analyzePrimariesForDupUniq(
+                primaryScored, compareSet, 50, 50, progress, "Uniques");
+        List<UniqueResult> uniquesWithScore = new ArrayList<>(collected.uniques());
         uniquesWithScore.sort(java.util.Comparator.comparingDouble(UniqueResult::score));
         return uniquesWithScore;
     }
@@ -1039,40 +1006,93 @@ public class SearchDataService {
             progress.accept(0, total);
         }
 
-        List<DuplicateMatchRow> dupRows = new ArrayList<>(primaryScored.size());
-        List<UniqueResult> uniquesWithScore = new ArrayList<>(primaryScored.size());
         final int maxMatch = 50;
-
-        for (int i = 0; i < primaryScored.size(); i++) {
-            ScoredSearchResult ss = primaryScored.get(i);
-            SearchResult primary = ss.result();
-            List<ScoredSearchResult> rawMatches = findSimilarInTroves(primary, compareSet, maxMatch);
-            List<ScoredSearchResult> filtered = filterMatchesByYearHeuristic(primary, rawMatches);
-            if (!filtered.isEmpty()) {
-                List<ScoredSearchResult> matches = filtered.stream().limit(maxMatch).toList();
-                dupRows.add(new DuplicateMatchRow(primary, matches));
-            } else {
-                double nearestMiss = rawMatches.isEmpty() ? 0.0
-                        : rawMatches.stream().mapToDouble(ScoredSearchResult::score).max().orElse(0.0);
-                TitleWithYear primaryParsed = parseTitleWithYear(primary.title() != null ? primary.title() : "");
-                List<ScoredSearchResult> topNearMisses = rawMatches.stream()
-                        .sorted(java.util.Comparator.comparingDouble(ScoredSearchResult::score).reversed())
-                        .filter(m -> !isYearOnlyMatch(primaryParsed, m.result().title() != null ? m.result().title() : ""))
-                        .limit(5)
-                        .toList();
-                uniquesWithScore.add(new UniqueResult(primary, nearestMiss, topNearMisses));
-            }
-            if (progress != null && ((i + 1) % 31 == 0 || i + 1 == total)) {
-                progress.accept(i + 1, total);
-            }
-            if ((i + 1) % 500 == 0) {
-                log.info("Duplicates/uniques analysis: {}/{} items", i + 1, total);
-            }
-        }
-
-        List<DuplicateMatchRow> deduped = rerankDuplicateRows(deduplicateDuplicateRowsByGroup(dupRows));
+        DupUniqCollected collected = analyzePrimariesForDupUniq(
+                primaryScored, compareSet, maxMatch, maxMatch, progress, "Duplicates/uniques");
+        List<DuplicateMatchRow> deduped = rerankDuplicateRows(deduplicateDuplicateRowsByGroup(collected.duplicates()));
+        List<UniqueResult> uniquesWithScore = new ArrayList<>(collected.uniques());
         uniquesWithScore.sort(java.util.Comparator.comparingDouble(UniqueResult::score));
         return new DupUniqPair(deduped, uniquesWithScore);
+    }
+
+    private record DupUniqPerPrimaryOutcome(DuplicateMatchRow duplicate, UniqueResult unique) {}
+
+    private record DupUniqCollected(List<DuplicateMatchRow> duplicates, List<UniqueResult> uniques) {}
+
+    /**
+     * For each primary item, run Lucene similarity against compare troves and classify as duplicate or unique.
+     * Uses parallel streams when there are enough items; results are collected in primary order for stable dedup.
+     */
+    private DupUniqCollected analyzePrimariesForDupUniq(
+            List<ScoredSearchResult> primaryScored,
+            Set<String> compareSet,
+            int similarityTopN,
+            int duplicateMatchCap,
+            BiConsumer<Integer, Integer> progress,
+            String logLabel) {
+        int total = primaryScored.size();
+        DupUniqPerPrimaryOutcome[] outcomes = new DupUniqPerPrimaryOutcome[total];
+        if (total >= DUP_UNIQ_PARALLEL_MIN_ITEMS) {
+            AtomicInteger completed = new AtomicInteger(0);
+            IntStream.range(0, total).parallel().forEach(i -> {
+                outcomes[i] = analyzePrimaryForDupUniq(
+                        primaryScored.get(i).result(), compareSet, similarityTopN, duplicateMatchCap);
+                reportDupUniqProgress(completed.incrementAndGet(), total, progress, logLabel);
+            });
+        } else {
+            for (int i = 0; i < total; i++) {
+                outcomes[i] = analyzePrimaryForDupUniq(
+                        primaryScored.get(i).result(), compareSet, similarityTopN, duplicateMatchCap);
+                reportDupUniqProgress(i + 1, total, progress, logLabel);
+            }
+        }
+        List<DuplicateMatchRow> dupRows = new ArrayList<>();
+        List<UniqueResult> uniquesWithScore = new ArrayList<>();
+        for (DupUniqPerPrimaryOutcome outcome : outcomes) {
+            if (outcome.duplicate() != null) {
+                dupRows.add(outcome.duplicate());
+            }
+            if (outcome.unique() != null) {
+                uniquesWithScore.add(outcome.unique());
+            }
+        }
+        return new DupUniqCollected(dupRows, uniquesWithScore);
+    }
+
+    private DupUniqPerPrimaryOutcome analyzePrimaryForDupUniq(
+            SearchResult primary,
+            Set<String> compareSet,
+            int similarityTopN,
+            int duplicateMatchCap) {
+        List<ScoredSearchResult> rawMatches = findSimilarInTroves(primary, compareSet, similarityTopN);
+        List<ScoredSearchResult> filtered = filterMatchesByYearHeuristic(primary, rawMatches);
+        if (!filtered.isEmpty()) {
+            int cap = Math.max(1, duplicateMatchCap);
+            List<ScoredSearchResult> matches = filtered.stream().limit(cap).toList();
+            return new DupUniqPerPrimaryOutcome(new DuplicateMatchRow(primary, matches), null);
+        }
+        double nearestMiss = rawMatches.isEmpty() ? 0.0
+                : rawMatches.stream().mapToDouble(ScoredSearchResult::score).max().orElse(0.0);
+        TitleWithYear primaryParsed = parseTitleWithYear(primary.title() != null ? primary.title() : "");
+        List<ScoredSearchResult> topNearMisses = rawMatches.stream()
+                .sorted(java.util.Comparator.comparingDouble(ScoredSearchResult::score).reversed())
+                .filter(m -> !isYearOnlyMatch(primaryParsed, m.result().title() != null ? m.result().title() : ""))
+                .limit(5)
+                .toList();
+        return new DupUniqPerPrimaryOutcome(null, new UniqueResult(primary, nearestMiss, topNearMisses));
+    }
+
+    private void reportDupUniqProgress(
+            int completed,
+            int total,
+            BiConsumer<Integer, Integer> progress,
+            String logLabel) {
+        if (progress != null && (completed % 31 == 0 || completed == total)) {
+            progress.accept(completed, total);
+        }
+        if (completed % 500 == 0) {
+            log.info("{} analysis: {}/{} items", logLabel, completed, total);
+        }
     }
 
     /**
@@ -1251,7 +1271,9 @@ public class SearchDataService {
         if (queryStr.isEmpty()) {
             return List.of();
         }
-        if (luceneSearcher == null) {
+        IndexSearcher searcher = luceneSearcher;
+        List<SearchResult> resultsSnapshot = allResults;
+        if (searcher == null) {
             return List.of();
         }
 
@@ -1266,16 +1288,16 @@ public class SearchDataService {
                 textQuery = parser.parse(QueryParser.escape(queryStr));
             }
             bq.add(textQuery, BooleanClause.Occur.MUST);
-            TopDocs topDocs = luceneSearcher.search(bq.build(), topN);
+            TopDocs topDocs = searcher.search(bq.build(), topN);
             List<ScoredSearchResult> out = new ArrayList<>(topDocs.scoreDocs.length);
-            StoredFields storedFields = luceneSearcher.storedFields();
+            StoredFields storedFields = searcher.storedFields();
             for (ScoreDoc sd : topDocs.scoreDocs) {
                 Document hitDoc = storedFields.document(sd.doc);
                 IndexableField idxField = hitDoc.getField("idx");
                 if (idxField != null && idxField.numericValue() != null) {
                     int idx = idxField.numericValue().intValue();
-                        if (idx >= 0 && idx < allResults.size()) {
-                        SearchResult r = allResults.get(idx);
+                    if (idx >= 0 && idx < resultsSnapshot.size()) {
+                        SearchResult r = resultsSnapshot.get(idx);
                         if (Objects.equals(r.id(), similarTo.id())) {
                             continue;
                         }
