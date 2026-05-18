@@ -188,6 +188,7 @@ function MobileApp() {
   const reloadRunIdRef = useRef(0)
   const reloadInProgressRef = useRef(false)
   const skipNextStalePollRef = useRef(false)
+  const partialReloadIdsRef = useRef<string>('')
   const compareTimerStartRef = useRef<number | null>(null)
   const compareIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const compareEtaHistoryRef = useRef<number[]>([])
@@ -3082,6 +3083,11 @@ onClick={() => {
                 setReloadTrovesProgress({ current: 0, total: 0 })
                 const controller = new AbortController()
                 reloadAbortControllerRef.current = controller
+                const partialIds = partialReloadIdsRef.current
+                partialReloadIdsRef.current = ''
+                const reloadUrl = partialIds
+                  ? `/api/troves/reload/stream?ids=${encodeURIComponent(partialIds)}`
+                  : '/api/troves/reload/stream'
                 const makeReloadHeaders = () => {
                   const h = { ...getApiAuthHeaders() }
                   const t = getCsrfToken()
@@ -3089,11 +3095,11 @@ onClick={() => {
                   return h
                 }
                 try {
-                  let res = await fetch('/api/troves/reload/stream', { method: 'POST', credentials: 'include', headers: makeReloadHeaders(), signal: controller.signal })
+                  let res = await fetch(reloadUrl, { method: 'POST', credentials: 'include', headers: makeReloadHeaders(), signal: controller.signal })
                   if (res.status === 401) { window.location.href = '/login'; return }
                   // 403 usually means the XSRF-TOKEN cookie was absent; the 403 response sets it — retry once
                   if (res.status === 403) {
-                    res = await fetch('/api/troves/reload/stream', { method: 'POST', credentials: 'include', headers: makeReloadHeaders(), signal: controller.signal })
+                    res = await fetch(reloadUrl, { method: 'POST', credentials: 'include', headers: makeReloadHeaders(), signal: controller.signal })
                     if (res.status === 401) { window.location.href = '/login'; return }
                   }
                   if (!res.ok || !res.body) {
@@ -3175,6 +3181,7 @@ onClick={() => {
             onClick={() => {
               setTrovesStale(false)
               skipNextStalePollRef.current = true
+              partialReloadIdsRef.current = staleTroveIds
               document.querySelector<HTMLButtonElement>('.mobile-reload-troves-btn')?.click()
             }}
           >

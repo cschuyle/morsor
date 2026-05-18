@@ -14,8 +14,10 @@ import org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBo
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Comparator;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.BiConsumer;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
 import java.util.List;
@@ -68,8 +70,13 @@ public class SearchController {
     public record SyncStateResponse(boolean stale, String detectedAt, String staleTroveIds) {}
 
     @PostMapping("/troves/reload")
-    public void reloadTroves() {
-        searchDataService.reloadData();
+    public void reloadTroves(@RequestParam(required = false) String ids) {
+        Set<String> partialIds = parseIds(ids);
+        if (partialIds.isEmpty()) {
+            searchDataService.reloadData();
+        } else {
+            searchDataService.reloadDataPartial(partialIds, null, null);
+        }
         searchCache.clear();
         stalenessRepository.clear();
         trovePollerService.resume();
@@ -77,14 +84,15 @@ public class SearchController {
 
     /** Streams NDJSON progress (current, total) during reload; total may be 0 when unknown. Use for UI progress bar. */
     @PostMapping(value = "/troves/reload/stream", produces = "application/x-ndjson")
-    public ResponseEntity<StreamingResponseBody> reloadTrovesStream() {
+    public ResponseEntity<StreamingResponseBody> reloadTrovesStream(@RequestParam(required = false) String ids) {
+        Set<String> partialIds = parseIds(ids);
         SecurityContext securityContext = SecurityContextHolder.getContext();
         ObjectMapper om = this.objectMapper;
         AtomicBoolean cancelled = new AtomicBoolean(false);
         StreamingResponseBody stream = out -> {
             try {
                 SecurityContextHolder.setContext(securityContext);
-                searchDataService.reloadData((current, total) -> {
+                BiConsumer<Integer, Integer> progress = (current, total) -> {
                     if (cancelled.get()) return;
                     synchronized (out) {
                         try {
@@ -95,7 +103,12 @@ public class SearchController {
                             cancelled.set(true);
                         }
                     }
-                }, cancelled);
+                };
+                if (partialIds.isEmpty()) {
+                    searchDataService.reloadData(progress, cancelled);
+                } else {
+                    searchDataService.reloadDataPartial(partialIds, progress, cancelled);
+                }
                 if (cancelled.get()) return;
                 searchCache.clear();
                 stalenessRepository.clear();
@@ -673,6 +686,17 @@ public class SearchController {
             return null;
         }
         return s;
+    }
+
+    /** Parses a comma-delimited {@code ids} query param into a set; returns empty set if blank/null. */
+    private static Set<String> parseIds(String ids) {
+        if (ids == null || ids.isBlank()) {
+            return Set.of();
+        }
+        return Arrays.stream(ids.split(","))
+                .map(String::trim)
+                .filter(s -> !s.isEmpty())
+                .collect(Collectors.toSet());
     }
 
     /** True if the result has a real thumbnail (non-blank, not the Amazon placeholder, and does not contain "/no_image"). Rows with real thumbnails sort before pop-out-only rows (asc = real first, pop-out last). */

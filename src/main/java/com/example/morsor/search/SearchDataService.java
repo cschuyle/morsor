@@ -54,6 +54,7 @@ import java.text.Normalizer;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -156,6 +157,68 @@ public class SearchDataService {
     /** Reload troves and search index from configured source (file or S3). Call after startup to refresh data. */
     public void reloadData() {
         reloadData(null, null);
+    }
+
+    /**
+     * Partial reload: re-fetch only the given trove IDs and splice their new results into the
+     * persisted data, leaving all other troves untouched. Useful after staleness detection so
+     * only changed troves are re-downloaded.
+     * <p>
+     * Config-level {@code moocho.only.trove.ids} / {@code moocho.exclude.trove.ids} still apply.
+     */
+    public void reloadDataPartial(Set<String> partialIds, BiConsumer<Integer, Integer> progress, AtomicBoolean cancelled) {
+        if (partialIds == null || partialIds.isEmpty()) {
+            reloadData(progress, cancelled);
+            return;
+        }
+        log.info("SearchDataService.reloadDataPartial() started for troves: {}", partialIds);
+
+        // Narrow to IDs that are actually permitted by the global config filters.
+        Set<String> configOnly = parseTroveIds(onlyTroveIds);
+        Set<String> configExclude = parseTroveIds(excludeTroveIds);
+        Set<String> effectiveIds = new HashSet<>(partialIds);
+        if (!configOnly.isEmpty()) {
+            effectiveIds.retainAll(configOnly);
+        }
+        effectiveIds.removeAll(configExclude);
+        if (effectiveIds.isEmpty()) {
+            log.info("reloadDataPartial: all requested ids were filtered out; nothing reloaded");
+            return;
+        }
+
+        // Scrub stale metadata so load methods can re-populate it cleanly.
+        effectiveIds.forEach(id -> {
+            troveMetadata.remove(id);
+            troveSourceDocuments.remove(id);
+        });
+
+        Set<String> loadedTroveIds = java.util.Collections.synchronizedSet(new TreeSet<>());
+        List<String> loadErrors = java.util.Collections.synchronizedList(new ArrayList<>());
+        List<SearchResult> freshResults = new ArrayList<>();
+        boolean useS3 = environment.acceptsProfiles(Profiles.of("s3troves"));
+        if (useS3) {
+            requireS3EnvVars();
+            loadFromS3(freshResults, effectiveIds, Set.of(), progress, loadedTroveIds, loadErrors);
+        } else {
+            loadFromClasspath(freshResults, effectiveIds, Set.of(), progress, loadedTroveIds, loadErrors);
+        }
+        if (cancelled != null && cancelled.get()) {
+            log.info("Partial reload cancelled; existing data unchanged");
+            return;
+        }
+        if (!loadErrors.isEmpty()) {
+            log.warn("Partial reload completed with {} errors: {}", loadErrors.size(), loadErrors);
+        }
+        synchronized (mergeLock) {
+            // Remove old results for the reloaded troves, then append fresh ones.
+            List<SearchResult> kept = persistedResults.stream()
+                    .filter(r -> !effectiveIds.contains(r.troveId()))
+                    .collect(Collectors.toCollection(ArrayList::new));
+            kept.addAll(freshResults);
+            persistedResults = List.copyOf(kept);
+            rebuildMergedIndexLocked();
+        }
+        log.info("SearchDataService.reloadDataPartial() finished: {} new results, {} total", freshResults.size(), allResults.size());
     }
 
     /**
