@@ -1,0 +1,15 @@
+-- Database schema is versioned with Flyway.
+--
+-- Scripts (one set for both H2 and PostgreSQL):
+--   src/main/resources/db/migration/h2+postgres/V1__auth_baseline.sql
+--   src/main/resources/db/migration/h2+postgres/V2__saved_queries.sql
+--
+-- V1 = users + api_tokens. V2 = saved_queries (references users).
+--
+-- New databases: start the app; Flyway applies migrations in order.
+--
+-- Existing PostgreSQL that already has auth tables but no flyway_schema_history:
+--   application-postgres.properties sets baseline-on-migrate and baseline-version=1 so the first run
+--   records baseline at V1 (auth assumed present) and then applies V2 if saved_queries is missing.
+--
+-- Manual one-shot: run V1 then V2 in psql or the H2 console, in order.
