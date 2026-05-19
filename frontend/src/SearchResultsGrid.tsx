@@ -39,6 +39,12 @@ export interface SearchResultsGridProps {
   onPrevPage?: (() => void) | null
   /** Called when the floating next-page button is clicked. */
   onNextPage?: (() => void) | null
+  /**
+   * 0-based offset of the first row on this page; used to compute the 1-based
+   * global row number shown in the index column (list view only).
+   * Defaults to 0 (first page / no pagination).
+   */
+  rowNumberOffset?: number
 }
 
 const AMAZON_PLACEHOLDER_THUMB = 'https://m.media-amazon.com/images/I/01RmK+J4pJL._SS135_.gif'
@@ -810,7 +816,7 @@ export function rawSourceDisplay(rawSourceItem: unknown): string {
   return (rawSourceItem != null && rawSourceItem !== '') ? String(rawSourceItem) : RAW_SOURCE_NOT_AVAILABLE
 }
 
-export function SearchResultsGrid({ data, sortBy = null, sortDir = 'asc', onSortChange, showScoreColumn = false, afterFilterSlot = null, viewMode = 'list', hideTroveInGallery = false, hideTroveInList = false, showPdfSashInGallery = false, showGalleryDecorations = true, isMobile = false, visibleExtraFieldKeys = null, onFetchAllForCopy = null, currentPage, totalPages, onPrevPage = null, onNextPage = null }: SearchResultsGridProps) {
+export function SearchResultsGrid({ data, sortBy = null, sortDir = 'asc', onSortChange, showScoreColumn = false, afterFilterSlot = null, viewMode = 'list', hideTroveInGallery = false, hideTroveInList = false, showPdfSashInGallery = false, showGalleryDecorations = true, isMobile = false, visibleExtraFieldKeys = null, onFetchAllForCopy = null, currentPage, totalPages, onPrevPage = null, onNextPage = null, rowNumberOffset = 0 }: SearchResultsGridProps) {
   const [globalFilter, setGlobalFilter] = useState('')
   const [lightbox, setLightbox] = useState<LightboxPayload | null>(null)
   const [rawSourceLightbox, setRawSourceLightbox] = useState<{ title: string; rawSourceItem: string } | null>(null)
@@ -966,9 +972,20 @@ export function SearchResultsGrid({ data, sortBy = null, sortDir = 'asc', onSort
     ],
     [hasAnyThumbnail, hasThumbnails, isMobile, listTextColumns, lpExtraHoverHandlers, extraFieldColumns]
   )
+  const idxColumn = useMemo(() => ({
+    id: 'idx',
+    header: '#',
+    cell: ({ row }: { row: { index: number } }) => rowNumberOffset + row.index + 1,
+    size: 24,
+    minSize: 24,
+    maxSize: 32,
+    enableSorting: false,
+    enableResizing: false,
+  }), [rowNumberOffset])
+
   const columns = useMemo(
-    () => (showScoreColumn ? [...baseColumns, scoreColumn] : baseColumns),
-    [baseColumns, showScoreColumn]
+    () => (showScoreColumn ? [idxColumn, ...baseColumns, scoreColumn] : [idxColumn, ...baseColumns]),
+    [idxColumn, baseColumns, showScoreColumn]
   )
   const sorting = useMemo(
     () => (sortBy ? [{ id: sortBy, desc: sortDir === 'desc' }] : []),
@@ -1736,7 +1753,7 @@ export function SearchResultsGrid({ data, sortBy = null, sortDir = 'asc', onSort
             {table.getFlatHeaders().map((header) => (
               <col
                 key={header.id}
-                style={{ width: `var(--header-${header.id}-size)` }}
+                style={{ width: header.column.id === 'idx' ? '24px' : `var(--header-${header.id}-size)` }}
               />
             ))}
           </colgroup>
@@ -1747,7 +1764,7 @@ export function SearchResultsGrid({ data, sortBy = null, sortDir = 'asc', onSort
                   <th
                     key={header.id}
                     className={`col-${header.column.id} ${header.column.getCanSort() ? 'sortable' : ''}`}
-                    style={{ width: `var(--header-${header.id}-size)` }}
+                    style={{ width: header.column.id === 'idx' ? '24px' : `var(--header-${header.id}-size)` }}
                     onClick={header.column.getToggleSortingHandler()}
                   >
                     <span className="grid-th-content">

@@ -56,6 +56,8 @@ interface UniquesResultsViewProps {
   onOpenRawSource?: (payload: { title: string; rawSourceItem: string }) => void
   /** Returns the full result set (all pages) for copy. Falls back to current page results if null. */
   onFetchAllResultsForCopy?: (() => Promise<UniqueResultRow[] | null>) | null
+  /** 0-based offset of the first row on this page; used to compute 1-based global row numbers. */
+  rowNumberOffset?: number
 }
 
 /**
@@ -63,7 +65,7 @@ interface UniquesResultsViewProps {
  * Each result has item (SearchResult), score (nearest-miss), and nearMisses (top possible duplicates).
  * sortBy / sortDir / onSortChange: optional column sort (title, trove, score).
  */
-export function UniquesResultsView({ results = [], sortBy = null, sortDir = 'asc', onSortChange, onOpenRawSource, onFetchAllResultsForCopy = null }: UniquesResultsViewProps) {
+export function UniquesResultsView({ results = [], sortBy = null, sortDir = 'asc', onSortChange, onOpenRawSource, onFetchAllResultsForCopy = null, rowNumberOffset = 0 }: UniquesResultsViewProps) {
   const [dialogRow, setDialogRow] = useState<number | null>(null)
   const { copyFeedbackMessage, showCopyFeedback } = useCopyFeedback()
 
@@ -253,6 +255,7 @@ export function UniquesResultsView({ results = [], sortBy = null, sortDir = 'asc
       <table className="duplicate-results-table">
         <thead>
           <tr>
+            <th className="col-idx" aria-label="Row number" style={{ textAlign: 'right' }}>#</th>
             <th className="col-thumb" scope="col">
               {/* Thumbnail */}
             </th>
@@ -298,6 +301,7 @@ export function UniquesResultsView({ results = [], sortBy = null, sortDir = 'asc
                   } : undefined}
                   title={onOpenRawSource ? 'Click to view raw source' : undefined}
                 >
+                  <td className="col-idx" style={{ textAlign: 'right' }}>{rowNumberOffset + idx + 1}</td>
                   <td className="col-thumb">
                     {primaryThumb ? (
                       <img src={primaryThumb} alt="" className="dup-thumb" loading="lazy" />
@@ -332,6 +336,7 @@ export function UniquesResultsView({ results = [], sortBy = null, sortDir = 'asc
                       } : undefined}
                       title={onOpenRawSource ? 'Click to view raw source' : undefined}
                     >
+                      <td className="col-idx" style={{ textAlign: 'right' }} />
                       <td className="col-thumb">
                         {matchThumb ? (
                           <img src={matchThumb} alt="" className="dup-thumb" loading="lazy" />

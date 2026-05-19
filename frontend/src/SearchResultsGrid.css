@@ -345,6 +345,22 @@
   color: #555;
 }
 
+.grid-table .col-idx {
+  text-align: right;
+  color: #aaa;
+  font-size: 0.78rem;
+  font-variant-numeric: tabular-nums;
+  user-select: none;
+  white-space: nowrap;
+  padding-left: 0.25rem;
+  padding-right: 0.25rem;
+}
+
+.grid-table thead .col-idx {
+  color: #bbb;
+  font-weight: 400;
+}
+
 .grid-table .col-trove {
   overflow: hidden;
   text-overflow: ellipsis;

@@ -35,13 +35,15 @@ interface DuplicateResultsViewProps {
   onOpenRawSource?: (payload: { title: string; rawSourceItem: string }) => void
   /** Returns the full result set (all pages) for copy. Falls back to current page rows if null. */
   onFetchAllRowsForCopy?: (() => Promise<DuplicateRow[] | null>) | null
+  /** 0-based offset of the first row on this page; used to compute 1-based global row numbers. */
+  rowNumberOffset?: number
 }
 
 /**
  * Renders duplicate-finder results: each row has one primary item and N match rows (different style).
  * sortBy / sortDir / onSortChange: optional column sort (title, trove, score). Sorting uses primary row only.
  */
-export function DuplicateResultsView({ rows = [], sortBy = null, sortDir = 'asc', onSortChange, onOpenRawSource, onFetchAllRowsForCopy = null }: DuplicateResultsViewProps) {
+export function DuplicateResultsView({ rows = [], sortBy = null, sortDir = 'asc', onSortChange, onOpenRawSource, onFetchAllRowsForCopy = null, rowNumberOffset = 0 }: DuplicateResultsViewProps) {
   const { copyFeedbackMessage, showCopyFeedback } = useCopyFeedback()
 
   const handleSort = (columnId: string) => {
@@ -214,6 +216,7 @@ export function DuplicateResultsView({ rows = [], sortBy = null, sortDir = 'asc'
       <table className="duplicate-results-table">
         <thead>
           <tr>
+            <th className="col-idx" aria-label="Row number" style={{ textAlign: 'right' }}>#</th>
             <th className="col-thumb" scope="col">
               {/* Thumbnail */}
             </th>
@@ -266,6 +269,7 @@ export function DuplicateResultsView({ rows = [], sortBy = null, sortDir = 'asc'
                 } : undefined}
                 title={onOpenRawSource ? 'Click to view raw source' : undefined}
               >
+                <td className="col-idx" style={{ textAlign: 'right' }}>{rowNumberOffset + rowIdx + 1}</td>
                 <td className="col-thumb">
                   {primaryThumb ? (
                     <img src={primaryThumb} alt="" className="dup-thumb" loading="lazy" />
@@ -289,6 +293,7 @@ export function DuplicateResultsView({ rows = [], sortBy = null, sortDir = 'asc'
                   } : undefined}
                   title={onOpenRawSource ? 'Click to view raw source' : undefined}
                 >
+                  <td className="col-idx" style={{ textAlign: 'right' }} />
                   <td className="col-thumb">
                     {matchThumb ? (
                       <img src={matchThumb} alt="" className="dup-thumb" loading="lazy" />

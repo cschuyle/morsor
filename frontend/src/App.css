@@ -2424,6 +2424,26 @@
   border-bottom: 1px solid #eee;
 }
 
+.duplicate-results-table .col-idx {
+  box-sizing: border-box;
+  width: 32px;
+  min-width: 32px;
+  text-align: right;
+  color: #aaa;
+  font-size: 0.78rem;
+  font-variant-numeric: tabular-nums;
+  user-select: none;
+  white-space: nowrap;
+  padding-left: 0.25rem;
+  padding-right: 0.25rem;
+}
+
+.duplicate-results-table thead .col-idx {
+  color: #bbb;
+  font-weight: 400;
+  text-align: right;
+}
+
 .duplicate-results-table thead th {
   font-weight: 600;
   color: #333;

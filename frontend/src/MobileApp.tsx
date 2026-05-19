@@ -143,6 +143,8 @@ function MobileApp() {
   const [reloadTrovesProgress, setReloadTrovesProgress] = useState({ current: 0, total: 0 })
   const [trovesStale, setTrovesStale] = useState(false)
   const [staleTroveIds, setStaleTroveIds] = useState<string>('')
+  const [staleDetectedAt, setStaleDetectedAt] = useState<string | null>(null)
+  const dismissedStaleDetectedAtRef = useRef<string | null>(null)
   const [fileTypeFilters, setFileTypeFilters] = useState<Set<string>>(() => {
     const ftAll = new URLSearchParams(window.location.search).getAll('fileTypes')
     return new Set(parseFileTypesQueryValues(ftAll))
@@ -518,8 +520,10 @@ function MobileApp() {
             skipNextStalePollRef.current = false
             return
           }
-          setTrovesStale(state.stale)
-          setStaleTroveIds(state.stale && state.staleTroveIds ? state.staleTroveIds : '')
+          const isNewStaleness = state.stale && state.detectedAt !== dismissedStaleDetectedAtRef.current
+          setTrovesStale(isNewStaleness)
+          setStaleTroveIds(isNewStaleness && state.staleTroveIds ? state.staleTroveIds : '')
+          setStaleDetectedAt(state.stale && state.detectedAt ? state.detectedAt : null)
         })
         .catch(() => { /* ignore */ })
     }
@@ -2979,6 +2983,7 @@ onClick={() => {
               onSortChange={(col, dir) => fetchDuplicates(0, null, col, dir)}
               onOpenRawSource={(payload) => setCompareRawSourceLightbox(payload)}
               onFetchAllRowsForCopy={async () => fullDuplicatesRowsRef.current}
+              rowNumberOffset={(duplicatesResult.page ?? 0) * (duplicatesResult.size ?? 50)}
             />
           </div>
         )}
@@ -2992,6 +2997,7 @@ onClick={() => {
               onSortChange={(col, dir) => fetchUniques(0, col, dir)}
               onOpenRawSource={(payload) => setCompareRawSourceLightbox(payload)}
               onFetchAllResultsForCopy={async () => fullUniquesResultsRef.current}
+              rowNumberOffset={(uniquesResult.page ?? 0) * (uniquesResult.size ?? 50)}
             />
           </div>
         )}
@@ -3191,7 +3197,10 @@ onClick={() => {
             type="button"
             className="troves-stale-dismiss-btn"
             aria-label="Dismiss"
-            onClick={() => setTrovesStale(false)}
+            onClick={() => {
+              dismissedStaleDetectedAtRef.current = staleDetectedAt
+              setTrovesStale(false)
+            }}
           >
             ✕
           </button>
