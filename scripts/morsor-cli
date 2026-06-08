@@ -69,13 +69,29 @@ def _server_unreachable(base: str, e: URLError) -> str:
 
 # Default User-Agent for all requests — prevents proxies (e.g. Cloudflare) from
 # blocking the default Python-urllib/3.x agent string.
+_BROWSER_USER_AGENT = (
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+    "AppleWebKit/537.36 (KHTML, like Gecko) "
+    "Chrome/124.0.0.0 Safari/537.36"
+)
+
 _DEFAULT_HEADERS: dict[str, str] = {
     "Accept": "application/json",
-    "User-Agent": (
-        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
-        "AppleWebKit/537.36 (KHTML, like Gecko) "
-        "Chrome/124.0.0.0 Safari/537.36"
-    )
+    "User-Agent": _BROWSER_USER_AGENT,
+}
+
+# Accept header for the form-login flow. The session login mirrors what a real
+# browser does (cookie jar + browser User-Agent), so it must also send a
+# browser-style Accept. Spring's form login redirects to "/" on success, which
+# urllib follows; "/" serves the SPA's index.html (text/html). An
+# "application/json"-only Accept can make the followed request fail content
+# negotiation with 406 Not Acceptable, so accept HTML first (and anything else).
+_LOGIN_FLOW_HEADERS: dict[str, str] = {
+    "Accept": (
+        "text/html,application/xhtml+xml,application/xml;q=0.9,"
+        "application/json;q=0.9,*/*;q=0.8"
+    ),
+    "User-Agent": _BROWSER_USER_AGENT,
 }
 
 
@@ -705,7 +721,7 @@ def run_login(base: str, debug: bool = False) -> None:
         die("username and password are required")
     jar = CookieJar()
     opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(jar))
-    opener.addheaders = list(_DEFAULT_HEADERS.items())
+    opener.addheaders = list(_LOGIN_FLOW_HEADERS.items())
     try:
         _run_login_inner(base, user, pw, jar, opener, debug=debug)
     except HTTPError as e:
