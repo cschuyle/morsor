@@ -10,6 +10,7 @@ import json
 import os
 import re
 import socket
+import subprocess
 import sys
 import time
 import urllib.error
@@ -32,6 +33,28 @@ TROVE_ROW_JSON = re.compile(
 def die(msg: str, code: int = 2) -> None:
     print(f"morsor-cli: {msg}", file=sys.stderr)
     sys.exit(code)
+
+
+def get_version() -> str:
+    """Best-effort version string: the last git commit of this script's repo.
+
+    Falls back to "unknown" when git is unavailable or the script lives outside a
+    git work tree (e.g. copied somewhere on its own).
+    """
+    repo_dir = Path(__file__).resolve().parent
+    try:
+        out = subprocess.run(
+            ["git", "-C", str(repo_dir), "log", "-1", "--format=%h %cs %s"],
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return "unknown"
+    line = out.stdout.strip()
+    if out.returncode != 0 or not line:
+        return "unknown"
+    return line
 
 
 _SESSION_TOKEN_FILE = Path.home() / ".morsor" / "session-token.json"
@@ -1994,6 +2017,9 @@ OPTIONS
        -v, --debug
               Log request URL and headers on stderr.
 
+       -V, --version
+              Print the CLI version (the last git commit of the repo) and exit.
+
 ENVIRONMENT
        MORSOR_CLI_BASE_URL     Default base URL (-b overrides).
        MORSOR_PROPERTIES_FILE  Path to YAML/JSON config. Used for local sisters and
@@ -2113,6 +2139,7 @@ USAGE SUMMARY
 
   morsor-cli --help      # This message
   morsor-cli --man       # Full manual (man-page style; use with a pager)
+  morsor-cli --version   # Print version (last git commit) and exit
 
 AUTH
   morsor-cli [OPTIONS] login          # saves token to ~/.morsor/session-token.json
@@ -2211,6 +2238,9 @@ def main(argv: list[str]) -> None:
             sys.exit(0)
         if a in ("-h", "--help", "help"):
             print_summary_usage()
+            sys.exit(0)
+        if a in ("-V", "--version", "version"):
+            print(f"morsor-cli {get_version()}")
             sys.exit(0)
         if a in ("-b", "--base"):
             i += 1
