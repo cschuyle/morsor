@@ -275,6 +275,8 @@ def resolve_action(token: str) -> tuple[str, str] | None:
         "duplicate": ("GET", "/api/search/duplicates"),
         "duplicates": ("GET", "/api/search/duplicates"),
         "dupliicates": ("GET", "/api/search/duplicates"),
+        "uniq": ("GET", "/api/search/uniques"),
+        "uniqs": ("GET", "/api/search/uniques"),
         "unique": ("GET", "/api/search/uniques"),
         "uniques": ("GET", "/api/search/uniques"),
     }
@@ -379,9 +381,19 @@ def print_duplicates_text(json_str: str) -> None:
         title = ""
         if isinstance(prim, dict):
             title = str(prim.get("title", ""))
+        print(title)
         matches = row.get("matches") or []
-        n = len(matches) if isinstance(matches, list) else 0
-        print(f"{title}\tmatches={n}")
+        if isinstance(matches, list):
+            for m in matches:
+                if not isinstance(m, dict):
+                    continue
+                res = m.get("result")
+                mtitle = str(res.get("title", "")) if isinstance(res, dict) else ""
+                try:
+                    score = float(m.get("score", 0))
+                except (TypeError, ValueError):
+                    score = 0.0
+                print(f"\t{score:07.3f}\t{mtitle}")
 
 
 def print_uniques_text(json_str: str) -> None:
@@ -402,8 +414,19 @@ def print_uniques_text(json_str: str) -> None:
             title = str(item.get("title", ""))
         else:
             title = ""
-        sc = u.get("score", 0)
-        print(f"{float(sc):.2f}\t{title}")
+        print(title)
+        near = u.get("nearMisses") or []
+        if isinstance(near, list):
+            for m in near:
+                if not isinstance(m, dict):
+                    continue
+                res = m.get("result")
+                mtitle = str(res.get("title", "")) if isinstance(res, dict) else ""
+                try:
+                    score = float(m.get("score", 0))
+                except (TypeError, ValueError):
+                    score = 0.0
+                print(f"\t{score:07.3f}\t{mtitle}")
 
 
 def print_text_for_path(json_str: str, path: str) -> None:
@@ -2400,6 +2423,14 @@ def main(argv: list[str]) -> None:
             method = "GET"
             path = "/api/search"
         query = parse_shorthand_query(positional, idx)
+        if path == "/api/search" and (primary_trove or compare_troves):
+            hint = "" if spec else f" (unknown action {first!r})"
+            print(
+                f"morsor-cli: warning: -p/--primary and -c/--compare apply to dups/uniques, "
+                f"but this runs a plain search{hint}; those flags are ignored. "
+                f"Did you mean 'dups' or 'uniques'?",
+                file=sys.stderr,
+            )
 
     # Expand trove aliases from config before building the query string.
     _aliases = _load_trove_aliases()
