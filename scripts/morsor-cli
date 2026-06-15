@@ -635,6 +635,82 @@ def print_ephemeral_register_text(json_str: str, debug: bool) -> None:
     print(json_str.rstrip() + ("\n" if json_str and not json_str.endswith("\n") else ""))
 
 
+def _read_inline_items(items_file: str | None) -> list[str]:
+    """Read item titles (one per line) for the "-" trove, from items_file or stdin."""
+    if items_file:
+        p = Path(items_file)
+        if not p.is_file():
+            die(f"--items file not found: {p}")
+        lines = p.read_text(encoding="utf-8", errors="replace").splitlines()
+    else:
+        lines = sys.stdin.read().splitlines()
+    titles = [line.strip() for line in lines if line.strip()]
+    if not titles:
+        src = f"file {items_file}" if items_file else "stdin"
+        die(f"the '-' trove has no items: no non-empty titles read from {src}")
+    if len(titles) > MAX_LOCAL_TROVE_ITEMS:
+        die(f"too many inline items (max {MAX_LOCAL_TROVE_ITEMS}): {len(titles)}")
+    return titles
+
+
+def _register_inline_trove(
+    base: str,
+    bearer: str | None,
+    extra_headers: list[str],
+    debug: bool,
+    titles: list[str],
+    items_file: str | None,
+) -> str:
+    """Register the inline "-" items as a temporary ephemeral trove; return its trove id.
+
+    The caller is responsible for deleting it afterward (see _delete_ephemeral_trove).
+    """
+    ts = int(time.time())
+    display_name = str(Path(items_file).resolve()) if items_file else f"stdin-{ts}"
+    items = [
+        {"id": f"inline-{ts}-{i}", "title": t, "files": []}
+        for i, t in enumerate(titles, start=1)
+    ]
+    body_obj = {"displayName": display_name, "items": items, "cliCreated": True}
+    body_bytes = json.dumps(body_obj).encode("utf-8")
+    token = bearer
+    if (not token or not token.strip()) and is_likely_local_dev_base(base):
+        token = DEV_DEFAULT_TOKEN
+    url = strip_trailing_slash(base) + "/api/ephemeral-troves"
+    headers = {**_DEFAULT_HEADERS, "Content-Type": "application/json"}
+    if token and token.strip():
+        headers["Authorization"] = "Bearer " + token.strip()
+    for h in extra_headers:
+        if ":" not in h or h.index(":") <= 0:
+            die(f"header must be Name: value, got: {h}")
+        name, value = h.split(":", 1)
+        headers[name.strip()] = value.strip()
+    req = urllib.request.Request(url, data=body_bytes, method="POST", headers=headers)
+    if debug:
+        print(f"[debug] POST {url} (register inline '-' trove, {len(items)} items)", file=sys.stderr)
+    try:
+        with urllib.request.urlopen(req, timeout=600) as resp:
+            raw = resp.read().decode("utf-8", errors="replace")
+    except HTTPError as e:
+        raw = e.read().decode("utf-8", errors="replace") if e.fp else ""
+        if e.code in (401, 403):
+            die("not authenticated — run 'morsor-cli login' or pass -T/--token")
+        die(f"failed to register inline '-' trove: HTTP {e.code} {json_body_preview(raw, 1024)}")
+    except URLError as e:
+        die(_server_unreachable(base, e))
+    try:
+        trove_id = json.loads(raw).get("troveId")
+    except json.JSONDecodeError:
+        trove_id = None
+    if not trove_id:
+        die("failed to register inline '-' trove: no troveId in response")
+    print(
+        f"morsor-cli: registered inline '-' trove {trove_id} ({len(items)} items)",
+        file=sys.stderr,
+    )
+    return trove_id
+
+
 def _extract_xsrf(jar: CookieJar, resp: Any, debug: bool = False) -> str | None:
     """Return the XSRF-TOKEN value from:
       1. The cookie jar (standard path).
@@ -1751,14 +1827,30 @@ THREE WAYS TO SEARCH
 
        dups, duplicates
               Cross-trove duplicate (near-duplicate) analysis. Requires
-              --primaryTrove / -p: items in that trove are matched against one or
-              more --compareTrove / -c values. Optional query narrows primary items.
-              Pagination: -P, -S (server caps duplicates/uniques page size at 500).
+              --primaryTrove / -p: items in that trove are matched against the
+              --compareTrove / -c values. Optional query narrows primary items.
+              When -c is omitted, the primary is compared against all other troves
+              (every trove except the primary). Pagination: -P, -S (server caps
+              duplicates/uniques page size at 500).
 
        uniques, unique
               Converse of duplicates: items in the primary trove that have no good
               match in the compare troves, for the optional query. Same primary/
-              compare parameters as duplicates (same 500 cap on page size).
+              compare parameters and same default (-c omitted = all troves except
+              the primary); same 500 cap on page size.
+
+INLINE ITEMS: THE "-" TROVE
+       Anywhere a trove id is accepted (-t/--trove, -p/--primary, -c/--compare) you
+       may use "-" to mean "the items read from --items FILE, or from stdin when
+       --items is omitted" (one title per line). The CLI registers those items as a
+       temporary trove on the server, runs your request, and deletes the temporary
+       trove afterward. This makes "multisearch" just a normal dups/uniques/search:
+
+         dups -p -                 duplicates of your pasted list vs all other troves
+         dups -p - -c vinyl,CDs    duplicates of your list vs vinyl and CDs
+         dups -p - -c -            duplicates WITHIN your list (self-compare)
+         uniques -p - -c jazz      items in your list with no match in jazz
+         search -t -               full-text search restricted to your list
 
 LOCAL SISTER TROVES (DIRECTORY SCAN)
        local sisters load
@@ -1844,12 +1936,20 @@ OPTIONS
               Restrict the request to one or more trove IDs (comma-delimited).
               Repeatable: -t vinyl -t jazz is the same as -t vinyl,jazz.
               Can appear anywhere on the command line (before or after the action).
+              Use "-" as an id to mean the inline items (see INLINE ITEMS above).
 
        -p, --primary ID
               Primary trove for dups/uniques (sets primaryTrove query parameter).
+              May be "-" for inline items.
 
        -c, --compare ID[,ID...]
               Compare trove(s) for dups/uniques (sets compareTrove; repeatable).
+              May include "-" for inline items (e.g. -c - for self-compare).
+              When omitted, defaults to all troves except the primary.
+
+       --items PATH
+              File of inline item titles (one per line) used by the "-" trove.
+              When "-" is used without --items, items are read from stdin.
 
        -o, --output json|yaml|text
               json: raw response body. text: abbreviated tables/lines for search,
@@ -1958,6 +2058,20 @@ EXAMPLES
                 --compareTrove=vinyl --compareTrove=CDs -o json \\
                 | jq -r '.rows[].primary.title'
 
+       Inline items ("-" trove): match a list of titles (from a file or stdin)
+       against troves without registering a trove first. The CLI registers a
+       temporary trove, runs the request, then deletes it.
+
+              ./scripts/morsor-cli dups -p - --items /path/to/titles.txt -c vinyl,CDs
+
+              cat /path/to/titles.txt | ./scripts/morsor-cli dups -p - -c vinyl -o json \\
+                | jq -r '.rows[].primary.title'
+
+       Find duplicates within the list itself (self-compare), or vs all troves:
+
+              cat /path/to/titles.txt | ./scripts/morsor-cli dups -p - -c -
+              cat /path/to/titles.txt | ./scripts/morsor-cli dups -p -
+
        Verbose raw search request:
 
               ./scripts/morsor-cli -v -b http://localhost:8080 GET /api/search -- \\
@@ -1998,9 +2112,19 @@ COMPARE  -p <trove> [-c <trove>...] [query text]
   uniques                             # items unique to a trove
 
   -p/--primary <id>          Primary trove (required)
-  -c/--compare <id[,id...]>  Compare trove(s) (repeatable, comma-delimited)
+  -c/--compare <id[,id...]>  Compare trove(s) (repeatable, comma-delimited).
+                             Default when omitted: all troves except the primary.
   query text                 Search terms for primary trove
   -o json|yaml               JSON or YAML output; troves get defaults to YAML in text mode
+
+INLINE ITEMS  use "-" as a trove id  [--items FILE]
+  Anywhere a trove id is accepted (-t, -p, -c), "-" means the items read from
+  --items FILE, or from stdin when --items is omitted (one title per line).
+  The CLI registers them as a temporary trove, runs the request, then deletes it.
+
+  dups -p -                  # duplicates of your list vs all other troves
+  dups -p - -c -             # duplicates WITHIN your list (self-compare)
+  uniques -p - -c jazz       # items in your list not found in jazz
 
 LOCAL (EPHEMERAL) TROVES
   local sisters load                   # Reconcile all config-defined sisters with server
@@ -2023,6 +2147,8 @@ Examples:
   morsor-cli -t vinyl search 'King Gizzard'
   morsor-cli -t vinyl -o json 'King Gizzard' | jq -r '.results[].title'
   morsor-cli -p vinyl -c jazz dups
+  cat titles.txt | morsor-cli dups -p -                 # list vs all other troves
+  cat titles.txt | morsor-cli dups -p - -c -            # duplicates within the list
   morsor-cli local sisters load
   morsor-cli local trove create /path/to/titles.txt
   cat /path/to/titles.txt | morsor-cli local trove create
@@ -2045,6 +2171,7 @@ def main(argv: list[str]) -> None:
     bearer: str | None = None
     bearer_from_arg = False
     body_file: str | None = None
+    items_file: str | None = None
     local_trove_name_override: str | None = None
     output_mode = "text"
     show_headers = False
@@ -2084,6 +2211,13 @@ def main(argv: list[str]) -> None:
             if i >= len(argv):
                 die(f"missing value for {argv[i - 1]}")
             body_file = argv[i]
+        elif a == "--items":
+            i += 1
+            if i >= len(argv):
+                die("missing value for --items")
+            items_file = argv[i]
+        elif a.startswith("--items="):
+            items_file = a.split("=", 1)[1]
         elif a == "--name":
             i += 1
             if i >= len(argv):
@@ -2279,6 +2413,31 @@ def main(argv: list[str]) -> None:
                     f"({', '.join(expanded_primary)}) — primary must be a single trove")
             primary_trove = expanded_primary[0] if expanded_primary else primary_trove
 
+    # Resolve the "-" trove (inline items from --items file or stdin) by registering a
+    # temporary ephemeral trove and substituting its id wherever "-" was used. It is
+    # deleted again in the finally block below.
+    inline_trove_id: str | None = None
+    uses_inline = "-" in trove_filter or primary_trove == "-" or "-" in compare_troves
+    if uses_inline:
+        titles = _read_inline_items(items_file)
+        inline_trove_id = _register_inline_trove(base, bearer, extra_headers, debug, titles, items_file)
+        trove_filter = [inline_trove_id if t == "-" else t for t in trove_filter]
+        if primary_trove == "-":
+            primary_trove = inline_trove_id
+        compare_troves = [inline_trove_id if t == "-" else t for t in compare_troves]
+    elif items_file:
+        die("--items was given but no '-' trove was used (use '-' as a trove id, e.g. -p -)")
+
+    # Default compare set for duplicates/uniques: all troves except the primary.
+    if path in ("/api/search/duplicates", "/api/search/uniques") and not compare_troves:
+        all_ids = [str(o["id"]) for o in _fetch_troves_list(base, bearer, extra_headers, debug) if o.get("id")]
+        compare_troves = [tid for tid in all_ids if tid != primary_trove]
+        if compare_troves:
+            print(
+                f"morsor-cli: no -c given; comparing against all {len(compare_troves)} other troves",
+                file=sys.stderr,
+            )
+
     extra_qs_parts: list[str] = []
     for t in trove_filter:
         extra_qs_parts.append("trove=" + urllib.parse.quote(t, safe=""))
@@ -2293,18 +2452,24 @@ def main(argv: list[str]) -> None:
     if body_file and method != "POST":
         die("--file is only valid for POST")
 
-    http_request(
-        base,
-        method,
-        path,
-        query,
-        bearer,
-        extra_headers,
-        body_file,
-        show_headers,
-        debug,
-        output_mode,
-    )
+    try:
+        http_request(
+            base,
+            method,
+            path,
+            query,
+            bearer,
+            extra_headers,
+            body_file,
+            show_headers,
+            debug,
+            output_mode,
+        )
+    finally:
+        if inline_trove_id:
+            if debug:
+                print(f"[debug] deleting inline '-' trove {inline_trove_id}", file=sys.stderr)
+            _delete_ephemeral_trove(base, bearer, extra_headers, debug, inline_trove_id)
 
 
 if __name__ == "__main__":
