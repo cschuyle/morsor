@@ -3,9 +3,9 @@
 # For production: postgres = Postgres, no dev seeding; s3troves = trove data from S3. Use both for postgres + S3.
 export SPRING_PROFILES_ACTIVE=postgres,s3troves
 
+export AWS_REGION='us-west-2'
 export AWS_ACCESS_KEY_ID=...
 export AWS_SECRET_ACCESS_KEY=...
-export AWS_REGION=...
 
 # This is the bucket where the troves are stored. See DATA.md for more details.
 export MOOCHO_BUCKET_NAME=blah
