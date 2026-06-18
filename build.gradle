@@ -45,11 +45,59 @@ tasks.named('bootRun') {
     systemProperty 'spring.profiles.active', System.getenv('SPRING_PROFILES_ACTIVE') ?: 'dev'
 }
 
+// Locate the npm executable robustly. Gradle's Exec uses the (possibly stale) PATH the
+// daemon inherited, so a bare 'npm' often fails with "A problem occurred starting process"
+// even when npm works in your shell. We also probe common install dirs and an explicit
+// -Pnpm=/path override (or NPM env var).
+def resolveNpm = {
+    def override = project.findProperty('npm') ?: System.getenv('NPM')
+    if (override) {
+        def f = file(override)
+        if (f.isFile()) {
+            return f
+        }
+    }
+    def isWindows = System.getProperty('os.name').toLowerCase().contains('win')
+    def names = isWindows ? ['npm.cmd', 'npm.exe', 'npm'] : ['npm']
+    def dirs = []
+    (System.getenv('PATH') ?: '').split(File.pathSeparator).each { if (it) { dirs << it } }
+    dirs += ['/opt/homebrew/bin', '/usr/local/bin', '/usr/bin']
+    def nvmDir = new File("${System.getProperty('user.home')}/.nvm/versions/node")
+    if (nvmDir.isDirectory()) {
+        nvmDir.listFiles()?.sort()?.reverse()?.each { dirs << new File(it, 'bin').path }
+    }
+    for (d in dirs) {
+        for (n in names) {
+            def cand = new File(d, n)
+            if (cand.isFile() && cand.canExecute()) {
+                return cand
+            }
+        }
+    }
+    return null
+}
+
 tasks.register('buildFrontend', Exec) {
     group = 'build'
     description = 'Build React frontend into src/main/resources/static'
     workingDir = file('frontend')
-    commandLine 'npm', 'run', 'build'
+    def npm = resolveNpm()
+    if (npm != null) {
+        commandLine npm.path, 'run', 'build'
+        // npm shells out to node; ensure node's dir is on PATH even if the daemon's isn't.
+        environment 'PATH', npm.parentFile.path + File.pathSeparator + (System.getenv('PATH') ?: '')
+    } else {
+        commandLine 'npm', 'run', 'build'
+    }
+    doFirst {
+        if (npm == null) {
+            throw new GradleException(
+                "Could not find 'npm'. Install Node.js (e.g. 'brew install node'), then either:\n" +
+                "  - run './gradlew --stop' and retry (a stale Gradle daemon may have an old PATH), or\n" +
+                "  - pass the path explicitly: ./gradlew test -Pnpm=/opt/homebrew/bin/npm, or\n" +
+                "  - skip the frontend build: ./gradlew test -PskipFrontendBuild")
+        }
+    }
 }
 if (!project.hasProperty('skipFrontendBuild')) {
     processResources.dependsOn buildFrontend
