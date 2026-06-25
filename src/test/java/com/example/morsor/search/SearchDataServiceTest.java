@@ -111,6 +111,53 @@ class SearchDataServiceTest {
         assertThat(moviesPrimary.get(0).matches().get(0).result().title()).isEqualTo("Jacob's Ladder (1990)");
     }
 
+    /**
+     * Recall for uniques: a same-year title that differs only by word order and a small extra token
+     * (e.g. a sequence number) must be recognized as a duplicate, not reported as unique, and the
+     * matching compare item must be returned. Regression for "007 James Bond 17 - Goldeneye (1995)"
+     * vs "James Bond 007 - GoldenEye (1995)".
+     */
+    @Test
+    void duplicatesFoundWhenTitlesDifferByWordOrderAndExtraToken() throws Exception {
+        Files.writeString(tempDir.resolve("lostmovies.json"), """
+                {
+                  "id": "lostmovies",
+                  "shortName": "Lost Movies",
+                  "titles": ["007 James Bond 17 - Goldeneye (1995)"]
+                }
+                """);
+        Files.writeString(tempDir.resolve("movies.json"), """
+                {
+                  "id": "movies",
+                  "shortName": "Movies",
+                  "titles": ["James Bond 007 - GoldenEye (1995)"]
+                }
+                """);
+
+        SearchDataService service = new SearchDataService(
+                new PathMatchingResourcePatternResolver(),
+                new ObjectMapper(),
+                new MockEnvironment()
+        );
+        ReflectionTestUtils.setField(service, "dataLocation", "file:" + tempDir.toAbsolutePath() + "/*.json");
+        ReflectionTestUtils.setField(service, "onlyTroveIds", "");
+        ReflectionTestUtils.setField(service, "excludeTroveIds", "");
+        service.reloadData();
+
+        List<DuplicateMatchRow> dups = service.searchDuplicates("lostmovies", Set.of("movies"), "", 5);
+        assertThat(dups)
+                .as("reordered title with extra token should be detected as a duplicate")
+                .isNotEmpty();
+        assertThat(dups.get(0).primary().title()).isEqualTo("007 James Bond 17 - Goldeneye (1995)");
+        assertThat(dups.get(0).matches().get(0).result().title()).isEqualTo("James Bond 007 - GoldenEye (1995)");
+
+        List<UniqueResult> uniques = service.searchUniques("lostmovies", Set.of("movies"), "");
+        assertThat(uniques)
+                .as("the GoldenEye item is a duplicate, so it must not be reported as unique")
+                .noneMatch(u -> u.item() != null
+                        && "007 James Bond 17 - Goldeneye (1995)".equals(u.item().title()));
+    }
+
     @Test
     void duplicateRerankPlacesExactMatchesBeforeYearSuffixOnlyMatches() throws Exception {
         SearchDataService service = new SearchDataService(

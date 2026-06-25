@@ -96,6 +96,20 @@ public class SearchDataService {
     @Value("${moocho.exclude.trove.ids:}")
     private String excludeTroveIds;
 
+    /**
+     * Title core-text overlap thresholds for the duplicate/uniques year heuristic. Two titles with the
+     * same (or compatible) year are treated as the same item when their normalized token sets share at
+     * least {@code titleOverlapMinTokens} tokens and the smaller set is at least {@code titleOverlapRatio}
+     * contained in the larger. This makes matching order-insensitive and tolerant of small extra tokens
+     * (e.g. "007 James Bond 17 - Goldeneye" vs "James Bond 007 - GoldenEye"). Inline defaults so plain
+     * unit-constructed instances behave; Spring overrides from properties.
+     */
+    @Value("${moocho.dup.title-overlap-ratio:0.8}")
+    private double titleOverlapRatio = 0.8;
+
+    @Value("${moocho.dup.title-overlap-min-tokens:2}")
+    private int titleOverlapMinTokens = 2;
+
     private final Environment environment;
 
     private List<SearchResult> allResults = List.of();
@@ -1139,7 +1153,8 @@ public class SearchDataService {
         TitleWithYear primaryParsed = parseTitleWithYear(primary.title() != null ? primary.title() : "");
         List<ScoredSearchResult> topNearMisses = rawMatches.stream()
                 .sorted(java.util.Comparator.comparingDouble(ScoredSearchResult::score).reversed())
-                .filter(m -> !isYearOnlyMatch(primaryParsed, m.result().title() != null ? m.result().title() : ""))
+                .filter(m -> !isYearOnlyMatch(primaryParsed, m.result().title() != null ? m.result().title() : "",
+                        titleOverlapRatio, titleOverlapMinTokens))
                 .limit(5)
                 .toList();
         return new DupUniqPerPrimaryOutcome(null, new UniqueResult(primary, nearestMiss, topNearMisses));
@@ -1167,7 +1182,8 @@ public class SearchDataService {
     private List<ScoredSearchResult> filterMatchesByYearHeuristic(SearchResult primary, List<ScoredSearchResult> matches) {
         TitleWithYear primaryParsed = parseTitleWithYear(primary.title() != null ? primary.title() : "");
         return matches.stream()
-                .filter(m -> passesYearHeuristic(primaryParsed, m.result().title() != null ? m.result().title() : ""))
+                .filter(m -> passesYearHeuristic(primaryParsed, m.result().title() != null ? m.result().title() : "",
+                        titleOverlapRatio, titleOverlapMinTokens))
                 .toList();
     }
 
@@ -1186,24 +1202,26 @@ public class SearchDataService {
         return new TitleWithYear(title.trim(), null);
     }
 
-    private static boolean passesYearHeuristic(TitleWithYear primary, String candidateTitle) {
+    private static boolean passesYearHeuristic(TitleWithYear primary, String candidateTitle,
+                                               double overlapRatio, int minSharedTokens) {
         TitleWithYear candidate = parseTitleWithYear(candidateTitle);
         if (primary.year != null && candidate.year != null && !primary.year.equals(candidate.year)) {
             return false;
         }
         if (primary.year != null) {
-            return coreTextMatch(primary.core, candidate.core);
+            return coreTextMatch(primary.core, candidate.core, overlapRatio, minSharedTokens);
         }
         return true;
     }
 
     /** True if candidate matches only on year (same year, core text does not match). Exclude from near-miss UI. */
-    private static boolean isYearOnlyMatch(TitleWithYear primary, String candidateTitle) {
+    private static boolean isYearOnlyMatch(TitleWithYear primary, String candidateTitle,
+                                           double overlapRatio, int minSharedTokens) {
         TitleWithYear candidate = parseTitleWithYear(candidateTitle);
         if (primary.year == null || candidate.year == null || !primary.year.equals(candidate.year)) {
             return false;
         }
-        return !coreTextMatch(primary.core, candidate.core);
+        return !coreTextMatch(primary.core, candidate.core, overlapRatio, minSharedTokens);
     }
 
     private static List<DuplicateMatchRow> rerankDuplicateRows(List<DuplicateMatchRow> rows) {
@@ -1301,13 +1319,39 @@ public class SearchDataService {
         return alnumSpaced.replaceAll("\\s+", " ").trim().toLowerCase();
     }
 
-    private static boolean coreTextMatch(String a, String b) {
+    /**
+     * True if two title cores refer to the same item. Beyond exact equality / substring containment,
+     * this is order-insensitive and tolerant of small extra tokens: the normalized token sets must
+     * share at least {@code minSharedTokens} tokens and the smaller set must be at least
+     * {@code overlapRatio} contained in the larger.
+     */
+    private static boolean coreTextMatch(String a, String b, double overlapRatio, int minSharedTokens) {
         String na = normalizeForComparison(a != null ? a : "");
         String nb = normalizeForComparison(b != null ? b : "");
         if (na.isEmpty() || nb.isEmpty()) {
             return false;
         }
-        return na.equals(nb) || nb.contains(na) || na.contains(nb);
+        if (na.equals(nb) || nb.contains(na) || na.contains(nb)) {
+            return true;
+        }
+        Set<String> ta = new HashSet<>(Arrays.asList(na.split(" ")));
+        Set<String> tb = new HashSet<>(Arrays.asList(nb.split(" ")));
+        ta.remove("");
+        tb.remove("");
+        if (ta.isEmpty() || tb.isEmpty()) {
+            return false;
+        }
+        int inter = 0;
+        for (String t : ta) {
+            if (tb.contains(t)) {
+                inter++;
+            }
+        }
+        if (inter < minSharedTokens) {
+            return false;
+        }
+        int smaller = Math.min(ta.size(), tb.size());
+        return ((double) inter / smaller) >= overlapRatio;
     }
 
     /** Lowercase, strip accents, and normalize punctuation so "Léon" vs "Leon" and "2001-" vs "2001:" compare equal. */
