@@ -38,11 +38,14 @@ export MOOCHO_BUCKET_NAME=blah
 
 # Docker image settings
 
-# Docker build platform. If unset or empty, the build is done on the local architecture. You can override it here.
-#export MOOCHO_ARCHITECTURE=linux/amd64
+# Docker build platform. If unset or empty, the build is done on the local architecture. 
+# You PROBABLY SHOULD override it here. 
+# linux/amd64 is what most hosts will require.
+export MOOCHO_ARCHITECTURE=linux/amd64
 
-# Docker image repository and name. If unset or empty, the deploy script provides this. You SHOULD override it here.
+# Docker image repository and name. 
+# If unset or empty, the deploy script provides a default value, BUT you SHOULD override it here.
 export MOOCHO_REGISTRY=namespace/morsor
 
-# Docker image version. If unset or empty, the deploy script provides this. You can override it here.
+# Docker image version. If unset or empty, the deploy script provides this (a datetime and sha). You can override it here.
 #export MOOCHO_VERSION=latest

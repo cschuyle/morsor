@@ -20,8 +20,10 @@ if [ "$force" != true ] && [ -n "$(git status --porcelain)" ]; then
   exit 1
 fi
 
+moocho_registry_default="namespace/morsor"
+
 # Default image coordinates
-: "${MOOCHO_REGISTRY:=namespace/morsor}"
+: "${MOOCHO_REGISTRY:=$moocho_registry_default }"
 
 # Derive unified version string if not already provided
 if [ -z "${MOOCHO_VERSION:-}" ]; then
@@ -33,7 +35,16 @@ if [ -z "${MOOCHO_VERSION:-}" ]; then
   MOOCHO_VERSION="${BUILD_DATE}-${BUILD_TIME_HHMM}-${GIT_SHA_SHORT}"
 fi
 
-echo "Using MOOCHO_VERSION=${MOOCHO_VERSION}"
+if [[ "$MOOCHO_REGISTRY" == "$moocho_registry_default" ]]
+then
+  echo "
+*** WARNING *** Using the default Docker registy name '$MOOCHO_REGISTRY'. 
+You should change it. See envrc=template for more information.
+"
+fi
+
+echo "Using Docker registry coordinates '$MOOCHO_REGISTRY:$MOOCHO_VERSION'"
+
 
 # Note: MOOCHO_ARCHITECTURE for cloud is probably linux/amd64
 if [ -n "${MOOCHO_ARCHITECTURE}" ]; then
