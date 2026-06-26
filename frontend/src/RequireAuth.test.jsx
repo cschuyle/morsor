@@ -6,7 +6,7 @@ describe('RequireAuth', () => {
   let fetchMock
 
   beforeEach(() => {
-    fetchMock = vi.fn((url, options) => {
+    fetchMock = vi.fn(() => {
       return Promise.resolve({
         status: 200,
         ok: true,
