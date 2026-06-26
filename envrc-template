@@ -10,7 +10,9 @@ export AWS_SECRET_ACCESS_KEY=...
 # This is the bucket where the troves are stored. See DATA.md for more details.
 export MOOCHO_BUCKET_NAME=blah
 
-# When not using S3, trove JSON is loaded from this location (dev/default). Default is file:./fixtures/data/*.json when run from project root. Use to point at a different directory or classpath, e.g. classpath*:data/*.json.
+# When not using S3, trove JSON is loaded from this location (dev/default). 
+# Default is file:./fixtures/data/*.json when run from project root. 
+# Can point at a different directory or classpath, e.g. classpath*:data/*.json.
 #export MOOCHO_DATA_LOCATION=file:./fixtures/data/*.json
 
 # Variables to limit which troves are loaded.
@@ -39,8 +41,8 @@ export MOOCHO_BUCKET_NAME=blah
 # Docker build platform. If unset or empty, the build is done on the local architecture. You can override it here.
 #export MOOCHO_ARCHITECTURE=linux/amd64
 
-# Docker image repository and name. If unset or empty, the deploy script provides this. You can override it here.
-#export MOOCHO_REGISTRY=namespace/morsor
+# Docker image repository and name. If unset or empty, the deploy script provides this. You SHOULD override it here.
+export MOOCHO_REGISTRY=namespace/morsor
 
 # Docker image version. If unset or empty, the deploy script provides this. You can override it here.
 #export MOOCHO_VERSION=latest
