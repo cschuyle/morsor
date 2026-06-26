@@ -58,5 +58,6 @@ docker push "${MOOCHO_REGISTRY}:latest"
 
 # Tag this commit with the deployed version and push the tag
 tag="release-v${MOOCHO_VERSION}"
+set +x
 git tag -a "$tag" -m "Deploy moocho version ${MOOCHO_VERSION} to ${MOOCHO_REGISTRY}"
 git push origin "$tag"
