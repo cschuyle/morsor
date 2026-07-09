@@ -124,6 +124,9 @@ export function formatLittlePrinceFieldLabel(key: string): string {
   if (lower === 'lpid') {
     return 'LPID'
   }
+  if (s === 'count(Languages)') {
+    return 'Count (Languages)'
+  }
   if (lower === 'asin') {
     return 'ASIN'
   }

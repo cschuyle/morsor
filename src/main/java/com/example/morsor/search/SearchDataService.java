@@ -572,19 +572,30 @@ public class SearchDataService {
         }
         StringBuilder sb = new StringBuilder();
         for (Object v : extraFields.values()) {
-            if (v == null) {
-                continue;
-            }
-            String s = String.valueOf(v);
-            if (s.isBlank()) {
-                continue;
-            }
-            if (sb.length() > 0) {
-                sb.append(' ');
-            }
-            sb.append(s);
+            appendExtraFieldValue(sb, v);
         }
         return sb.toString();
+    }
+
+    /** Flatten extra field values into indexable text (supports lists for e.g. subtitle languages). */
+    private static void appendExtraFieldValue(StringBuilder sb, Object v) {
+        if (v == null) {
+            return;
+        }
+        if (v instanceof Iterable<?> iterable && !(v instanceof CharSequence)) {
+            for (Object elem : iterable) {
+                appendExtraFieldValue(sb, elem);
+            }
+            return;
+        }
+        String s = String.valueOf(v);
+        if (s.isBlank()) {
+            return;
+        }
+        if (sb.length() > 0) {
+            sb.append(' ');
+        }
+        sb.append(s);
     }
 
     /** Build Lucene index from the given list and set luceneDirectory/luceneSearcher. Used so reload can build from new data before replacing allResults. */

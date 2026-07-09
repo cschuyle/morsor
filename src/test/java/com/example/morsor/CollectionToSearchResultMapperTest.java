@@ -379,4 +379,40 @@ class CollectionToSearchResultMapperTest {
         assertThat(results.get(0).rawSourceItem()).isEqualTo("Title A");
         assertThat(results.get(1).rawSourceItem()).isEqualTo("Title B");
     }
+
+    @Test
+    void mapsVideoSubtitleFieldsToSearchResult() throws Exception {
+        String json = """
+            {
+              "id": "test-movies",
+              "name": "Test: Movies",
+              "shortName": "Test Movies",
+              "items": [
+                {
+                  "video": {
+                    "title": "Tears of Steel",
+                    "languages": ["de", "en", "es"],
+                    "embedded_count": 0,
+                    "external_count": 10,
+                    "video_count": 1,
+                    "scanned_at": "2026-07-08T23:24:47Z"
+                  }
+                }
+              ]
+            }
+            """;
+        JsonNode root = objectMapper.readTree(json);
+        List<SearchResult> results = CollectionToSearchResultMapper.mapRootToSearchResults(root);
+
+        assertThat(results).hasSize(1);
+        assertThat(results.get(0).troveId()).isEqualTo("test-movies");
+        assertThat(results.get(0).itemType()).isEqualTo("video");
+        assertThat(results.get(0).title()).isEqualTo("Tears of Steel");
+        assertThat(results.get(0).snippet()).isEqualTo("de, en, es");
+        assertThat(results.get(0).extraFields()).isNotNull();
+        assertThat(results.get(0).extraFields()).containsEntry("languages", List.of("de", "en", "es"));
+        assertThat(results.get(0).extraFields()).containsEntry("count(Languages)", 3);
+        assertThat(results.get(0).extraFields()).containsEntry("external_count", 10);
+        assertThat(results.get(0).extraFields()).containsEntry("video_count", 1);
+    }
 }

@@ -195,6 +195,7 @@ public final class CollectionToSearchResultMapper {
         }
 
         Map<String, Object> extraFields = buildExtraFields(item);
+        extraFields = mergeComputedExtraFields(item, extraFields);
         if ("littlePrinceItem".equals(itemTypeRaw)) {
             extraFields = mergeLpidIntoExtraFields(item, extraFields);
             extraFields = mergeTintenfassIdIntoExtraFields(item, extraFields);
@@ -275,6 +276,44 @@ public final class CollectionToSearchResultMapper {
         return out.isEmpty() ? null : out;
     }
 
+    /** Computed extra fields derived from source JSON (e.g. subtitle language count). */
+    private static Map<String, Object> mergeComputedExtraFields(JsonNode item, Map<String, Object> extra) {
+        if (item == null || !item.isObject()) {
+            return extra;
+        }
+        JsonNode languagesNode = item.get("languages");
+        if (languagesNode == null || languagesNode.isNull()) {
+            return extra;
+        }
+        int count = languageCount(languagesNode);
+        Map<String, Object> out = extra != null ? new LinkedHashMap<>(extra) : new LinkedHashMap<>();
+        out.put("count(Languages)", count);
+        return out;
+    }
+
+    private static int languageCount(JsonNode languagesNode) {
+        if (languagesNode.isArray()) {
+            int n = 0;
+            for (JsonNode el : languagesNode) {
+                if (el != null && !el.isNull() && !el.asText("").isBlank()) {
+                    n++;
+                }
+            }
+            return n;
+        }
+        if (languagesNode.isTextual()) {
+            String t = languagesNode.asText().trim();
+            if (t.isEmpty()) {
+                return 0;
+            }
+            return (int) java.util.Arrays.stream(t.split(","))
+                    .map(String::trim)
+                    .filter(s -> !s.isEmpty())
+                    .count();
+        }
+        return 0;
+    }
+
     private static boolean hasRealThumbnail(String thumbnailUrl) {
         if (thumbnailUrl == null) {
             return false;
@@ -290,6 +329,10 @@ public final class CollectionToSearchResultMapper {
         String language = text(item, "language");
         if (language != null && !language.isEmpty()) {
             parts.add(language);
+        }
+        String languages = textOrJoinList(item, "languages");
+        if (languages != null && !languages.isEmpty()) {
+            parts.add(languages);
         }
         String author = text(item, "author");
         if (author != null && !author.isEmpty()) {
@@ -311,6 +354,31 @@ public final class CollectionToSearchResultMapper {
             return text(item, "title");
         }
         return String.join(" · ", parts);
+    }
+
+    /** Text field, or comma-joined text elements when the JSON value is an array. */
+    private static String textOrJoinList(JsonNode node, String field) {
+        if (node == null) {
+            return null;
+        }
+        JsonNode v = node.get(field);
+        if (v == null || v.isNull()) {
+            return null;
+        }
+        if (v.isArray()) {
+            List<String> parts = new ArrayList<>();
+            for (JsonNode el : v) {
+                if (el == null || el.isNull()) {
+                    continue;
+                }
+                String s = el.asText().trim();
+                if (!s.isEmpty()) {
+                    parts.add(s);
+                }
+            }
+            return parts.isEmpty() ? null : String.join(", ", parts);
+        }
+        return text(node, field);
     }
 
     private static String text(JsonNode node, String field) {

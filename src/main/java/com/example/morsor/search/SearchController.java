@@ -649,12 +649,32 @@ public class SearchController {
         if (jsonKey.isEmpty()) {
             return null;
         }
-        Comparator<String> byString = descending
-                ? String.CASE_INSENSITIVE_ORDER.reversed()
-                : String.CASE_INSENSITIVE_ORDER;
         return Comparator
-                .comparing((SearchResultWithScore r) -> extraFieldValueForSort(r.result(), jsonKey) == null)
-                .thenComparing(r -> extraFieldValueForSort(r.result(), jsonKey), Comparator.nullsLast(byString));
+                .comparing((SearchResultWithScore r) -> extraFieldObjectForSort(r.result(), jsonKey) == null)
+                .thenComparing(
+                        r -> extraFieldObjectForSort(r.result(), jsonKey),
+                        (a, b) -> compareExtraFieldSortValues(a, b, descending));
+    }
+
+    private static int compareExtraFieldSortValues(Object a, Object b, boolean descending) {
+        int cmp = compareExtraFieldSortValuesAsc(a, b);
+        return descending ? -cmp : cmp;
+    }
+
+    private static int compareExtraFieldSortValuesAsc(Object a, Object b) {
+        if (a == null && b == null) {
+            return 0;
+        }
+        if (a == null) {
+            return 1;
+        }
+        if (b == null) {
+            return -1;
+        }
+        if (a instanceof Number na && b instanceof Number nb) {
+            return Double.compare(na.doubleValue(), nb.doubleValue());
+        }
+        return String.CASE_INSENSITIVE_ORDER.compare(String.valueOf(a), String.valueOf(b));
     }
 
     private static Comparator<SearchResultWithScore> comparatorForWithScore(String sortBy) {
@@ -671,8 +691,8 @@ public class SearchController {
         };
     }
 
-    /** String form of one extra field for sorting; blank/whitespace is treated as missing (sorts last). */
-    private static String extraFieldValueForSort(SearchResult r, String jsonKey) {
+    /** Value of one extra field for sorting; blank/whitespace is treated as missing (sorts last). */
+    private static Object extraFieldObjectForSort(SearchResult r, String jsonKey) {
         Map<String, Object> ex = r.extraFields();
         if (ex == null) {
             return null;
@@ -680,6 +700,22 @@ public class SearchController {
         Object v = ex.get(jsonKey);
         if (v == null) {
             return null;
+        }
+        if (v instanceof String s) {
+            if (s.isBlank()) {
+                return null;
+            }
+            return s;
+        }
+        if (v instanceof Number) {
+            return v;
+        }
+        if (v instanceof Iterable<?> iterable) {
+            int n = 0;
+            for (Object ignored : iterable) {
+                n++;
+            }
+            return n == 0 ? null : n;
         }
         String s = String.valueOf(v);
         if (s.isBlank()) {
