@@ -70,15 +70,15 @@ describe('SearchResultsGrid copy titles', () => {
 })
 
 describe('collectExtraFieldKeysFromRows', () => {
-  it('excludes languages(display) from extra field picker keys', () => {
+  it('excludes subtitles(display) from extra field picker keys', () => {
     expect(
       collectExtraFieldKeysFromRows([
         {
           id: '1',
           title: 'Movie',
-          extraFields: { languages: ['de'], 'languages(display)': ['German'] },
+          extraFields: { subtitles: ['de'], 'subtitles(display)': ['German'] },
         },
       ]),
-    ).toEqual(['languages'])
+    ).toEqual(['subtitles'])
   })
 })

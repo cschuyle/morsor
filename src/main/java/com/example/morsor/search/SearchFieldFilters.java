@@ -11,17 +11,17 @@ import java.util.TreeSet;
 /**
  * Parses {@code field:value} tokens from the user search string and filters
  * {@link SearchResult} rows. Recognized fields map to built-in record properties
- * (e.g. {@code title}) or selected extra fields (e.g. {@code languages}).
+ * (e.g. {@code title}) or selected extra fields (e.g. {@code subtitles}).
  * Unrecognized field names raise {@link InvalidSearchQueryException}.
  */
 final class SearchFieldFilters {
 
-    static final String LANGUAGES_FIELD = "languages";
-    static final String COUNT_LANGUAGES_FIELD = "count(Languages)";
+    static final String SUBTITLES_FIELD = "subtitles";
+    static final String COUNT_SUBTITLES_FIELD = "count(Subtitles)";
 
     private static final Set<String> KNOWN_CANONICAL_FIELDS = Set.of(
-            LANGUAGES_FIELD,
-            COUNT_LANGUAGES_FIELD,
+            SUBTITLES_FIELD,
+            COUNT_SUBTITLES_FIELD,
             "title",
             "id",
             "itemType",
@@ -110,8 +110,8 @@ final class SearchFieldFilters {
 
     private static boolean matchesOne(SearchResult result, FieldFilter filter, LanguageCodeLookup languageLookup) {
         return switch (filter.fieldKey()) {
-            case LANGUAGES_FIELD -> matchesLanguage(result, filter.value(), languageLookup);
-            case COUNT_LANGUAGES_FIELD -> matchesCountLanguages(result, filter.value());
+            case SUBTITLES_FIELD -> matchesSubtitles(result, filter.value(), languageLookup);
+            case COUNT_SUBTITLES_FIELD -> matchesCountSubtitles(result, filter.value());
             case "title", "snippet", "trove", "itemType", "itemUrl" ->
                     matchesTextContains(builtinValue(result, filter.fieldKey()), filter.value());
             case "id", "troveId" -> matchesTextEquals(builtinValue(result, filter.fieldKey()), filter.value());
@@ -146,11 +146,11 @@ final class SearchFieldFilters {
         return actual.trim().equalsIgnoreCase(expected.trim());
     }
 
-    private static boolean matchesLanguage(SearchResult result, String expected, LanguageCodeLookup languageLookup) {
+    private static boolean matchesSubtitles(SearchResult result, String expected, LanguageCodeLookup languageLookup) {
         if (expected == null || expected.isBlank()) {
             return false;
         }
-        Object rawCodes = extraFieldValue(result, LANGUAGES_FIELD);
+        Object rawCodes = extraFieldValue(result, SUBTITLES_FIELD);
         if (languageValuesMatchFilter(rawCodes, expected, languageLookup)) {
             return true;
         }
@@ -206,7 +206,7 @@ final class SearchFieldFilters {
         return valueLower.equals(needle);
     }
 
-    private static boolean matchesCountLanguages(SearchResult result, String expected) {
+    private static boolean matchesCountSubtitles(SearchResult result, String expected) {
         if (expected == null || expected.isBlank()) {
             return false;
         }
@@ -216,7 +216,7 @@ final class SearchFieldFilters {
         } catch (NumberFormatException e) {
             return false;
         }
-        Object raw = extraFieldValue(result, COUNT_LANGUAGES_FIELD);
+        Object raw = extraFieldValue(result, COUNT_SUBTITLES_FIELD);
         if (!(raw instanceof Number number)) {
             return false;
         }
@@ -245,8 +245,8 @@ final class SearchFieldFilters {
         }
         String lower = field.toLowerCase(Locale.ROOT);
         return switch (lower) {
-            case "count(languages)" -> Optional.of(COUNT_LANGUAGES_FIELD);
-            case "languages" -> Optional.of(LANGUAGES_FIELD);
+            case "count(subtitles)" -> Optional.of(COUNT_SUBTITLES_FIELD);
+            case "subtitles" -> Optional.of(SUBTITLES_FIELD);
             case "title" -> Optional.of("title");
             case "id" -> Optional.of("id");
             case "itemtype" -> Optional.of("itemType");

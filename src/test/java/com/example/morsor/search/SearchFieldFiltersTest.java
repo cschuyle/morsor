@@ -43,34 +43,34 @@ class SearchFieldFiltersTest {
 
     @Test
     void parseExtractsLanguageFilterAndLeavesFreeText() {
-        SearchFieldFilters.ParsedQuery parsed = SearchFieldFilters.parse("Tears languages:ru steel");
+        SearchFieldFilters.ParsedQuery parsed = SearchFieldFilters.parse("Tears subtitles:ru steel");
         assertThat(parsed.textQuery()).isEqualTo("Tears steel");
         assertThat(parsed.filters()).containsExactly(
-                new SearchFieldFilters.FieldFilter(SearchFieldFilters.LANGUAGES_FIELD, "ru"));
+                new SearchFieldFilters.FieldFilter(SearchFieldFilters.SUBTITLES_FIELD, "ru"));
     }
 
     @Test
     void parseLanguageFilterOnly() {
-        SearchFieldFilters.ParsedQuery parsed = SearchFieldFilters.parse("languages:ru");
+        SearchFieldFilters.ParsedQuery parsed = SearchFieldFilters.parse("subtitles:ru");
         assertThat(parsed.textQuery()).isEmpty();
         assertThat(parsed.filters()).hasSize(1);
     }
 
     @Test
     void parseCountLanguagesFilterCaseInsensitive() {
-        SearchFieldFilters.ParsedQuery parsed = SearchFieldFilters.parse("COUNT(languages):9");
+        SearchFieldFilters.ParsedQuery parsed = SearchFieldFilters.parse("COUNT(subtitles):9");
         assertThat(parsed.textQuery()).isEmpty();
         assertThat(parsed.filters()).containsExactly(
-                new SearchFieldFilters.FieldFilter(SearchFieldFilters.COUNT_LANGUAGES_FIELD, "9"));
+                new SearchFieldFilters.FieldFilter(SearchFieldFilters.COUNT_SUBTITLES_FIELD, "9"));
     }
 
     @Test
     void parseTitleFilter() {
-        SearchFieldFilters.ParsedQuery parsed = SearchFieldFilters.parse("title:Tears languages:ru");
+        SearchFieldFilters.ParsedQuery parsed = SearchFieldFilters.parse("title:Tears subtitles:ru");
         assertThat(parsed.textQuery()).isEmpty();
         assertThat(parsed.filters()).containsExactly(
                 new SearchFieldFilters.FieldFilter("title", "Tears"),
-                new SearchFieldFilters.FieldFilter(SearchFieldFilters.LANGUAGES_FIELD, "ru"));
+                new SearchFieldFilters.FieldFilter(SearchFieldFilters.SUBTITLES_FIELD, "ru"));
     }
 
     @Test
@@ -119,11 +119,11 @@ class SearchFieldFiltersTest {
         SearchResult r = videoResult(List.of("de", "en", "ru"), 3);
         LanguageCodeLookup lookup = lookupWithGermanAndRussian();
         assertThat(SearchFieldFilters.matches(r, List.of(
-                new SearchFieldFilters.FieldFilter(SearchFieldFilters.LANGUAGES_FIELD, "ru")), lookup)).isTrue();
+                new SearchFieldFilters.FieldFilter(SearchFieldFilters.SUBTITLES_FIELD, "ru")), lookup)).isTrue();
         assertThat(SearchFieldFilters.matches(r, List.of(
-                new SearchFieldFilters.FieldFilter(SearchFieldFilters.LANGUAGES_FIELD, "RU")), lookup)).isTrue();
+                new SearchFieldFilters.FieldFilter(SearchFieldFilters.SUBTITLES_FIELD, "RU")), lookup)).isTrue();
         assertThat(SearchFieldFilters.matches(r, List.of(
-                new SearchFieldFilters.FieldFilter(SearchFieldFilters.LANGUAGES_FIELD, "ja")), lookup)).isFalse();
+                new SearchFieldFilters.FieldFilter(SearchFieldFilters.SUBTITLES_FIELD, "ja")), lookup)).isFalse();
     }
 
     @Test
@@ -133,22 +133,22 @@ class SearchFieldFiltersTest {
         germanCodes = withLanguageDisplay(germanCodes, List.of("German"));
 
         assertThat(SearchFieldFilters.matches(germanCodes, List.of(
-                new SearchFieldFilters.FieldFilter(SearchFieldFilters.LANGUAGES_FIELD, "German")), lookup)).isTrue();
+                new SearchFieldFilters.FieldFilter(SearchFieldFilters.SUBTITLES_FIELD, "German")), lookup)).isTrue();
         assertThat(SearchFieldFilters.matches(germanCodes, List.of(
-                new SearchFieldFilters.FieldFilter(SearchFieldFilters.LANGUAGES_FIELD, "deu")), lookup)).isTrue();
+                new SearchFieldFilters.FieldFilter(SearchFieldFilters.SUBTITLES_FIELD, "deu")), lookup)).isTrue();
         assertThat(SearchFieldFilters.matches(germanCodes, List.of(
-                new SearchFieldFilters.FieldFilter(SearchFieldFilters.LANGUAGES_FIELD, "de")), lookup)).isTrue();
+                new SearchFieldFilters.FieldFilter(SearchFieldFilters.SUBTITLES_FIELD, "de")), lookup)).isTrue();
         assertThat(SearchFieldFilters.matches(germanCodes, List.of(
-                new SearchFieldFilters.FieldFilter(SearchFieldFilters.LANGUAGES_FIELD, "Russian")), lookup)).isFalse();
+                new SearchFieldFilters.FieldFilter(SearchFieldFilters.SUBTITLES_FIELD, "Russian")), lookup)).isFalse();
     }
 
     @Test
     void matchesLanguageWithoutLookupStillMatchesRawCodeSubstring() {
         SearchResult r = videoResult(List.of("de", "en", "ru"), 3);
         assertThat(SearchFieldFilters.matches(r, List.of(
-                new SearchFieldFilters.FieldFilter(SearchFieldFilters.LANGUAGES_FIELD, "ru")))).isTrue();
+                new SearchFieldFilters.FieldFilter(SearchFieldFilters.SUBTITLES_FIELD, "ru")))).isTrue();
         assertThat(SearchFieldFilters.matches(r, List.of(
-                new SearchFieldFilters.FieldFilter(SearchFieldFilters.LANGUAGES_FIELD, "rus")))).isFalse();
+                new SearchFieldFilters.FieldFilter(SearchFieldFilters.SUBTITLES_FIELD, "rus")))).isFalse();
     }
 
     @Test
@@ -162,13 +162,13 @@ class SearchFieldFiltersTest {
         mozarabic = withLanguageDisplay(mozarabic, List.of("Mozarabic"));
 
         assertThat(SearchFieldFilters.matches(russian, List.of(
-                new SearchFieldFilters.FieldFilter(SearchFieldFilters.LANGUAGES_FIELD, "russ")), lookup)).isTrue();
+                new SearchFieldFilters.FieldFilter(SearchFieldFilters.SUBTITLES_FIELD, "russ")), lookup)).isTrue();
         assertThat(SearchFieldFilters.matches(arabic, List.of(
-                new SearchFieldFilters.FieldFilter(SearchFieldFilters.LANGUAGES_FIELD, "arab")), lookup)).isTrue();
+                new SearchFieldFilters.FieldFilter(SearchFieldFilters.SUBTITLES_FIELD, "arab")), lookup)).isTrue();
         assertThat(SearchFieldFilters.matches(mozarabic, List.of(
-                new SearchFieldFilters.FieldFilter(SearchFieldFilters.LANGUAGES_FIELD, "arab")), lookup)).isTrue();
+                new SearchFieldFilters.FieldFilter(SearchFieldFilters.SUBTITLES_FIELD, "arab")), lookup)).isTrue();
         assertThat(SearchFieldFilters.matches(russian, List.of(
-                new SearchFieldFilters.FieldFilter(SearchFieldFilters.LANGUAGES_FIELD, "arab")), lookup)).isFalse();
+                new SearchFieldFilters.FieldFilter(SearchFieldFilters.SUBTITLES_FIELD, "arab")), lookup)).isFalse();
     }
 
     private static LanguageCodeLookup lookupWithArabicAndMozarabic() {
@@ -184,16 +184,16 @@ class SearchFieldFiltersTest {
     void matchesLanguageWithoutLookupStillMatchesRawCode() {
         SearchResult r = videoResult(List.of("de", "en", "ru"), 3);
         assertThat(SearchFieldFilters.matches(r, List.of(
-                new SearchFieldFilters.FieldFilter(SearchFieldFilters.LANGUAGES_FIELD, "ru")))).isTrue();
+                new SearchFieldFilters.FieldFilter(SearchFieldFilters.SUBTITLES_FIELD, "ru")))).isTrue();
     }
 
     @Test
     void matchesCountLanguages() {
         SearchResult r = videoResult(List.of("de", "en", "ru"), 3);
         assertThat(SearchFieldFilters.matches(r, List.of(
-                new SearchFieldFilters.FieldFilter(SearchFieldFilters.COUNT_LANGUAGES_FIELD, "3")))).isTrue();
+                new SearchFieldFilters.FieldFilter(SearchFieldFilters.COUNT_SUBTITLES_FIELD, "3")))).isTrue();
         assertThat(SearchFieldFilters.matches(r, List.of(
-                new SearchFieldFilters.FieldFilter(SearchFieldFilters.COUNT_LANGUAGES_FIELD, "9")))).isFalse();
+                new SearchFieldFilters.FieldFilter(SearchFieldFilters.COUNT_SUBTITLES_FIELD, "9")))).isFalse();
     }
 
     @Test
@@ -201,8 +201,8 @@ class SearchFieldFiltersTest {
         SearchResult tears = videoResult(List.of("de", "en", "ru"), 3);
         SearchResult other = videoResult(List.of("ru"), 1);
         List<SearchFieldFilters.FieldFilter> both = List.of(
-                new SearchFieldFilters.FieldFilter(SearchFieldFilters.LANGUAGES_FIELD, "ru"),
-                new SearchFieldFilters.FieldFilter(SearchFieldFilters.COUNT_LANGUAGES_FIELD, "3"));
+                new SearchFieldFilters.FieldFilter(SearchFieldFilters.SUBTITLES_FIELD, "ru"),
+                new SearchFieldFilters.FieldFilter(SearchFieldFilters.COUNT_SUBTITLES_FIELD, "3"));
         assertThat(SearchFieldFilters.matches(tears, both)).isTrue();
         assertThat(SearchFieldFilters.matches(other, both)).isFalse();
     }
@@ -226,7 +226,7 @@ class SearchFieldFiltersTest {
                 extra);
     }
 
-    private static SearchResult videoResult(List<String> languages, int count) {
+    private static SearchResult videoResult(List<String> subtitles, int count) {
         return new SearchResult(
                 "test-movies-0",
                 "video",
@@ -241,8 +241,8 @@ class SearchFieldFiltersTest {
                 List.of(),
                 null,
                 Map.of(
-                        "languages", languages,
-                        SearchFieldFilters.COUNT_LANGUAGES_FIELD, count,
+                        "subtitles", subtitles,
+                        SearchFieldFilters.COUNT_SUBTITLES_FIELD, count,
                         "external_count", 10));
     }
 }

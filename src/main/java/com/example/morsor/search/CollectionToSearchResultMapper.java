@@ -281,28 +281,28 @@ public final class CollectionToSearchResultMapper {
         if (item == null || !item.isObject()) {
             return extra;
         }
-        JsonNode languagesNode = item.get("languages");
-        if (languagesNode == null || languagesNode.isNull()) {
+        JsonNode subtitlesNode = item.get("subtitles");
+        if (subtitlesNode == null || subtitlesNode.isNull()) {
             return extra;
         }
-        int count = languageCount(languagesNode);
+        int count = subtitleCount(subtitlesNode);
         Map<String, Object> out = extra != null ? new LinkedHashMap<>(extra) : new LinkedHashMap<>();
-        out.put("count(Languages)", count);
+        out.put("count(Subtitles)", count);
         return out;
     }
 
-    private static int languageCount(JsonNode languagesNode) {
-        if (languagesNode.isArray()) {
+    private static int subtitleCount(JsonNode subtitlesNode) {
+        if (subtitlesNode.isArray()) {
             int n = 0;
-            for (JsonNode el : languagesNode) {
+            for (JsonNode el : subtitlesNode) {
                 if (el != null && !el.isNull() && !el.asText("").isBlank()) {
                     n++;
                 }
             }
             return n;
         }
-        if (languagesNode.isTextual()) {
-            String t = languagesNode.asText().trim();
+        if (subtitlesNode.isTextual()) {
+            String t = subtitlesNode.asText().trim();
             if (t.isEmpty()) {
                 return 0;
             }
@@ -330,9 +330,9 @@ public final class CollectionToSearchResultMapper {
         if (language != null && !language.isEmpty()) {
             parts.add(language);
         }
-        String languages = textOrJoinList(item, "languages");
-        if (languages != null && !languages.isEmpty()) {
-            parts.add(languages);
+        String subtitles = textOrJoinList(item, "subtitles");
+        if (subtitles != null && !subtitles.isEmpty()) {
+            parts.add(subtitles);
         }
         String author = text(item, "author");
         if (author != null && !author.isEmpty()) {

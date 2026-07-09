@@ -24,10 +24,10 @@ describe('languageCodeLookup', () => {
     expect(resolveLanguageCodes(['eng-US'], map)).toEqual(['English'])
   })
 
-  it('prefers languages(display) from extra fields', () => {
+  it('prefers subtitles(display) from extra fields', () => {
     expect(
       resolveLanguagesFromExtra(
-        { languages: ['de'], 'languages(display)': ['German'] },
+        { subtitles: ['de'], 'subtitles(display)': ['German'] },
         null,
       ),
     ).toBe('German')
@@ -35,6 +35,6 @@ describe('languageCodeLookup', () => {
 
   it('falls back to client map when display field is absent', () => {
     const map = new Map([['de', 'German']])
-    expect(resolveLanguagesFromExtra({ languages: ['de', 'xyz'] }, map)).toBe('German, xyz')
+    expect(resolveLanguagesFromExtra({ subtitles: ['de', 'xyz'] }, map)).toBe('German, xyz')
   })
 })

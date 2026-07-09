@@ -127,11 +127,11 @@ export function formatLittlePrinceFieldLabel(key: string): string {
   if (lower === 'lpid') {
     return 'LPID'
   }
-  if (s === 'count(Languages)') {
-    return 'Count (Languages)'
+  if (s === 'count(Subtitles)') {
+    return 'Count (Subtitles)'
   }
-  if (s === 'languages(display)') {
-    return 'Languages'
+  if (s === 'subtitles(display)') {
+    return 'Subtitles'
   }
   if (lower === 'asin') {
     return 'ASIN'
@@ -171,7 +171,7 @@ function formatExtraFieldDisplayValue(
   extra: Record<string, unknown> | null | undefined,
   languageCodeMap: LanguageCodeMap | null | undefined,
 ): string {
-  if (jsonKey === 'languages') {
+  if (jsonKey === 'subtitles') {
     const resolved = resolveLanguagesFromExtra(extra, languageCodeMap)
     if (resolved) {
       return resolved
@@ -189,7 +189,7 @@ function formatLittlePrinceExtraLines(
   }
   const out: LittlePrinceExtraLine[] = []
   for (const [key, value] of Object.entries(extra)) {
-    if (key === 'languages(display)') {
+    if (key === 'subtitles(display)') {
       continue
     }
     const content = formatExtraFieldDisplayValue(key, value, extra, languageCodeMap)
@@ -504,11 +504,11 @@ export function extraFieldsFromRow(row: SearchResultRow | undefined | null): Rec
   const raw = row as Record<string, unknown>
   const base = asRecord(row.extraFields) ?? asRecord(raw.littlePrinceItemExtra)
   const merged: Record<string, unknown> = base ? { ...base } : {}
-  if (merged.languages == null && raw.languages != null) {
-    merged.languages = raw.languages
+  if (merged.subtitles == null && raw.subtitles != null) {
+    merged.subtitles = raw.subtitles
   }
-  if (merged['languages(display)'] == null && raw['languages(display)'] != null) {
-    merged['languages(display)'] = raw['languages(display)']
+  if (merged['subtitles(display)'] == null && raw['subtitles(display)'] != null) {
+    merged['subtitles(display)'] = raw['subtitles(display)']
   }
   return Object.keys(merged).length > 0 ? merged : null
 }
@@ -517,7 +517,7 @@ export function extraFieldsFromRow(row: SearchResultRow | undefined | null): Rec
 const LITTLE_PRINCE_EXTRA_FIELD_KEYS_ALWAYS_OFFERED = ['lpid', 'tintenfassId'] as const
 
 /** Computed display fields — not offered as separate picker columns (see {@link formatLittlePrinceExtraLines}). */
-const HIDDEN_EXTRA_FIELD_KEYS = new Set(['languages(display)'])
+const HIDDEN_EXTRA_FIELD_KEYS = new Set(['subtitles(display)'])
 
 function isOfferedExtraFieldKey(key: string): boolean {
   return !HIDDEN_EXTRA_FIELD_KEYS.has(key)

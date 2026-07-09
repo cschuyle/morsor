@@ -24,9 +24,9 @@ public class LanguageCodeLookup {
 
     private static final Logger log = LoggerFactory.getLogger(LanguageCodeLookup.class);
 
-    public static final String DISPLAY_FIELD = "languages(display)";
+    public static final String DISPLAY_FIELD = "subtitles(display)";
 
-    /** Substring matching for {@code languages:} requires at least this many characters in the filter term. */
+    /** Substring matching for {@code subtitles:} requires at least this many characters in the filter term. */
     static final int MIN_LANGUAGE_FILTER_SUBSTRING_LENGTH = 3;
 
     @Value("${moocho.language.trove.id:iso639-languages}")
@@ -125,7 +125,7 @@ public class LanguageCodeLookup {
 
     /**
      * True when {@code itemValue} (a raw code or display name on a result row) satisfies
-     * {@code languages:filterTerm}. Supports exact code/name matches, lookup aliases, and
+     * {@code subtitles:filterTerm}. Supports exact code/name matches, lookup aliases, and
      * case-insensitive substring matches on codes and catalog display names.
      */
     public boolean languageFilterMatchesItemValue(String filterTerm, String itemValue) {
@@ -166,7 +166,7 @@ public class LanguageCodeLookup {
     }
 
     /**
-     * Lowercase codes and display names that satisfy {@code languages:term} exactly — the term itself, any
+     * Lowercase codes and display names that satisfy {@code subtitles:term} exactly — the term itself, any
      * codes that resolve to that display name, and the display name for that code when it is known.
      */
     public Set<String> expandLanguageFilterTerm(String term) {

@@ -789,10 +789,10 @@ public class SearchDataService {
 
     private SearchResult enrichLanguageDisplay(SearchResult result) {
         Map<String, Object> extra = result.extraFields();
-        if (extra == null || !extra.containsKey("languages")) {
+        if (extra == null || !extra.containsKey("subtitles")) {
             return result;
         }
-        List<String> display = languageCodeLookup.resolveList(extra.get("languages"));
+        List<String> display = languageCodeLookup.resolveList(extra.get("subtitles"));
         if (display.isEmpty()) {
             return result;
         }

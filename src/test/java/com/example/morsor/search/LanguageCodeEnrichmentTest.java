@@ -58,7 +58,7 @@ class LanguageCodeEnrichmentTest {
                     {
                       "video": {
                         "title": "Tears of Steel",
-                        "languages": ["de", "en", "xyz"]
+                        "subtitles": ["de", "en", "xyz"]
                       }
                     }
                   ]
@@ -73,8 +73,8 @@ class LanguageCodeEnrichmentTest {
                 .toList();
         assertThat(movies).hasSize(1);
         Map<String, Object> extra = movies.get(0).extraFields();
-        assertThat(extra).containsEntry("languages", List.of("de", "en", "xyz"));
-        assertThat(extra).containsEntry("languages(display)", List.of("German", "English", "xyz"));
+        assertThat(extra).containsEntry("subtitles", List.of("de", "en", "xyz"));
+        assertThat(extra).containsEntry("subtitles(display)", List.of("German", "English", "xyz"));
     }
 
     @Test
@@ -98,7 +98,7 @@ class LanguageCodeEnrichmentTest {
                     {
                       "video": {
                         "title": "Example Film",
-                        "languages": ["eng", "deu", "spa", "xyz"]
+                        "subtitles": ["eng", "deu", "spa", "xyz"]
                       }
                     }
                   ]
@@ -113,7 +113,7 @@ class LanguageCodeEnrichmentTest {
                 .toList();
         assertThat(movies).hasSize(1);
         assertThat(movies.get(0).extraFields())
-                .containsEntry("languages(display)", List.of("English", "German", "Spanish", "xyz"));
+                .containsEntry("subtitles(display)", List.of("English", "German", "Spanish", "xyz"));
     }
 
     @Test
@@ -132,7 +132,7 @@ class LanguageCodeEnrichmentTest {
                   "id": "movies",
                   "shortName": "Movies",
                   "items": [
-                    { "video": { "title": "Example", "languages": ["de"] } }
+                    { "video": { "title": "Example", "subtitles": ["de"] } }
                   ]
                 }
                 """);

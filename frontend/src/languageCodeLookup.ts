@@ -160,7 +160,7 @@ export function resolveLanguagesFromExtra(
   if (!extra) {
     return null
   }
-  const display = extra['languages(display)']
+  const display = extra['subtitles(display)']
   if (display != null) {
     if (Array.isArray(display)) {
       return display.map(String).filter(Boolean).join(', ')
@@ -169,7 +169,7 @@ export function resolveLanguagesFromExtra(
       return display.trim()
     }
   }
-  const raw = extra.languages
+  const raw = extra.subtitles
   if (raw == null) {
     return null
   }

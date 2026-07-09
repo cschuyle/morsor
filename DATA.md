@@ -61,7 +61,7 @@ python3 scripts/generate-language-trove.py
 | `moocho.language.trove.id` | `MOOCHO_LANGUAGE_TROVE_ID` | `iso639-languages` |
 | `moocho.reference.trove.ids` | `MOOCHO_REFERENCE_TROVE_IDS` | `iso639-languages` |
 
-Reference troves are always loaded (even when excluded) and hidden from the trove picker. A bundled copy ships at `classpath:reference/iso639-languages.json` and is loaded automatically when the trove is missing from the main data source (e.g. S3 manifest). Video items gain a computed extra field **`languages(display)`** with resolved names; raw **`languages`** codes are unchanged for filtering (`COUNT(languages):3`). The **`languages:`** filter accepts a code or display name fragment when the term is at least three characters (e.g. `languages:russ` matches `Russian`, `languages:arab` matches `Arabic` and `Mozarabic`). Shorter terms use exact code/name matching only (e.g. `languages:ru` matches `rus` via the lookup table, not substring).
+Reference troves are always loaded (even when excluded) and hidden from the trove picker. A bundled copy ships at `classpath:reference/iso639-languages.json` and is loaded automatically when the trove is missing from the main data source (e.g. S3 manifest). Video items gain a computed extra field **`subtitles(display)`** with resolved names; raw **`subtitles`** codes are unchanged for filtering (`COUNT(subtitles):3`). The **`subtitles:`** filter accepts a code or display name fragment when the term is at least three characters (e.g. `subtitles:russ` matches `Russian`, `subtitles:arab` matches `Arabic` and `Mozarabic`). Shorter terms use exact code/name matching only (e.g. `subtitles:ru` matches `rus` via the lookup table, not substring).
 
 ## AWS S3
 

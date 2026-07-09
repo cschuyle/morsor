@@ -391,7 +391,7 @@ class CollectionToSearchResultMapperTest {
                 {
                   "video": {
                     "title": "Tears of Steel",
-                    "languages": ["de", "en", "es"],
+                    "subtitles": ["de", "en", "es"],
                     "embedded_count": 0,
                     "external_count": 10,
                     "video_count": 1,
@@ -410,8 +410,8 @@ class CollectionToSearchResultMapperTest {
         assertThat(results.get(0).title()).isEqualTo("Tears of Steel");
         assertThat(results.get(0).snippet()).isEqualTo("de, en, es");
         assertThat(results.get(0).extraFields()).isNotNull();
-        assertThat(results.get(0).extraFields()).containsEntry("languages", List.of("de", "en", "es"));
-        assertThat(results.get(0).extraFields()).containsEntry("count(Languages)", 3);
+        assertThat(results.get(0).extraFields()).containsEntry("subtitles", List.of("de", "en", "es"));
+        assertThat(results.get(0).extraFields()).containsEntry("count(Subtitles)", 3);
         assertThat(results.get(0).extraFields()).containsEntry("external_count", 10);
         assertThat(results.get(0).extraFields()).containsEntry("video_count", 1);
     }
