@@ -154,6 +154,11 @@ public class SearchController {
         return ResponseEntity.badRequest().body(Map.of("error", ex.getMessage()));
     }
 
+    @org.springframework.web.bind.annotation.ExceptionHandler(InvalidSearchQueryException.class)
+    public ResponseEntity<Map<String, String>> handleInvalidSearchQuery(InvalidSearchQueryException ex) {
+        return ResponseEntity.badRequest().body(Map.of("error", ex.getMessage()));
+    }
+
     private void validateTroveIds(java.util.Collection<String> ids) {
         if (ids == null || ids.isEmpty()) {
             return;

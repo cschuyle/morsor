@@ -22,3 +22,16 @@ export function getApiAuthHeaders(env: ImportMetaEnv = import.meta.env): Record<
   }
   return {}
 }
+
+/** Prefer JSON `error` from a failed API response; fall back to status text. */
+export async function readApiErrorMessage(res: Response): Promise<string> {
+  try {
+    const body = (await res.json()) as { error?: string }
+    if (typeof body?.error === 'string' && body.error.trim()) {
+      return body.error
+    }
+  } catch {
+    // ignore non-JSON bodies
+  }
+  return res.statusText || `HTTP ${res.status}`
+}

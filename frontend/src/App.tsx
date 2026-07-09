@@ -14,7 +14,7 @@ import {
 } from './SearchResultsGrid'
 import { DuplicateResultsView } from './DuplicateResultsView'
 import { UniquesResultsView } from './UniquesResultsView'
-import { getApiAuthHeaders } from './apiAuth'
+import { getApiAuthHeaders, readApiErrorMessage } from './apiAuth'
 import { getCsrfToken } from './getCsrfToken'
 import { performLogout } from './performLogout'
 import { queryCache } from './queryCache'
@@ -369,9 +369,9 @@ function App() {
     fullFetchParams.set('size', '10000')
     const fullFetchUrl = `/api/search?${fullFetchParams}`
     fetch(fullFetchUrl, { credentials: 'include', headers: { ...getApiAuthHeaders() }, signal: controller.signal })
-      .then((res) => {
+      .then(async (res) => {
         if (res.status === 401) { window.location.href = '/login'; return Promise.reject() }
-        if (!res.ok) throw new Error(res.statusText)
+        if (!res.ok) throw new Error(await readApiErrorMessage(res))
         return res.json()
       })
       .then((allData: SearchResultData) => {

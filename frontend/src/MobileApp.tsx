@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom'
 import { Link, useSearchParams, useLocation } from 'react-router-dom'
 import type { SearchResultData, SearchResultRow, Trove, DuplicatesResultData, UniquesResultData } from './types'
 import type { FileTypeQuickModeValue } from './fileTypeQuickMode'
-import { getApiAuthHeaders } from './apiAuth'
+import { getApiAuthHeaders, readApiErrorMessage } from './apiAuth'
 import { getCsrfToken } from './getCsrfToken'
 import { performLogout } from './performLogout'
 import { queryCache } from './queryCache'
@@ -851,9 +851,10 @@ function MobileApp() {
     fullFetchParams.set('size', '10000')
     const fullFetchUrl = `/api/search?${fullFetchParams}`
     fetch(fullFetchUrl, { credentials: 'include', headers: { ...getApiAuthHeaders() }, signal: controller.signal })
-      .then((res) => {
+      .then(async (res) => {
         if (res.status === 401) { window.location.href = '/login'; return Promise.reject() }
-        return res.ok ? res.json() : Promise.reject(new Error(res.statusText))
+        if (!res.ok) throw new Error(await readApiErrorMessage(res))
+        return res.json()
       })
       .then((allData: SearchResultData) => {
         if (searchRequestIdRef.current !== requestId) return
