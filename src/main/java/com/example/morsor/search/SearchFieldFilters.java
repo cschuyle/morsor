@@ -85,11 +85,15 @@ final class SearchFieldFilters {
     }
 
     static boolean matches(SearchResult result, List<FieldFilter> filters) {
+        return matches(result, filters, null);
+    }
+
+    static boolean matches(SearchResult result, List<FieldFilter> filters, LanguageCodeLookup languageLookup) {
         if (filters == null || filters.isEmpty()) {
             return true;
         }
         for (FieldFilter filter : filters) {
-            if (!matchesOne(result, filter)) {
+            if (!matchesOne(result, filter, languageLookup)) {
                 return false;
             }
         }
@@ -104,9 +108,9 @@ final class SearchFieldFilters {
         return colon > 0 && colon < token.length() - 1;
     }
 
-    private static boolean matchesOne(SearchResult result, FieldFilter filter) {
+    private static boolean matchesOne(SearchResult result, FieldFilter filter, LanguageCodeLookup languageLookup) {
         return switch (filter.fieldKey()) {
-            case LANGUAGES_FIELD -> matchesLanguage(result, filter.value());
+            case LANGUAGES_FIELD -> matchesLanguage(result, filter.value(), languageLookup);
             case COUNT_LANGUAGES_FIELD -> matchesCountLanguages(result, filter.value());
             case "title", "snippet", "trove", "itemType", "itemUrl" ->
                     matchesTextContains(builtinValue(result, filter.fieldKey()), filter.value());
@@ -142,18 +146,31 @@ final class SearchFieldFilters {
         return actual.trim().equalsIgnoreCase(expected.trim());
     }
 
-    private static boolean matchesLanguage(SearchResult result, String expected) {
+    private static boolean matchesLanguage(SearchResult result, String expected, LanguageCodeLookup languageLookup) {
         if (expected == null || expected.isBlank()) {
             return false;
         }
-        Object raw = extraFieldValue(result, LANGUAGES_FIELD);
+        Object rawCodes = extraFieldValue(result, LANGUAGES_FIELD);
+        if (languageValuesMatchFilter(rawCodes, expected, languageLookup)) {
+            return true;
+        }
+        Object display = extraFieldValue(result, LanguageCodeLookup.DISPLAY_FIELD);
+        return languageValuesMatchFilter(display, expected, languageLookup);
+    }
+
+    private static boolean languageValuesMatchFilter(
+            Object raw,
+            String filterTerm,
+            LanguageCodeLookup languageLookup) {
         if (raw == null) {
             return false;
         }
-        String want = expected.trim().toLowerCase(Locale.ROOT);
-        if (raw instanceof Iterable<?> iterable) {
+        if (raw instanceof Iterable<?> iterable && !(raw instanceof CharSequence)) {
             for (Object elem : iterable) {
-                if (elem != null && want.equals(String.valueOf(elem).trim().toLowerCase(Locale.ROOT))) {
+                if (elem == null) {
+                    continue;
+                }
+                if (languageValueMatches(String.valueOf(elem), filterTerm, languageLookup)) {
                     return true;
                 }
             }
@@ -164,11 +181,29 @@ final class SearchFieldFilters {
             return false;
         }
         for (String part : text.split(",")) {
-            if (want.equals(part.trim().toLowerCase(Locale.ROOT))) {
+            if (languageValueMatches(part, filterTerm, languageLookup)) {
                 return true;
             }
         }
         return false;
+    }
+
+    private static boolean languageValueMatches(
+            String value,
+            String filterTerm,
+            LanguageCodeLookup languageLookup) {
+        if (languageLookup != null && languageLookup.lookupSize() > 0) {
+            return languageLookup.languageFilterMatchesItemValue(filterTerm, value);
+        }
+        if (filterTerm == null || filterTerm.isBlank()) {
+            return false;
+        }
+        String needle = filterTerm.trim().toLowerCase(Locale.ROOT);
+        String valueLower = value.trim().toLowerCase(Locale.ROOT);
+        if (needle.length() >= LanguageCodeLookup.MIN_LANGUAGE_FILTER_SUBSTRING_LENGTH) {
+            return valueLower.contains(needle);
+        }
+        return valueLower.equals(needle);
     }
 
     private static boolean matchesCountLanguages(SearchResult result, String expected) {

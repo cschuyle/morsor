@@ -44,7 +44,8 @@ class SearchDataServiceTest {
         SearchDataService service = new SearchDataService(
                 new PathMatchingResourcePatternResolver(),
                 new ObjectMapper(),
-                new MockEnvironment()
+                new MockEnvironment(),
+                new LanguageCodeLookup()
         );
         ReflectionTestUtils.setField(service, "dataLocation", "file:" + tempDir.toAbsolutePath() + "/*.json");
         ReflectionTestUtils.setField(service, "onlyTroveIds", "");
@@ -87,7 +88,8 @@ class SearchDataServiceTest {
         SearchDataService service = new SearchDataService(
                 new PathMatchingResourcePatternResolver(),
                 new ObjectMapper(),
-                new MockEnvironment()
+                new MockEnvironment(),
+                new LanguageCodeLookup()
         );
         ReflectionTestUtils.setField(service, "dataLocation", "file:" + tempDir.toAbsolutePath() + "/*.json");
         ReflectionTestUtils.setField(service, "onlyTroveIds", "");
@@ -137,7 +139,8 @@ class SearchDataServiceTest {
         SearchDataService service = new SearchDataService(
                 new PathMatchingResourcePatternResolver(),
                 new ObjectMapper(),
-                new MockEnvironment()
+                new MockEnvironment(),
+                new LanguageCodeLookup()
         );
         ReflectionTestUtils.setField(service, "dataLocation", "file:" + tempDir.toAbsolutePath() + "/*.json");
         ReflectionTestUtils.setField(service, "onlyTroveIds", "");
@@ -163,7 +166,8 @@ class SearchDataServiceTest {
         SearchDataService service = new SearchDataService(
                 new PathMatchingResourcePatternResolver(),
                 new ObjectMapper(),
-                new MockEnvironment()
+                new MockEnvironment(),
+                new LanguageCodeLookup()
         );
 
         SearchResult exactPrimary = new SearchResult(

@@ -316,7 +316,11 @@ public class SearchController {
             }
             Map<String, Object> ex = r.extraFields();
             if (ex != null && !ex.isEmpty()) {
-                keys.addAll(ex.keySet());
+                for (String key : ex.keySet()) {
+                    if (!LanguageCodeLookup.DISPLAY_FIELD.equals(key)) {
+                        keys.add(key);
+                    }
+                }
             }
         }
         if (hasLittlePrince) {

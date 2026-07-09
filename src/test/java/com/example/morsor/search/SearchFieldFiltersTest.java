@@ -10,6 +10,37 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class SearchFieldFiltersTest {
 
+    private static LanguageCodeLookup lookupWithGermanAndRussian() {
+        LanguageCodeLookup lookup = new LanguageCodeLookup();
+        lookup.rebuild(List.of(
+                languageItem("de", "German", List.of("deu", "ger")),
+                languageItem("ru", "Russian", List.of("rus"))));
+        return lookup;
+    }
+
+    private static SearchResult languageItem(String code, String title, List<String> aliases) {
+        Map<String, Object> extra = new java.util.LinkedHashMap<>();
+        extra.put("code", code);
+        extra.put("title", title);
+        if (!aliases.isEmpty()) {
+            extra.put("aliases", aliases);
+        }
+        return new SearchResult(
+                "iso639-" + code,
+                "languageCode",
+                title,
+                title,
+                "Languages",
+                "iso639-languages",
+                false,
+                null,
+                null,
+                "{}",
+                List.of(),
+                null,
+                extra);
+    }
+
     @Test
     void parseExtractsLanguageFilterAndLeavesFreeText() {
         SearchFieldFilters.ParsedQuery parsed = SearchFieldFilters.parse("Tears languages:ru steel");
@@ -86,12 +117,74 @@ class SearchFieldFiltersTest {
     @Test
     void matchesLanguageInArray() {
         SearchResult r = videoResult(List.of("de", "en", "ru"), 3);
+        LanguageCodeLookup lookup = lookupWithGermanAndRussian();
+        assertThat(SearchFieldFilters.matches(r, List.of(
+                new SearchFieldFilters.FieldFilter(SearchFieldFilters.LANGUAGES_FIELD, "ru")), lookup)).isTrue();
+        assertThat(SearchFieldFilters.matches(r, List.of(
+                new SearchFieldFilters.FieldFilter(SearchFieldFilters.LANGUAGES_FIELD, "RU")), lookup)).isTrue();
+        assertThat(SearchFieldFilters.matches(r, List.of(
+                new SearchFieldFilters.FieldFilter(SearchFieldFilters.LANGUAGES_FIELD, "ja")), lookup)).isFalse();
+    }
+
+    @Test
+    void matchesLanguageByDisplayNameOrCode() {
+        LanguageCodeLookup lookup = lookupWithGermanAndRussian();
+        SearchResult germanCodes = videoResult(List.of("deu"), 1);
+        germanCodes = withLanguageDisplay(germanCodes, List.of("German"));
+
+        assertThat(SearchFieldFilters.matches(germanCodes, List.of(
+                new SearchFieldFilters.FieldFilter(SearchFieldFilters.LANGUAGES_FIELD, "German")), lookup)).isTrue();
+        assertThat(SearchFieldFilters.matches(germanCodes, List.of(
+                new SearchFieldFilters.FieldFilter(SearchFieldFilters.LANGUAGES_FIELD, "deu")), lookup)).isTrue();
+        assertThat(SearchFieldFilters.matches(germanCodes, List.of(
+                new SearchFieldFilters.FieldFilter(SearchFieldFilters.LANGUAGES_FIELD, "de")), lookup)).isTrue();
+        assertThat(SearchFieldFilters.matches(germanCodes, List.of(
+                new SearchFieldFilters.FieldFilter(SearchFieldFilters.LANGUAGES_FIELD, "Russian")), lookup)).isFalse();
+    }
+
+    @Test
+    void matchesLanguageWithoutLookupStillMatchesRawCodeSubstring() {
+        SearchResult r = videoResult(List.of("de", "en", "ru"), 3);
         assertThat(SearchFieldFilters.matches(r, List.of(
                 new SearchFieldFilters.FieldFilter(SearchFieldFilters.LANGUAGES_FIELD, "ru")))).isTrue();
         assertThat(SearchFieldFilters.matches(r, List.of(
-                new SearchFieldFilters.FieldFilter(SearchFieldFilters.LANGUAGES_FIELD, "RU")))).isTrue();
+                new SearchFieldFilters.FieldFilter(SearchFieldFilters.LANGUAGES_FIELD, "rus")))).isFalse();
+    }
+
+    @Test
+    void matchesLanguageByDisplayNamePrefixOrSubstring() {
+        LanguageCodeLookup lookup = lookupWithArabicAndMozarabic();
+        SearchResult russian = videoResult(List.of("rus"), 1);
+        russian = withLanguageDisplay(russian, List.of("Russian"));
+        SearchResult arabic = videoResult(List.of("ara"), 1);
+        arabic = withLanguageDisplay(arabic, List.of("Arabic"));
+        SearchResult mozarabic = videoResult(List.of("mxi"), 1);
+        mozarabic = withLanguageDisplay(mozarabic, List.of("Mozarabic"));
+
+        assertThat(SearchFieldFilters.matches(russian, List.of(
+                new SearchFieldFilters.FieldFilter(SearchFieldFilters.LANGUAGES_FIELD, "russ")), lookup)).isTrue();
+        assertThat(SearchFieldFilters.matches(arabic, List.of(
+                new SearchFieldFilters.FieldFilter(SearchFieldFilters.LANGUAGES_FIELD, "arab")), lookup)).isTrue();
+        assertThat(SearchFieldFilters.matches(mozarabic, List.of(
+                new SearchFieldFilters.FieldFilter(SearchFieldFilters.LANGUAGES_FIELD, "arab")), lookup)).isTrue();
+        assertThat(SearchFieldFilters.matches(russian, List.of(
+                new SearchFieldFilters.FieldFilter(SearchFieldFilters.LANGUAGES_FIELD, "arab")), lookup)).isFalse();
+    }
+
+    private static LanguageCodeLookup lookupWithArabicAndMozarabic() {
+        LanguageCodeLookup lookup = new LanguageCodeLookup();
+        lookup.rebuild(List.of(
+                languageItem("ru", "Russian", List.of("rus")),
+                languageItem("ar", "Arabic", List.of("ara")),
+                languageItem("mxi", "Mozarabic", List.of())));
+        return lookup;
+    }
+
+    @Test
+    void matchesLanguageWithoutLookupStillMatchesRawCode() {
+        SearchResult r = videoResult(List.of("de", "en", "ru"), 3);
         assertThat(SearchFieldFilters.matches(r, List.of(
-                new SearchFieldFilters.FieldFilter(SearchFieldFilters.LANGUAGES_FIELD, "ja")))).isFalse();
+                new SearchFieldFilters.FieldFilter(SearchFieldFilters.LANGUAGES_FIELD, "ru")))).isTrue();
     }
 
     @Test
@@ -112,6 +205,25 @@ class SearchFieldFiltersTest {
                 new SearchFieldFilters.FieldFilter(SearchFieldFilters.COUNT_LANGUAGES_FIELD, "3"));
         assertThat(SearchFieldFilters.matches(tears, both)).isTrue();
         assertThat(SearchFieldFilters.matches(other, both)).isFalse();
+    }
+
+    private static SearchResult withLanguageDisplay(SearchResult result, List<String> display) {
+        Map<String, Object> extra = new java.util.LinkedHashMap<>(result.extraFields());
+        extra.put(LanguageCodeLookup.DISPLAY_FIELD, display);
+        return new SearchResult(
+                result.id(),
+                result.itemType(),
+                result.title(),
+                result.snippet(),
+                result.trove(),
+                result.troveId(),
+                result.hasThumbnail(),
+                result.thumbnailUrl(),
+                result.largeImageUrl(),
+                result.rawSourceItem(),
+                result.files(),
+                result.itemUrl(),
+                extra);
     }
 
     private static SearchResult videoResult(List<String> languages, int count) {

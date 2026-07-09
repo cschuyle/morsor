@@ -61,6 +61,8 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.BiConsumer;
@@ -96,6 +98,10 @@ public class SearchDataService {
     @Value("${moocho.exclude.trove.ids:}")
     private String excludeTroveIds;
 
+    /** Reference troves (e.g. language code lookup) hidden from the trove picker but always loaded when configured. */
+    @Value("${moocho.reference.trove.ids:iso639-languages}")
+    private String referenceTroveIds;
+
     /**
      * Title core-text overlap thresholds for the duplicate/uniques year heuristic. Two titles with the
      * same (or compatible) year are treated as the same item when their normalized token sets share at
@@ -111,6 +117,7 @@ public class SearchDataService {
     private int titleOverlapMinTokens = 2;
 
     private final Environment environment;
+    private final LanguageCodeLookup languageCodeLookup;
 
     private List<SearchResult> allResults = List.of();
     /** Last successful reload payload (before ephemeral merge). */
@@ -156,10 +163,11 @@ public class SearchDataService {
     private final AccentInsensitiveAnalyzer luceneAnalyzer = new AccentInsensitiveAnalyzer();
 
     public SearchDataService(ResourcePatternResolver resourceResolver, ObjectMapper objectMapper,
-            Environment environment) {
+            Environment environment, LanguageCodeLookup languageCodeLookup) {
         this.resourceResolver = resourceResolver;
         this.objectMapper = objectMapper;
         this.environment = environment;
+        this.languageCodeLookup = languageCodeLookup;
         log.info("SearchDataService created; active profiles: {}", Arrays.toString(environment.getActiveProfiles()));
     }
 
@@ -229,7 +237,12 @@ public class SearchDataService {
                     .filter(r -> !effectiveIds.contains(r.troveId()))
                     .collect(Collectors.toCollection(ArrayList::new));
             kept.addAll(freshResults);
-            persistedResults = List.copyOf(kept);
+            Set<String> troveIdsPresent = kept.stream()
+                    .map(SearchResult::troveId)
+                    .filter(Objects::nonNull)
+                    .collect(Collectors.toCollection(HashSet::new));
+            loadMissingReferenceTroves(kept, troveIdsPresent, loadErrors);
+            persistedResults = List.copyOf(applyLanguageEnrichment(kept));
             rebuildMergedIndexLocked();
         }
         log.info("SearchDataService.reloadDataPartial() finished: {} new results, {} total", freshResults.size(), allResults.size());
@@ -264,6 +277,7 @@ public class SearchDataService {
         } else {
             loadFromClasspath(combined, onlyIds, excludeIds, progress, loadedTroveIds, loadErrors);
         }
+        loadMissingReferenceTroves(combined, loadedTroveIds, loadErrors);
         if (cancelled != null && cancelled.get()) {
             log.info("Reload cancelled (client disconnected); existing data unchanged");
             return;
@@ -288,7 +302,7 @@ public class SearchDataService {
             log.warn("Trove load completed with {} errors: {}", loadErrors.size(), loadErrors);
         }
         synchronized (mergeLock) {
-            persistedResults = List.copyOf(combined);
+            persistedResults = List.copyOf(applyLanguageEnrichment(combined));
             rebuildMergedIndexLocked();
         }
         log.info("SearchDataService.reloadData() finished: {} results, {} trove options", allResults.size(), getTroveOptions().size());
@@ -386,7 +400,7 @@ public class SearchDataService {
                     }
                 }
             }
-            ephemeralTroves.put(troveId, List.copyOf(toIndex));
+            ephemeralTroves.put(troveId, List.copyOf(enrichLanguageDisplays(toIndex)));
             try {
                 troveSourceDocuments.put(troveId, objectMapper.writeValueAsString(
                         buildEphemeralTroveDocumentNode(troveId, troveLabel, toIndex)));
@@ -643,6 +657,163 @@ public class SearchDataService {
                 .collect(Collectors.toUnmodifiableSet());
     }
 
+    private Set<String> referenceTroveIdSet() {
+        return parseTroveIds(referenceTroveIds);
+    }
+
+    private boolean isRequiredReferenceTrove(String troveId) {
+        if (troveId == null || troveId.isBlank()) {
+            return false;
+        }
+        String trimmed = troveId.trim();
+        String languageTroveId = languageCodeLookup.getLanguageTroveId();
+        if (!languageTroveId.isEmpty() && languageTroveId.equalsIgnoreCase(trimmed)) {
+            return true;
+        }
+        return referenceTroveIdSet().contains(trimmed);
+    }
+
+    private boolean shouldSkipTrove(String troveId, Set<String> onlyIds, Set<String> excludeIds) {
+        if (isRequiredReferenceTrove(troveId)) {
+            return false;
+        }
+        if (!onlyIds.isEmpty() && !onlyIds.contains(troveId)) {
+            return true;
+        }
+        return excludeIds.contains(troveId);
+    }
+
+    private List<SearchResult> applyLanguageEnrichment(List<SearchResult> results) {
+        if (!languageCodeLookup.isConfigured() || results == null || results.isEmpty()) {
+            return results;
+        }
+        String languageTroveId = languageCodeLookup.getLanguageTroveId();
+        List<SearchResult> languageItems = results.stream()
+                .filter(r -> r.troveId() != null && languageTroveId.equalsIgnoreCase(r.troveId()))
+                .toList();
+        languageCodeLookup.rebuild(languageItems);
+        if (languageItems.isEmpty()) {
+            log.warn("Language trove \"{}\" has no indexed items; subtitle language names will not resolve",
+                    languageTroveId);
+        } else if (languageCodeLookup.lookupSize() == 0) {
+            log.warn("Language code lookup map is empty after loading {} items from trove \"{}\"",
+                    languageItems.size(), languageTroveId);
+        }
+        return enrichLanguageDisplays(results);
+    }
+
+    private Set<String> requiredReferenceTroveIds() {
+        Set<String> ids = new LinkedHashSet<>(referenceTroveIdSet());
+        String languageTroveId = languageCodeLookup.getLanguageTroveId();
+        if (!languageTroveId.isEmpty()) {
+            ids.add(languageTroveId);
+        }
+        return ids;
+    }
+
+    /**
+     * Load configured reference troves (e.g. language codes) when absent from the main load set
+     * (S3 manifest omit, MOOCHO_INCLUDE_TROVE_IDS, etc.). Falls back to {@code classpath:reference/}.
+     */
+    private void loadMissingReferenceTroves(
+            List<SearchResult> combined,
+            Set<String> loadedTroveIds,
+            List<String> loadErrors) {
+        for (String refId : requiredReferenceTroveIds()) {
+            if (refId.isBlank() || loadedTroveIds.contains(refId)) {
+                continue;
+            }
+            if (loadReferenceTroveFromFallback(refId, combined, loadedTroveIds, loadErrors)) {
+                log.info("Loaded reference trove \"{}\" from bundled fallback", refId);
+            } else {
+                log.warn("Reference trove \"{}\" is not loaded; language name lookup will be unavailable", refId);
+            }
+        }
+    }
+
+    private boolean loadReferenceTroveFromFallback(
+            String refId,
+            List<SearchResult> combined,
+            Set<String> loadedTroveIds,
+            List<String> loadErrors) {
+        String location = "classpath:reference/" + refId + ".json";
+        try {
+            Resource[] resources = resourceResolver.getResources(location);
+            for (Resource resource : resources) {
+                if (resource == null || !resource.exists()) {
+                    continue;
+                }
+                if (ingestTroveResource(resource, refId, combined, loadedTroveIds, loadErrors)) {
+                    return true;
+                }
+            }
+        } catch (IOException e) {
+            log.debug("Could not resolve reference trove at {}: {}", location, e.getMessage());
+            loadErrors.add(refId + " (reference fallback): " + e.getMessage());
+        }
+        return false;
+    }
+
+    private boolean ingestTroveResource(
+            Resource resource,
+            String expectedTroveId,
+            List<SearchResult> combined,
+            Set<String> loadedTroveIds,
+            List<String> loadErrors) {
+        try (InputStream in = resource.getInputStream()) {
+            JsonNode root = objectMapper.readTree(in);
+            String troveId = troveIdFromCollectionNode(root);
+            if (troveId == null || troveId.isEmpty()) {
+                troveId = expectedTroveId;
+            }
+            storeTroveSourceDocuments(root, troveId);
+            List<SearchResult> results = CollectionToSearchResultMapper.mapRootToSearchResults(root);
+            log.info("Loaded reference trove \"{}\": {} records from {}", troveId, results.size(), resource.getDescription());
+            loadedTroveIds.add(troveId);
+            combined.addAll(results);
+            return true;
+        } catch (Exception e) {
+            log.error("Failed to load reference trove from {}: {}", resource.getDescription(), e.getMessage(), e);
+            String source = resource.getFilename() != null ? resource.getFilename() : resource.getDescription();
+            loadErrors.add(source + ": " + e.getMessage());
+            return false;
+        }
+    }
+
+    private List<SearchResult> enrichLanguageDisplays(List<SearchResult> results) {
+        if (!languageCodeLookup.isConfigured() || results == null || results.isEmpty()) {
+            return results;
+        }
+        return results.stream().map(this::enrichLanguageDisplay).toList();
+    }
+
+    private SearchResult enrichLanguageDisplay(SearchResult result) {
+        Map<String, Object> extra = result.extraFields();
+        if (extra == null || !extra.containsKey("languages")) {
+            return result;
+        }
+        List<String> display = languageCodeLookup.resolveList(extra.get("languages"));
+        if (display.isEmpty()) {
+            return result;
+        }
+        Map<String, Object> enrichedExtra = new LinkedHashMap<>(extra);
+        enrichedExtra.put(LanguageCodeLookup.DISPLAY_FIELD, display);
+        return new SearchResult(
+                result.id(),
+                result.itemType(),
+                result.title(),
+                result.snippet(),
+                result.trove(),
+                result.troveId(),
+                result.hasThumbnail(),
+                result.thumbnailUrl(),
+                result.largeImageUrl(),
+                result.rawSourceItem(),
+                result.files(),
+                result.itemUrl(),
+                enrichedExtra);
+    }
+
     private void loadFromS3(
             List<SearchResult> combined,
             Set<String> onlyIds,
@@ -693,12 +864,12 @@ public class SearchDataService {
                     log.warn("Skipping trove entry with no id (tried id, troveId, trove_id); entry: {}", entry);
                     continue;
                 }
-                if (!onlyIds.isEmpty() && !onlyIds.contains(troveId)) {
-                    log.debug("Skipping trove \"{}\" (not in moocho.only.trove.ids)", troveId);
-                    continue;
-                }
-                if (excludeIds.contains(troveId)) {
-                    log.debug("Skipping trove \"{}\" (in moocho.exclude.trove.ids)", troveId);
+                if (shouldSkipTrove(troveId, onlyIds, excludeIds)) {
+                    if (!onlyIds.isEmpty() && !onlyIds.contains(troveId)) {
+                        log.debug("Skipping trove \"{}\" (not in moocho.only.trove.ids)", troveId);
+                    } else {
+                        log.debug("Skipping trove \"{}\" (in moocho.exclude.trove.ids)", troveId);
+                    }
                     continue;
                 }
                 // Extract and store updateTimestamp if present
@@ -772,15 +943,12 @@ public class SearchDataService {
                     if (troveId == null || troveId.isEmpty()) {
                         troveId = resource.getFilename() != null ? resource.getFilename() : "unknown";
                     }
-                    if (!onlyIds.isEmpty() && !onlyIds.contains(troveId)) {
-                        log.debug("Skipping trove \"{}\" (not in moocho.only.trove.ids)", troveId);
-                        if (progress != null) {
-                            progress.accept(i + 1, total);
+                    if (shouldSkipTrove(troveId, onlyIds, excludeIds)) {
+                        if (!onlyIds.isEmpty() && !onlyIds.contains(troveId)) {
+                            log.debug("Skipping trove \"{}\" (not in moocho.only.trove.ids)", troveId);
+                        } else {
+                            log.debug("Skipping trove \"{}\" (in moocho.exclude.trove.ids)", troveId);
                         }
-                        continue;
-                    }
-                    if (excludeIds.contains(troveId)) {
-                        log.debug("Skipping trove \"{}\" (in moocho.exclude.trove.ids)", troveId);
                         if (progress != null) {
                             progress.accept(i + 1, total);
                         }
@@ -833,7 +1001,7 @@ public class SearchDataService {
                 stream = stream.filter(r -> r.troveId() != null && troveIdSet.contains(r.troveId()));
             }
             List<ScoredSearchResult> list = stream
-                    .filter(r -> SearchFieldFilters.matches(r, fieldFilters))
+                    .filter(r -> SearchFieldFilters.matches(r, fieldFilters, languageCodeLookup))
                     .map(r -> new ScoredSearchResult(r, 0.0))
                     .toList();
             return finalizeSearchResults(list, boostId);
@@ -913,7 +1081,7 @@ public class SearchDataService {
             List<SearchFieldFilters.FieldFilter> fieldFilters,
             String boostId) {
         List<ScoredSearchResult> filtered = results.stream()
-                .filter(sr -> SearchFieldFilters.matches(sr.result(), fieldFilters))
+                .filter(sr -> SearchFieldFilters.matches(sr.result(), fieldFilters, languageCodeLookup))
                 .toList();
         return finalizeSearchResults(filtered, boostId);
     }
@@ -978,7 +1146,7 @@ public class SearchDataService {
             List<SearchFieldFilters.FieldFilter> fieldFilters) {
         List<SearchResult> list = searchFallback(troveIdSet, textQuery);
         return list.stream()
-                .filter(r -> SearchFieldFilters.matches(r, fieldFilters))
+                .filter(r -> SearchFieldFilters.matches(r, fieldFilters, languageCodeLookup))
                 .map(r -> new ScoredSearchResult(r, 0.0))
                 .toList();
     }
@@ -1591,8 +1759,10 @@ public class SearchDataService {
     }
 
     public List<TroveOption> getTroveOptions() {
+        Set<String> hiddenReferenceTroves = referenceTroveIdSet();
         return allResults.stream()
                 .filter(r -> r.troveId() != null && !r.troveId().isBlank())
+                .filter(r -> !hiddenReferenceTroves.contains(r.troveId()))
                 .collect(Collectors.groupingBy(SearchResult::troveId))
                 .entrySet().stream()
                 .map(e -> {

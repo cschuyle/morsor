@@ -7,6 +7,7 @@ import {
   flexRender,
 } from '@tanstack/react-table'
 import type { SearchResultRow, LightboxPayload } from './types'
+import { resolveLanguagesFromExtra, type LanguageCodeMap } from './languageCodeLookup'
 import { CopyFeedbackFlare, useCopyFeedback } from './CopyFeedback'
 import './SearchResultsGrid.css'
 
@@ -39,6 +40,8 @@ export interface SearchResultsGridProps {
   onPrevPage?: (() => void) | null
   /** Called when the floating next-page button is clicked. */
   onNextPage?: (() => void) | null
+  /** Optional client-side fallback map for subtitle language code display. */
+  languageCodeMap?: LanguageCodeMap | null
 }
 
 const AMAZON_PLACEHOLDER_THUMB = 'https://m.media-amazon.com/images/I/01RmK+J4pJL._SS135_.gif'
@@ -127,6 +130,9 @@ export function formatLittlePrinceFieldLabel(key: string): string {
   if (s === 'count(Languages)') {
     return 'Count (Languages)'
   }
+  if (s === 'languages(display)') {
+    return 'Languages'
+  }
   if (lower === 'asin') {
     return 'ASIN'
   }
@@ -159,13 +165,34 @@ export function extraFieldKeyMatchesFilter(jsonKey: string, query: string): bool
 /** One row in the Little Prince extra hover tooltip (includes original JSON key for catalog links). */
 type LittlePrinceExtraLine = { label: string; content: string; jsonKey: string }
 
-function formatLittlePrinceExtraLines(extra: Record<string, unknown> | null | undefined): LittlePrinceExtraLine[] {
+function formatExtraFieldDisplayValue(
+  jsonKey: string,
+  value: unknown,
+  extra: Record<string, unknown> | null | undefined,
+  languageCodeMap: LanguageCodeMap | null | undefined,
+): string {
+  if (jsonKey === 'languages') {
+    const resolved = resolveLanguagesFromExtra(extra, languageCodeMap)
+    if (resolved) {
+      return resolved
+    }
+  }
+  return formatLittlePrinceExtraValue(value)
+}
+
+function formatLittlePrinceExtraLines(
+  extra: Record<string, unknown> | null | undefined,
+  languageCodeMap?: LanguageCodeMap | null,
+): LittlePrinceExtraLine[] {
   if (extra == null || typeof extra !== 'object') {
     return []
   }
   const out: LittlePrinceExtraLine[] = []
   for (const [key, value] of Object.entries(extra)) {
-    const content = formatLittlePrinceExtraValue(value)
+    if (key === 'languages(display)') {
+      continue
+    }
+    const content = formatExtraFieldDisplayValue(key, value, extra, languageCodeMap)
     if (content === '') {
       continue
     }
@@ -204,8 +231,11 @@ function littlePrinceExtraCatalogLinkHref(jsonKey: string, content: string): str
 }
 
 /** Plain "Label: value" lines (e.g. aria-label); use formatLittlePrinceExtraLines + rich tooltip for bold labels. */
-function formatLittlePrinceExtraTooltip(extra: Record<string, unknown> | null | undefined): string | null {
-  const lines = formatLittlePrinceExtraLines(extra)
+function formatLittlePrinceExtraTooltip(
+  extra: Record<string, unknown> | null | undefined,
+  languageCodeMap?: LanguageCodeMap | null,
+): string | null {
+  const lines = formatLittlePrinceExtraLines(extra, languageCodeMap)
   return lines.length > 0 ? lines.map((l) => `${l.label}: ${l.content}`).join('\n') : null
 }
 
@@ -471,11 +501,27 @@ export function extraFieldsFromRow(row: SearchResultRow | undefined | null): Rec
   }
   const asRecord = (v: unknown): Record<string, unknown> | null =>
     v != null && typeof v === 'object' && !Array.isArray(v) ? (v as Record<string, unknown>) : null
-  return asRecord(row.extraFields) ?? asRecord((row as Record<string, unknown>).littlePrinceItemExtra)
+  const raw = row as Record<string, unknown>
+  const base = asRecord(row.extraFields) ?? asRecord(raw.littlePrinceItemExtra)
+  const merged: Record<string, unknown> = base ? { ...base } : {}
+  if (merged.languages == null && raw.languages != null) {
+    merged.languages = raw.languages
+  }
+  if (merged['languages(display)'] == null && raw['languages(display)'] != null) {
+    merged['languages(display)'] = raw['languages(display)']
+  }
+  return Object.keys(merged).length > 0 ? merged : null
 }
 
 /** LP vendor ids: always listed in the extra-fields picker when any row is a Little Prince item. */
 const LITTLE_PRINCE_EXTRA_FIELD_KEYS_ALWAYS_OFFERED = ['lpid', 'tintenfassId'] as const
+
+/** Computed display fields — not offered as separate picker columns (see {@link formatLittlePrinceExtraLines}). */
+const HIDDEN_EXTRA_FIELD_KEYS = new Set(['languages(display)'])
+
+function isOfferedExtraFieldKey(key: string): boolean {
+  return !HIDDEN_EXTRA_FIELD_KEYS.has(key)
+}
 
 /** Distinct extra-field JSON keys on the current rows, sorted for stable column order. */
 export function collectExtraFieldKeysFromRows(rows: SearchResultRow[] | null | undefined): string[] {
@@ -493,7 +539,9 @@ export function collectExtraFieldKeysFromRows(rows: SearchResultRow[] | null | u
       continue
     }
     for (const k of Object.keys(ex)) {
-      keys.add(k)
+      if (isOfferedExtraFieldKey(k)) {
+        keys.add(k)
+      }
     }
   }
   if (hasLittlePrinceItem) {
@@ -543,9 +591,10 @@ export function mergeGalleryExtraSortKeys(
   fallbackRows: SearchResultRow[] | null | undefined,
   effectiveSortBy: string
 ): string[] {
-  const base = Array.isArray(availableFromApi)
+  const base = (Array.isArray(availableFromApi)
     ? [...availableFromApi]
     : collectExtraFieldKeysFromRows(fallbackRows)
+  ).filter(isOfferedExtraFieldKey)
   const fromSort = extraSortJsonKey(effectiveSortBy)
   if (fromSort && !base.includes(fromSort)) {
     base.push(fromSort)
@@ -737,8 +786,8 @@ function thumbnailColumnDef(
       const showNonLpThumb = !isLittlePrince && url && String(url).trim() && !thumbIsPlaceholder
       const fileTypeTooltip = getFileTypeTooltip(pdfs, imageUrls, ebooks, videos, audios, otherFiles, itemUrl, !!largeUrl)
       const rowExtras = extraFieldsFromRow(row)
-      const lpLines = formatLittlePrinceExtraLines(rowExtras ?? undefined)
-      const lpExtraPlain = formatLittlePrinceExtraTooltip(rowExtras ?? undefined)
+      const lpLines = formatLittlePrinceExtraLines(rowExtras ?? undefined, languageCodeMap)
+      const lpExtraPlain = formatLittlePrinceExtraTooltip(rowExtras ?? undefined, languageCodeMap)
       const payload = rowToLightboxPayload(row)
       const linkIcon = (
         <span className="search-thumb-link-icon" aria-hidden="true">
@@ -813,7 +862,7 @@ export function rawSourceDisplay(rawSourceItem: unknown): string {
   return (rawSourceItem != null && rawSourceItem !== '') ? String(rawSourceItem) : RAW_SOURCE_NOT_AVAILABLE
 }
 
-export function SearchResultsGrid({ data, sortBy = null, sortDir = 'asc', onSortChange, showScoreColumn = false, afterFilterSlot = null, viewMode = 'list', hideTroveInGallery = false, hideTroveInList = false, showPdfSashInGallery = false, showGalleryDecorations = true, isMobile = false, visibleExtraFieldKeys = null, onFetchAllForCopy = null, currentPage, totalPages, onPrevPage = null, onNextPage = null }: SearchResultsGridProps) {
+export function SearchResultsGrid({ data, sortBy = null, sortDir = 'asc', onSortChange, showScoreColumn = false, afterFilterSlot = null, viewMode = 'list', hideTroveInGallery = false, hideTroveInList = false, showPdfSashInGallery = false, showGalleryDecorations = true, isMobile = false, visibleExtraFieldKeys = null, onFetchAllForCopy = null, currentPage, totalPages, onPrevPage = null, onNextPage = null, languageCodeMap = null }: SearchResultsGridProps) {
   const [globalFilter, setGlobalFilter] = useState('')
   const [lightbox, setLightbox] = useState<LightboxPayload | null>(null)
   const [rawSourceLightbox, setRawSourceLightbox] = useState<{ title: string; rawSourceItem: string } | null>(null)
@@ -946,9 +995,10 @@ export function SearchResultsGrid({ data, sortBy = null, sortDir = 'asc', onSort
       },
       header: formatLittlePrinceFieldLabel(jsonKey),
       enableSorting: !!onSortChange,
-      cell: (info: { getValue: () => unknown }) => {
+      cell: (info: { getValue: () => unknown; row: { original: SearchResultRow } }) => {
         const v = info.getValue()
-        const text = formatLittlePrinceExtraValue(v)
+        const ex = extraFieldsFromRow(info.row.original)
+        const text = formatExtraFieldDisplayValue(jsonKey, v, ex, languageCodeMap)
         if (!text) {
           return ''
         }
@@ -958,7 +1008,7 @@ export function SearchResultsGrid({ data, sortBy = null, sortDir = 'asc', onSort
       minSize: 36,
       maxSize: 520,
     }))
-  }, [viewMode, visibleExtraFieldKeys, onSortChange])
+  }, [viewMode, visibleExtraFieldKeys, onSortChange, languageCodeMap])
   const baseColumns = useMemo(
     () => [
       ...(hasAnyThumbnail ? [thumbnailColumnDef((payload) => {
@@ -1081,7 +1131,8 @@ export function SearchResultsGrid({ data, sortBy = null, sortDir = 'asc', onSort
       if (showScoreColumn) {
         baseCells.push(typeof row?.score === 'number' ? row.score.toFixed(2) : '')
       }
-      const extras = extraKeys.map((k) => formatLittlePrinceExtraValue(extraFieldsFromRow(row)?.[k]))
+      const rowExtra = extraFieldsFromRow(row)
+      const extras = extraKeys.map((k) => formatExtraFieldDisplayValue(k, rowExtra?.[k], rowExtra, languageCodeMap))
       lines.push([...baseCells, ...extras].map(encode).join(delimiter))
     }
     return lines.join('\n')
@@ -1249,7 +1300,7 @@ export function SearchResultsGrid({ data, sortBy = null, sortDir = 'asc', onSort
           : rawSourceContent
       })()}
       {lightbox && (() => {
-        const lpExtraLines = formatLittlePrinceExtraLines(extraFieldsFromLightboxPayload(lightbox) ?? undefined)
+        const lpExtraLines = formatLittlePrinceExtraLines(extraFieldsFromLightboxPayload(lightbox) ?? undefined, languageCodeMap)
         const hasLpExtra = lpExtraLines.length > 0
         const hasLightboxImage = Boolean(lightbox.imageUrl && String(lightbox.imageUrl).trim())
         const desktopLpExtraBesideImage = !isMobile && hasLpExtra && hasLightboxImage
@@ -1550,8 +1601,8 @@ export function SearchResultsGrid({ data, sortBy = null, sortDir = 'asc', onSort
               }
               const showUrlTooltip = payload?.itemUrl && !payload?.imageUrl
               const rowExtras = extraFieldsFromRow(row)
-              const lpLines = formatLittlePrinceExtraLines(rowExtras ?? undefined)
-              const lpExtraPlain = formatLittlePrinceExtraTooltip(rowExtras ?? undefined)
+              const lpLines = formatLittlePrinceExtraLines(rowExtras ?? undefined, languageCodeMap)
+              const lpExtraPlain = formatLittlePrinceExtraTooltip(rowExtras ?? undefined, languageCodeMap)
               const galleryCardTitle =
                 showUrlTooltip
                   ? undefined
@@ -1792,7 +1843,7 @@ export function SearchResultsGrid({ data, sortBy = null, sortDir = 'asc', onSort
                   rowData?.itemUrl && String(rowData.itemUrl).trim() ? String(rowData.itemUrl).trim() : null
                 const listRowLpLines =
                   !listItemUrl
-                    ? formatLittlePrinceExtraLines(extraFieldsFromRow(rowData) ?? undefined)
+                    ? formatLittlePrinceExtraLines(extraFieldsFromRow(rowData) ?? undefined, languageCodeMap)
                     : []
                 const handleRowClick = () => {
                   const now = Date.now()

@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
-import { SearchResultsGrid } from './SearchResultsGrid'
+import { SearchResultsGrid, collectExtraFieldKeysFromRows } from './SearchResultsGrid'
 
 describe('SearchResultsGrid copy titles', () => {
   const originalClipboard = navigator.clipboard
@@ -66,5 +66,19 @@ describe('SearchResultsGrid copy titles', () => {
         "Title\tTrove\tScore\nWayne's World\tMovies\t1.20\nFace-Off (1997)\tMovies\t1.10",
       )
     })
+  })
+})
+
+describe('collectExtraFieldKeysFromRows', () => {
+  it('excludes languages(display) from extra field picker keys', () => {
+    expect(
+      collectExtraFieldKeysFromRows([
+        {
+          id: '1',
+          title: 'Movie',
+          extraFields: { languages: ['de'], 'languages(display)': ['German'] },
+        },
+      ]),
+    ).toEqual(['languages'])
   })
 })

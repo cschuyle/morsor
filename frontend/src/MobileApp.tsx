@@ -47,6 +47,7 @@ import {
   type UniquesTabSession,
 } from './sessionTabState'
 import { fetchTroveSyncState } from './troveSyncStateApi'
+import { clearLanguageCodeMapCache, ensureLanguageCodeMap, type LanguageCodeMap } from './languageCodeLookup'
 import './MobileApp.css'
 
 const MOBILE_PAGE_SIZE = 100
@@ -87,6 +88,7 @@ function hasUsableThumbnail(row: SearchResultRow | undefined | null): boolean {
 
 function MobileApp() {
   const [troves, setTroves] = useState<Trove[]>([])
+  const [languageCodeMap, setLanguageCodeMap] = useState<LanguageCodeMap | null>(null)
   const [searchParams, setSearchParams] = useSearchParams()
   const searchMode = (() => {
     const m = searchParams.get('mode')
@@ -1190,6 +1192,9 @@ function MobileApp() {
       .then((data) => (Array.isArray(data) ? data : []))
       .then(setTroves)
       .catch(() => setTroves([]))
+    ensureLanguageCodeMap(getApiAuthHeaders())
+      .then(setLanguageCodeMap)
+      .catch(() => setLanguageCodeMap(null))
   }, [])
 
   useEffect(() => {
@@ -2961,6 +2966,7 @@ onClick={() => {
                   isMobile
                   visibleExtraFieldKeys={visibleExtraFieldKeysForGrid}
                   onFetchAllForCopy={async () => fullSearchResultsRef.current}
+                  languageCodeMap={languageCodeMap}
                   currentPage={page}
                   totalPages={totalPages}
                   onPrevPage={() => goToPage(page - 1)}
@@ -3126,8 +3132,12 @@ onClick={() => {
                         if (data.type === 'progress') setReloadTrovesProgress({ current: data.current ?? 0, total: data.total ?? 0 })
                         else if (data.type === 'done') {
                           queryCache.clear()
+                          clearLanguageCodeMapCache()
                           const r = await fetch('/api/troves', { credentials: 'include', headers: { ...getApiAuthHeaders() } })
                           if (r.ok) { const arr = await r.json(); if (Array.isArray(arr)) setTroves(arr) }
+                          ensureLanguageCodeMap(getApiAuthHeaders())
+                            .then(setLanguageCodeMap)
+                            .catch(() => setLanguageCodeMap(null))
                           refreshStatusMessage()
                         }
                       } catch (_) {}
