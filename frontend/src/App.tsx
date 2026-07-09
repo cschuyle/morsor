@@ -53,6 +53,7 @@ import {
 import { paginationPageWindow } from './paginationPageWindow'
 import { fetchTroveSyncState } from './troveSyncStateApi'
 import { clearLanguageCodeMapCache, ensureLanguageCodeMap, type LanguageCodeMap } from './languageCodeLookup'
+import { SearchQueryHelpButton, SearchQueryHelpPopover } from './SearchQueryHelpPopover'
 import './App.css'
 
 const DEFAULT_DUP_SESSION: DuplicatesTabSession = {
@@ -169,6 +170,8 @@ function App() {
   const [compareBackToTopCenterX, setCompareBackToTopCenterX] = useState<number | null>(null)
   const fileTypeDropdownRef = useRef<HTMLDivElement | null>(null)
   const extraFieldDropdownRef = useRef<HTMLDivElement | null>(null)
+  const searchQueryWrapRef = useRef<HTMLDivElement | null>(null)
+  const [searchHelpOpen, setSearchHelpOpen] = useState(false)
   const dupPageSizeRef = useRef(dupPageSize)
   const uniqPageSizeRef = useRef(uniqPageSize)
   dupPageSizeRef.current = dupPageSize
@@ -214,6 +217,10 @@ function App() {
     () => [...extraGridFieldsSelected],
     [extraGridFieldsSelected]
   )
+
+  useEffect(() => {
+    setSearchHelpOpen(false)
+  }, [searchMode])
 
   // Back-to-top for compare results (duplicates/uniques) – mirrors SearchResultsGrid behavior
   useEffect(() => {
@@ -1279,6 +1286,47 @@ function App() {
     fetchSearch(0)
   }
 
+  function applyQueryExample(q: string) {
+    setSearchHelpOpen(false)
+    queryRef.current = q
+    setFreezeTroveListOrder(false)
+    setSearchError(null)
+    if (searchMode === 'search') {
+      setSearchQuery(q)
+      if (!q.trim()) {
+        setSearchResult({ count: 0, results: [], page: 0, size: pageSize })
+        return
+      }
+      setDuplicatesResult(null)
+      setUniquesResult(null)
+      fetchSearch(0)
+      return
+    }
+    if (searchMode === 'duplicates') {
+      setDupQuery(q)
+      if (!primaryTroveId.trim()) {
+        return
+      }
+      setSearchResult(null)
+      setUniquesResult(null)
+      fetchDuplicates(0)
+      return
+    }
+    setUniqQuery(q)
+    if (!primaryTroveId.trim()) {
+      return
+    }
+    if (selectedTroveIds.size === 0) {
+      return
+    }
+    if (primaryTroveId && selectedTroveIds.has(primaryTroveId)) {
+      return
+    }
+    setSearchResult(null)
+    setDuplicatesResult(null)
+    fetchUniques(0)
+  }
+
   function handlePageSizeChange(e) {
     const newSize = Number(e.target.value)
     setPageSize(newSize)
@@ -2096,7 +2144,7 @@ function App() {
             </div>
             <form onSubmit={handleSearch} className="search-form">
               <div className="search-form-row">
-                <div className="search-query-wrap">
+                <div className="search-query-wrap" ref={searchQueryWrapRef}>
                   <div className="search-query-input-wrap">
                     <input
                       type="text"
@@ -2182,8 +2230,19 @@ function App() {
                     >
                       <span className="search-query-asterisk" aria-hidden="true">*</span>
                     </button>
+                    <SearchQueryHelpButton
+                      open={searchHelpOpen}
+                      onToggle={() => setSearchHelpOpen((open) => !open)}
+                    />
                   </span>
                 </div>
+                <SearchQueryHelpPopover
+                  open={searchHelpOpen}
+                  onClose={() => setSearchHelpOpen(false)}
+                  anchorRef={searchQueryWrapRef}
+                  mode={searchMode}
+                  onTryExample={applyQueryExample}
+                />
                 <button type="submit" disabled={searching} className="search-submit-btn" aria-label="Search" title="Search">
                   {searching ? 'Searching\u2026' : 'Go!'}
                 </button>

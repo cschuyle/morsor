@@ -8,6 +8,7 @@ import {
 } from '@tanstack/react-table'
 import type { SearchResultRow, LightboxPayload } from './types'
 import { resolveLanguagesFromExtra, type LanguageCodeMap } from './languageCodeLookup'
+import { formatVideoExtraFieldValue } from './videoMetadataFormat'
 import { CopyFeedbackFlare, useCopyFeedback } from './CopyFeedback'
 import './SearchResultsGrid.css'
 
@@ -130,8 +131,29 @@ export function formatLittlePrinceFieldLabel(key: string): string {
   if (s === 'count(Subtitles)') {
     return 'Count (Subtitles)'
   }
+  if (lower === 'video_count') {
+    return 'Count(Video)'
+  }
+  if (lower === 'embedded_count') {
+    return 'Count(Embedded Subs)'
+  }
+  if (lower === 'external_count') {
+    return 'Count(External Subs)'
+  }
   if (s === 'subtitles(display)') {
     return 'Subtitles'
+  }
+  if (lower === 'total_duration_seconds') {
+    return 'Duration'
+  }
+  if (lower === 'total_size_bytes') {
+    return 'Size'
+  }
+  if (lower === 'files') {
+    return 'Files'
+  }
+  if (lower === 'scanned_at') {
+    return 'Scanned At'
   }
   if (lower === 'asin') {
     return 'ASIN'
@@ -176,6 +198,10 @@ function formatExtraFieldDisplayValue(
     if (resolved) {
       return resolved
     }
+  }
+  const videoFormatted = formatVideoExtraFieldValue(jsonKey, value, languageCodeMap)
+  if (videoFormatted != null) {
+    return videoFormatted
   }
   return formatLittlePrinceExtraValue(value)
 }

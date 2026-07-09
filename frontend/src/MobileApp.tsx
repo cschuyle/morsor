@@ -48,6 +48,7 @@ import {
 } from './sessionTabState'
 import { fetchTroveSyncState } from './troveSyncStateApi'
 import { clearLanguageCodeMapCache, ensureLanguageCodeMap, type LanguageCodeMap } from './languageCodeLookup'
+import { SearchQueryHelpButton, SearchQueryHelpPopover } from './SearchQueryHelpPopover'
 import './MobileApp.css'
 
 const MOBILE_PAGE_SIZE = 100
@@ -196,6 +197,8 @@ function MobileApp() {
   const compareEtaHistoryRef = useRef<number[]>([])
   const fileTypeDropdownRef = useRef<HTMLDivElement | null>(null)
   const extraFieldDropdownRef = useRef<HTMLDivElement | null>(null)
+  const searchQueryWrapRef = useRef<HTMLDivElement | null>(null)
+  const [searchHelpOpen, setSearchHelpOpen] = useState(false)
   const pageSizeDropdownRef = useRef<HTMLDivElement | null>(null)
   const comparePageSizeDropdownRef = useRef<HTMLDivElement | null>(null)
   const gallerySortDropdownRef = useRef<HTMLDivElement | null>(null)
@@ -1228,6 +1231,10 @@ function MobileApp() {
   }, [searchMode, selectedTroveIds, searchParams])
 
   useEffect(() => {
+    setSearchHelpOpen(false)
+  }, [searchMode])
+
+  useEffect(() => {
     setFreezeTroveListOrder(false)
   }, [searchMode])
 
@@ -1412,6 +1419,53 @@ function MobileApp() {
     nextParams.set('size', String(pageSize))
     setSearchParams(nextParams, { replace: true })
     fetchSearch(0)
+  }
+
+  function applyQueryExample(q: string) {
+    setSearchHelpOpen(false)
+    queryRef.current = q
+    setFreezeTroveListOrder(false)
+    setSearchError(null)
+    if (searchMode === 'search') {
+      setSearchQuery(q)
+      setPage(0)
+      if (!q.trim()) {
+        setSearchResult({ count: 0, results: [], page: 0, size: pageSize })
+        return
+      }
+      setDuplicatesResult(null)
+      setUniquesResult(null)
+      const nextParams = buildSearchParams()
+      nextParams.set('page', '1')
+      setSearchParams(nextParams, { replace: true })
+      fetchSearch(0)
+      return
+    }
+    if (searchMode === 'duplicates') {
+      setDupQuery(q)
+      if (!primaryTroveId.trim()) {
+        return
+      }
+      setSearchResult(null)
+      setUniquesResult(null)
+      setDuplicatesPage(0)
+      fetchDuplicates(0)
+      return
+    }
+    setUniqQuery(q)
+    if (!primaryTroveId.trim()) {
+      return
+    }
+    if (compareTroveIds.size === 0) {
+      return
+    }
+    if (compareTroveIds.has(primaryTroveId)) {
+      return
+    }
+    setSearchResult(null)
+    setDuplicatesResult(null)
+    setUniquesPage(0)
+    fetchUniques(0)
   }
 
   function goToPage(nextPage) {
@@ -1870,7 +1924,7 @@ onClick={() => {
         </div>
 
         <form onSubmit={handleSearch} className="mobile-search-form">
-          <div className="mobile-search-query-wrap">
+          <div className="mobile-search-query-wrap" ref={searchQueryWrapRef}>
             <div className="mobile-search-input-wrap">
               <input
                 type="search"
@@ -1959,8 +2013,20 @@ onClick={() => {
               >
                 <span className="mobile-search-query-asterisk" aria-hidden="true">*</span>
               </button>
+              <SearchQueryHelpButton
+                open={searchHelpOpen}
+                onToggle={() => setSearchHelpOpen((open) => !open)}
+                className="mobile-search-query-btn"
+              />
             </span>
           </div>
+          <SearchQueryHelpPopover
+            open={searchHelpOpen}
+            onClose={() => setSearchHelpOpen(false)}
+            anchorRef={searchQueryWrapRef}
+            mode={searchMode}
+            onTryExample={applyQueryExample}
+          />
           <button type="submit" className="mobile-search-btn" disabled={searching || (searchMode === 'duplicates' ? !primaryTroveId : (searchMode === 'uniques' && (!primaryTroveId || compareTroveIds.size === 0)))} aria-label="Search">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
               <circle cx="11" cy="11" r="8" />

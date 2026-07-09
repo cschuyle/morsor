@@ -1,0 +1,127 @@
+.search-query-help-btn {
+  font-weight: 600;
+  color: #666;
+}
+
+.search-query-help-btn--open,
+.search-query-help-btn:hover {
+  background: #ede8ff;
+  color: #4a3d8f;
+}
+
+.search-query-help-btn-glyph {
+  display: inline-block;
+  font-size: 1.05rem;
+  line-height: 1;
+  transform: translateY(-0.05em);
+}
+
+.search-query-help-popover {
+  box-sizing: border-box;
+  max-height: min(70vh, 28rem);
+  overflow: auto;
+  padding: 0.75rem 0.85rem 0.85rem;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.14);
+  color: #252525;
+  font-size: 0.875rem;
+  line-height: 1.4;
+}
+
+.search-query-help-popover-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.search-query-help-popover-title {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #333;
+}
+
+.search-query-help-popover-close {
+  flex-shrink: 0;
+  width: 1.75rem;
+  height: 1.75rem;
+  padding: 0;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: #666;
+  font-size: 1.2rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.search-query-help-popover-close:hover {
+  background: #f0f0f0;
+  color: #333;
+}
+
+.search-query-help-popover-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.search-query-help-popover-item + .search-query-help-popover-item {
+  margin-top: 0.65rem;
+  padding-top: 0.65rem;
+  border-top: 1px solid #eee;
+}
+
+.search-query-help-popover-item-title {
+  font-weight: 600;
+  font-size: 0.8125rem;
+  color: #444;
+}
+
+.search-query-help-popover-item-hint {
+  margin: 0.2rem 0 0.35rem;
+  font-size: 0.8125rem;
+  color: #666;
+}
+
+.search-query-help-popover-example {
+  display: inline-block;
+  max-width: 100%;
+  padding: 0.28rem 0.55rem;
+  border: 1px solid #d8d0f5;
+  border-radius: 5px;
+  background: #f7f4ff;
+  color: #3d2f7a;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', monospace;
+  font-size: 0.8125rem;
+  line-height: 1.35;
+  text-align: left;
+  cursor: pointer;
+  word-break: break-word;
+}
+
+.search-query-help-popover-example:hover {
+  background: #ede8ff;
+  border-color: #b8a8e8;
+}
+
+.search-query-help-popover-example:active {
+  transform: translateY(1px);
+}
+
+.search-query-help-popover-footnote {
+  margin: 0.75rem 0 0;
+  padding-top: 0.65rem;
+  border-top: 1px solid #eee;
+  font-size: 0.75rem;
+  color: #777;
+}
+
+.search-query-help-popover-footnote code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', monospace;
+  font-size: 0.9em;
+}
