@@ -47,30 +47,151 @@ export function formatVideoDurationSeconds(seconds: number | undefined | null): 
   return `${minutes}m`
 }
 
-/** Human-readable byte size using b, K, M, G (1024-based). */
+/** Human-readable byte size using bytes, K, MB, GB, TB (1024-based). */
 export function formatVideoBytes(bytes: number | undefined | null): string {
   if (typeof bytes !== 'number' || !Number.isFinite(bytes) || bytes < 0) {
     return ''
   }
   if (bytes < 1024) {
-    return `${Math.round(bytes)} b`
+    return `${Math.round(bytes)} bytes`
   }
   if (bytes < 1024 * 1024) {
     return `${Math.round(bytes / 1024)} K`
   }
   if (bytes < 1024 * 1024 * 1024) {
-    return `${(bytes / (1024 * 1024)).toFixed(1)} M`
+    return `${(bytes / (1024 * 1024)).toFixed(1)}MB`
   }
-  return `${(bytes / (1024 * 1024 * 1024)).toFixed(1)} G`
+  if (bytes < 1024 * 1024 * 1024 * 1024) {
+    return `${(bytes / (1024 * 1024 * 1024)).toFixed(1)}GB`
+  }
+  return `${(bytes / (1024 * 1024 * 1024 * 1024)).toFixed(1)}TB`
 }
 
-function videoFileBasename(source: unknown): string {
+export function videoFileBasename(source: unknown): string {
   if (typeof source !== 'string' || !source.trim()) {
     return 'file'
   }
   const normalized = source.replace(/\\/g, '/')
   const idx = normalized.lastIndexOf('/')
   return idx >= 0 ? normalized.slice(idx + 1) : normalized
+}
+
+export function formatVideoResolution(resolution: unknown): string {
+  if (resolution == null || typeof resolution !== 'object' || Array.isArray(resolution)) {
+    return ''
+  }
+  const r = resolution as Record<string, unknown>
+  const w = r.width
+  const h = r.height
+  if (
+    typeof w === 'number' &&
+    typeof h === 'number' &&
+    Number.isFinite(w) &&
+    Number.isFinite(h) &&
+    w > 0 &&
+    h > 0
+  ) {
+    return `${Math.round(w)}x${Math.round(h)}`
+  }
+  return ''
+}
+
+/** One-line summary for an expandable list row: `movie.mkv, 2h45m, 1920x1080, 5.0MB`. */
+export function formatVideoFileSummaryLine(file: unknown): string {
+  if (file == null || typeof file !== 'object' || Array.isArray(file)) {
+    return ''
+  }
+  const entry = file as Record<string, unknown>
+  const parts: string[] = [videoFileBasename(entry.source)]
+  if (typeof entry.duration_seconds === 'number') {
+    const duration = formatVideoDurationSeconds(entry.duration_seconds)
+    if (duration) {
+      parts.push(duration)
+    }
+  }
+  const resolution = formatVideoResolution(entry.resolution)
+  if (resolution) {
+    parts.push(resolution)
+  }
+  if (typeof entry.size_bytes === 'number') {
+    const size = formatVideoBytes(entry.size_bytes)
+    if (size) {
+      parts.push(size)
+    }
+  }
+  return parts.join(', ')
+}
+
+export function isVideoMetadataFileEntry(file: unknown): file is Record<string, unknown> {
+  return file != null && typeof file === 'object' && !Array.isArray(file) && 'source' in file
+}
+
+function parseRawSourceRecord(raw: unknown): Record<string, unknown> | null {
+  if (raw == null) {
+    return null
+  }
+  let parsed: unknown = raw
+  if (typeof raw === 'string') {
+    const trimmed = raw.trim()
+    if (!trimmed) {
+      return null
+    }
+    try {
+      parsed = JSON.parse(trimmed)
+    } catch {
+      return null
+    }
+  }
+  if (parsed == null || typeof parsed !== 'object' || Array.isArray(parsed)) {
+    return null
+  }
+  return parsed as Record<string, unknown>
+}
+
+function unwrapRawSourceItem(record: Record<string, unknown>): Record<string, unknown> {
+  if (videoMetadataFilesFromExtra(record).length > 0) {
+    return record
+  }
+  for (const key of Object.keys(record)) {
+    const value = record[key]
+    if (value != null && typeof value === 'object' && !Array.isArray(value)) {
+      const inner = value as Record<string, unknown>
+      if (videoMetadataFilesFromExtra(inner).length > 0) {
+        return inner
+      }
+    }
+  }
+  return record
+}
+
+/** Per-file metadata for expandable list rows (extraFields first, then raw source JSON). */
+export function videoMetadataFilesFromRow(
+  extra: Record<string, unknown> | null | undefined,
+  rawSourceItem?: unknown,
+): Record<string, unknown>[] {
+  const fromExtra = videoMetadataFilesFromExtra(extra)
+  if (fromExtra.length > 0) {
+    return fromExtra
+  }
+  const parsed = parseRawSourceRecord(rawSourceItem)
+  if (!parsed) {
+    return []
+  }
+  return videoMetadataFilesFromExtra(unwrapRawSourceItem(parsed))
+}
+
+/** Per-file video metadata from `extraFields.files` (not URL string arrays on the row). */
+export function videoMetadataFilesFromExtra(
+  extra: Record<string, unknown> | null | undefined,
+): Record<string, unknown>[] {
+  if (!extra) {
+    return []
+  }
+  const files = extra.files
+  if (!Array.isArray(files)) {
+    return []
+  }
+  return files.filter(isVideoMetadataFileEntry)
 }
 
 function formatVideoFileEntry(file: unknown, languageCodeMap: LanguageCodeMap | null | undefined): string {

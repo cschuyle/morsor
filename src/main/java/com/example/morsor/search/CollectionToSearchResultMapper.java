@@ -196,6 +196,7 @@ public final class CollectionToSearchResultMapper {
 
         Map<String, Object> extraFields = buildExtraFields(item);
         extraFields = mergeComputedExtraFields(item, extraFields);
+        extraFields = mergeFileMetadataIntoExtraFields(item, extraFields);
         if ("littlePrinceItem".equals(itemTypeRaw)) {
             extraFields = mergeLpidIntoExtraFields(item, extraFields);
             extraFields = mergeTintenfassIdIntoExtraFields(item, extraFields);
@@ -274,6 +275,35 @@ public final class CollectionToSearchResultMapper {
             out.put(e.getKey(), javaVal);
         }
         return out.isEmpty() ? null : out;
+    }
+
+    /**
+     * Video troves store per-file metadata in {@code files} as an object array. That property is also mapped to
+     * {@link SearchResult#files()} as strings, so copy the object array into {@link SearchResult#extraFields()} for
+     * the UI and sorting.
+     */
+    private static Map<String, Object> mergeFileMetadataIntoExtraFields(JsonNode item, Map<String, Object> extra) {
+        if (item == null || !item.isObject()) {
+            return extra;
+        }
+        JsonNode filesNode = item.get("files");
+        if (filesNode == null || !filesNode.isArray() || filesNode.isEmpty()) {
+            return extra;
+        }
+        boolean hasObjectEntry = false;
+        for (JsonNode el : filesNode) {
+            if (el != null && el.isObject()) {
+                hasObjectEntry = true;
+                break;
+            }
+        }
+        if (!hasObjectEntry) {
+            return extra;
+        }
+        Object filesVal = PRETTY_MAPPER.convertValue(filesNode, Object.class);
+        Map<String, Object> out = extra != null ? new LinkedHashMap<>(extra) : new LinkedHashMap<>();
+        out.put("files", filesVal);
+        return out;
     }
 
     /** Computed extra fields derived from source JSON (e.g. subtitle language count). */

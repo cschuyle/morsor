@@ -1,5 +1,14 @@
 import { describe, it, expect } from 'vitest'
-import { formatVideoBytes, formatVideoDurationSeconds, formatVideoExtraFieldValue, formatIsoTimestamp } from './videoMetadataFormat'
+import {
+  formatVideoBytes,
+  formatVideoDurationSeconds,
+  formatVideoExtraFieldValue,
+  formatIsoTimestamp,
+  formatVideoFileSummaryLine,
+  formatVideoResolution,
+  videoMetadataFilesFromExtra,
+  videoMetadataFilesFromRow,
+} from './videoMetadataFormat'
 
 describe('formatVideoDurationSeconds', () => {
   it('rounds to the nearest minute and formats hours', () => {
@@ -12,11 +21,12 @@ describe('formatVideoDurationSeconds', () => {
 })
 
 describe('formatVideoBytes', () => {
-  it('formats bytes with b, K, M, G suffixes', () => {
-    expect(formatVideoBytes(512)).toBe('512 b')
+  it('formats bytes with bytes, K, MB, GB, TB suffixes', () => {
+    expect(formatVideoBytes(512)).toBe('512 bytes')
     expect(formatVideoBytes(1536)).toBe('2 K')
-    expect(formatVideoBytes(5 * 1024 * 1024)).toBe('5.0 M')
-    expect(formatVideoBytes(2.5 * 1024 * 1024 * 1024)).toBe('2.5 G')
+    expect(formatVideoBytes(5 * 1024 * 1024)).toBe('5.0MB')
+    expect(formatVideoBytes(2.5 * 1024 * 1024 * 1024)).toBe('2.5GB')
+    expect(formatVideoBytes(3 * 1024 * 1024 * 1024 * 1024)).toBe('3.0TB')
   })
 })
 
@@ -28,6 +38,53 @@ describe('formatIsoTimestamp', () => {
 
   it('strips fractional seconds', () => {
     expect(formatIsoTimestamp('2026-07-09T13:17:54.123Z')).toBe('2026-07-09 13:17:54')
+  })
+})
+
+describe('formatVideoFileSummaryLine', () => {
+  it('uses the filename and comma-separated duration, resolution, and size', () => {
+    expect(
+      formatVideoFileSummaryLine({
+        source: '/movies/Disc 1/feature.mkv',
+        duration_seconds: 9900,
+        resolution: { width: 1920, height: 1080 },
+        size_bytes: 5 * 1024 * 1024,
+      }),
+    ).toBe('feature.mkv, 2h45m, 1920x1080, 5.0MB')
+  })
+})
+
+describe('formatVideoResolution', () => {
+  it('formats width and height', () => {
+    expect(formatVideoResolution({ width: 1280, height: 720 })).toBe('1280x720')
+  })
+})
+
+describe('videoMetadataFilesFromRow', () => {
+  it('falls back to raw source JSON when extraFields lacks files', () => {
+    const files = videoMetadataFilesFromRow(null, {
+      video: {
+        title: 'Example',
+        files: [
+          { source: 'Disc 1/movie.mkv', duration_seconds: 120 },
+        ],
+      },
+    })
+    expect(files).toHaveLength(1)
+    expect(files[0].source).toBe('Disc 1/movie.mkv')
+  })
+})
+
+describe('videoMetadataFilesFromExtra', () => {
+  it('returns only object entries with a source field', () => {
+    const files = videoMetadataFilesFromExtra({
+      files: [
+        { source: 'a.mkv', duration_seconds: 60 },
+        'https://example.com/b.pdf',
+      ],
+    })
+    expect(files).toHaveLength(1)
+    expect(files[0].source).toBe('a.mkv')
   })
 })
 
@@ -49,7 +106,7 @@ describe('formatVideoExtraFieldValue', () => {
         ],
         new Map([['eng', 'English']]),
       ),
-    ).toBe('movie.mkv (h264 · 2m · 100 b · English)')
+    ).toBe('movie.mkv (h264 · 2m · 100 bytes · English)')
     expect(formatVideoExtraFieldValue('scanned_at', '2026-07-09T13:17:54Z', null)).toBe('2026-07-09 13:17:54')
   })
 })

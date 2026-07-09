@@ -9,6 +9,7 @@ import org.springframework.core.io.FileSystemResource;
 
 import java.io.InputStream;
 import java.util.List;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -414,5 +415,41 @@ class CollectionToSearchResultMapperTest {
         assertThat(results.get(0).extraFields()).containsEntry("count(Subtitles)", 3);
         assertThat(results.get(0).extraFields()).containsEntry("external_count", 10);
         assertThat(results.get(0).extraFields()).containsEntry("video_count", 1);
+    }
+
+    @Test
+    void mapsVideoFileMetadataIntoExtraFields() throws Exception {
+        String json = """
+            {
+              "id": "test-movies",
+              "name": "Test: Movies",
+              "shortName": "Test Movies",
+              "items": [
+                {
+                  "video": {
+                    "title": "Tears of Steel",
+                    "files": [
+                      {
+                        "source": "Disc 1/movie.mkv",
+                        "duration_seconds": 120,
+                        "resolution": { "width": 1920, "height": 1080 }
+                      }
+                    ]
+                  }
+                }
+              ]
+            }
+            """;
+        JsonNode root = objectMapper.readTree(json);
+        List<SearchResult> results = CollectionToSearchResultMapper.mapRootToSearchResults(root);
+
+        assertThat(results).hasSize(1);
+        assertThat(results.get(0).extraFields()).isNotNull();
+        assertThat(results.get(0).extraFields()).containsKey("files");
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> files = (List<Map<String, Object>>) results.get(0).extraFields().get("files");
+        assertThat(files).hasSize(1);
+        assertThat(files.get(0)).containsEntry("source", "Disc 1/movie.mkv");
+        assertThat(files.get(0)).containsEntry("duration_seconds", 120);
     }
 }

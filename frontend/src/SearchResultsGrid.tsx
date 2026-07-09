@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useCallback, useRef, type ReactNode, type MouseEvent } from 'react'
+import { useState, useMemo, useEffect, useCallback, useRef, Fragment, type ReactNode, type MouseEvent } from 'react'
 import { createPortal } from 'react-dom'
 import {
   useReactTable,
@@ -8,7 +8,7 @@ import {
 } from '@tanstack/react-table'
 import type { SearchResultRow, LightboxPayload } from './types'
 import { resolveLanguagesFromExtra, type LanguageCodeMap } from './languageCodeLookup'
-import { formatVideoExtraFieldValue } from './videoMetadataFormat'
+import { formatVideoExtraFieldValue, formatVideoFileSummaryLine, videoMetadataFilesFromRow } from './videoMetadataFormat'
 import { CopyFeedbackFlare, useCopyFeedback } from './CopyFeedback'
 import './SearchResultsGrid.css'
 
@@ -890,6 +890,18 @@ export function rawSourceDisplay(rawSourceItem: unknown): string {
 
 export function SearchResultsGrid({ data, sortBy = null, sortDir = 'asc', onSortChange, showScoreColumn = false, afterFilterSlot = null, viewMode = 'list', hideTroveInGallery = false, hideTroveInList = false, showPdfSashInGallery = false, showGalleryDecorations = true, isMobile = false, visibleExtraFieldKeys = null, onFetchAllForCopy = null, currentPage, totalPages, onPrevPage = null, onNextPage = null, languageCodeMap = null }: SearchResultsGridProps) {
   const [globalFilter, setGlobalFilter] = useState('')
+  const [expandedFileRowIds, setExpandedFileRowIds] = useState<Set<string>>(() => new Set())
+  const toggleFileRowExpanded = useCallback((rowKey: string) => {
+    setExpandedFileRowIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(rowKey)) {
+        next.delete(rowKey)
+      } else {
+        next.add(rowKey)
+      }
+      return next
+    })
+  }, [])
   const [lightbox, setLightbox] = useState<LightboxPayload | null>(null)
   const [rawSourceLightbox, setRawSourceLightbox] = useState<{ title: string; rawSourceItem: string } | null>(null)
   const { copyFeedbackMessage, showCopyFeedback } = useCopyFeedback()
@@ -1005,10 +1017,50 @@ export function SearchResultsGrid({ data, sortBy = null, sortDir = 'asc', onSort
     [data]
   )
   const hasResults = Array.isArray(data) && data.length > 0
-  const listTextColumns = useMemo(
-    () => (hideTroveInList ? textColumns.filter((c) => c.id !== 'trove') : textColumns),
-    [hideTroveInList]
-  )
+  useEffect(() => {
+    setExpandedFileRowIds(new Set())
+  }, [data])
+
+  const listTextColumns = useMemo(() => {
+    const base = hideTroveInList ? textColumns.filter((c) => c.id !== 'trove') : textColumns
+    if (viewMode !== 'list') {
+      return base
+    }
+    return base.map((col) => {
+      if (col.id !== 'title') {
+        return col
+      }
+      return {
+        ...col,
+        cell: (info: { getValue: () => unknown; row: { id: string; original: SearchResultRow } }) => {
+          const row = info.row.original
+          const metadataFiles = videoMetadataFilesFromRow(extraFieldsFromRow(row), row.rawSourceItem)
+          const rowKey = String(row.id ?? info.row.id)
+          const canExpand = metadataFiles.length > 0
+          const expanded = expandedFileRowIds.has(rowKey)
+          return (
+            <span className="grid-title-cell">
+              {canExpand ? (
+                <button
+                  type="button"
+                  className="grid-file-expand-btn"
+                  aria-expanded={expanded}
+                  aria-label={expanded ? 'Collapse files' : 'Expand files'}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    toggleFileRowExpanded(rowKey)
+                  }}
+                >
+                  <span className="grid-file-expand-icon" aria-hidden="true">{expanded ? '▼' : '▶'}</span>
+                </button>
+              ) : null}
+              <span className="grid-title-text">{String(info.getValue() ?? '')}</span>
+            </span>
+          )
+        },
+      }
+    })
+  }, [hideTroveInList, viewMode, expandedFileRowIds, toggleFileRowExpanded])
   const extraFieldColumns = useMemo(() => {
     if (viewMode !== 'list' || !visibleExtraFieldKeys || visibleExtraFieldKeys.length === 0) {
       return []
@@ -1925,9 +1977,12 @@ export function SearchResultsGrid({ data, sortBy = null, sortDir = 'asc', onSort
                     }, 150)
                   }
                   : undefined
+                const metadataFiles = videoMetadataFilesFromRow(extraFieldsFromRow(rowData), rowData.rawSourceItem)
+                const fileRowKey = String(rowData.id ?? row.id)
+                const filesExpanded = expandedFileRowIds.has(fileRowKey)
                 return (
+                  <Fragment key={row.id}>
                   <tr
-                    key={row.id}
                     className="grid-row-double-clickable"
                     onClick={handleRowClick}
                     onMouseEnter={
@@ -1958,6 +2013,17 @@ export function SearchResultsGrid({ data, sortBy = null, sortDir = 'asc', onSort
                       </td>
                     ))}
                   </tr>
+                  {filesExpanded &&
+                    metadataFiles.map((file, fileIndex) => (
+                      <tr key={`${row.id}-file-${fileIndex}`} className="grid-file-child-row">
+                        <td colSpan={columns.length}>
+                          <div className="grid-file-child-line">
+                            {formatVideoFileSummaryLine(file)}
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </Fragment>
                 )
               })
             )}
