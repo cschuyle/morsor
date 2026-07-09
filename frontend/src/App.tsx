@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect, useRef, useLayoutEffect } from 'react'
+import { useMemo, useState, useEffect, useRef, useLayoutEffect, useCallback } from 'react'
 import { Link, useSearchParams, useLocation } from 'react-router-dom'
 import type { SearchResultData, Trove, DuplicatesResultData, UniquesResultData } from './types'
 import type { FileTypeQuickModeValue } from './fileTypeQuickMode'
@@ -52,6 +52,8 @@ import {
 } from './sessionTabState'
 import { paginationPageWindow } from './paginationPageWindow'
 import { fetchTroveSyncState } from './troveSyncStateApi'
+import { listConnectedTroveIds } from './troveDirectoryHandles'
+import { TroveLocalRootsPanel } from './TroveLocalRootsPanel'
 import { clearLanguageCodeMapCache, ensureLanguageCodeMap, type LanguageCodeMap } from './languageCodeLookup'
 import { SearchQueryHelpButton, SearchQueryHelpPopover } from './SearchQueryHelpPopover'
 import './App.css'
@@ -77,6 +79,15 @@ function App() {
   const [message, setMessage] = useState('')
   const [cacheEntries, setCacheEntries] = useState(0)
   const [troves, setTroves] = useState<Trove[]>([])
+  const [connectedLocalTroveIds, setConnectedLocalTroveIds] = useState<Set<string>>(() => new Set())
+  const refreshConnectedLocalTroves = useCallback(async () => {
+    setConnectedLocalTroveIds(new Set(await listConnectedTroveIds()))
+  }, [])
+
+  useEffect(() => {
+    void refreshConnectedLocalTroves()
+  }, [refreshConnectedLocalTroves])
+
   const [languageCodeMap, setLanguageCodeMap] = useState<LanguageCodeMap | null>(null)
   const [searchSelectedTroveIds, setSearchSelectedTroveIds] = useState<Set<string>>(() => new Set())
   const [dupCompareTroveIds, setDupCompareTroveIds] = useState<Set<string>>(() => new Set())
@@ -1932,6 +1943,11 @@ function App() {
               </button>
             )}
           </div>
+          <TroveLocalRootsPanel
+            troves={troves}
+            onConnectionChange={refreshConnectedLocalTroves}
+            troveFilter={troveFilter}
+          />
           <ul className="trove-list">
             {selectedTroves.map((t) => (
               <li
@@ -3059,6 +3075,7 @@ function App() {
                       visibleExtraFieldKeys={visibleExtraFieldKeysForGrid}
                       onFetchAllForCopy={async () => fullSearchResultsRef.current}
                       languageCodeMap={languageCodeMap}
+                      troveIdsWithLocalDirectory={connectedLocalTroveIds}
                     />
                   </>
                 )
@@ -3269,6 +3286,7 @@ function App() {
                     visibleExtraFieldKeys={visibleExtraFieldKeysForGrid}
                     onFetchAllForCopy={async () => fullSearchResultsRef.current}
                     languageCodeMap={languageCodeMap}
+                    troveIdsWithLocalDirectory={connectedLocalTroveIds}
                     currentPage={pageNum}
                     totalPages={totalPages}
                     onPrevPage={() => goToPage(pageNum - 1)}

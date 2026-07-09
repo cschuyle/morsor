@@ -1,0 +1,130 @@
+.trove-local-roots-panel {
+  margin: 0.65rem 0 0.5rem;
+  border-top: 1px solid #e0d8f5;
+  padding-top: 0.5rem;
+}
+
+.trove-local-roots-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  width: 100%;
+  border: none;
+  background: transparent;
+  color: #443366;
+  font-size: 0.88rem;
+  cursor: pointer;
+  padding: 0.2rem 0;
+  text-align: left;
+}
+
+.trove-local-roots-toggle:hover {
+  color: #6633cc;
+}
+
+.trove-local-roots-toggle-meta {
+  margin-left: auto;
+  font-size: 0.78rem;
+  color: #777;
+}
+
+.trove-local-roots-toggle-chevron {
+  font-size: 0.65rem;
+  color: #6633cc;
+}
+
+.trove-local-roots-body {
+  margin-top: 0.45rem;
+}
+
+.trove-local-roots-hint {
+  margin: 0 0 0.5rem;
+  font-size: 0.78rem;
+  line-height: 1.35;
+  color: #666;
+}
+
+.trove-local-roots-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 12rem;
+  overflow-y: auto;
+}
+
+.trove-local-roots-item + .trove-local-roots-item {
+  margin-top: 0.35rem;
+}
+
+.trove-local-roots-warning {
+  margin: 0 0 0.5rem;
+  font-size: 0.78rem;
+  color: #a44;
+}
+
+.trove-local-roots-row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.trove-local-roots-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.trove-local-roots-status {
+  font-size: 0.76rem;
+  color: #555;
+  max-width: 10rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.trove-local-roots-btn {
+  font-size: 0.76rem;
+  padding: 0.2rem 0.45rem;
+  border: 1px solid #6633cc;
+  border-radius: 4px;
+  background: #6633cc;
+  color: #fff;
+  cursor: pointer;
+}
+
+.trove-local-roots-btn:hover:not(:disabled) {
+  background: #5528b8;
+}
+
+.trove-local-roots-btn:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.trove-local-roots-btn--secondary {
+  background: #fff;
+  color: #6633cc;
+}
+
+.trove-local-roots-btn--secondary:hover:not(:disabled) {
+  background: #f3eeff;
+}
+
+.trove-local-roots-name {
+  font-size: 0.8rem;
+  color: #444;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mobile-trove-picker .trove-local-roots-panel {
+  margin: 0.5rem 0.75rem 0;
+  padding-top: 0.45rem;
+}
+
+.mobile-trove-picker .trove-local-roots-list {
+  max-height: 10rem;
+}

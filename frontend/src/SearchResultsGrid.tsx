@@ -8,7 +8,9 @@ import {
 } from '@tanstack/react-table'
 import type { SearchResultRow, LightboxPayload } from './types'
 import { resolveLanguagesFromExtra, type LanguageCodeMap } from './languageCodeLookup'
-import { formatVideoExtraFieldValue, formatVideoFileSummaryLine, videoMetadataFilesFromRow } from './videoMetadataFormat'
+import { formatVideoExtraFieldValue, formatVideoFileSummaryLine, isVideoMetadataFileEntry, expandableFilesFromRow, urlFileBasename, videoFileBasename, videoFileSourcePath, videoFileSummarySuffix } from './videoMetadataFormat'
+import { openTroveLocalFile } from './troveDirectoryHandles'
+import { looksLikeStandaloneHttpUrl, normalizeUrlForHref, trimUrlTrailingPunctuation } from './urlUtils'
 import { CopyFeedbackFlare, useCopyFeedback } from './CopyFeedback'
 import './SearchResultsGrid.css'
 
@@ -43,6 +45,8 @@ export interface SearchResultsGridProps {
   onNextPage?: (() => void) | null
   /** Optional client-side fallback map for subtitle language code display. */
   languageCodeMap?: LanguageCodeMap | null
+  /** Trove ids with a connected local folder (File System Access API; see TroveLocalRootsPanel). */
+  troveIdsWithLocalDirectory?: ReadonlySet<string> | null
 }
 
 const AMAZON_PLACEHOLDER_THUMB = 'https://m.media-amazon.com/images/I/01RmK+J4pJL._SS135_.gif'
@@ -269,15 +273,36 @@ function combineTooltipParts(...parts: Array<string | null | undefined>): string
   return parts.filter((p): p is string => Boolean(p && p.trim())).join('\n\n')
 }
 
-/** Strip trailing punctuation often glued to URLs in prose. */
-function trimUrlDisplayAndHref(raw: string): string {
-  return raw.replace(/[.,;:!?)\]}>'"]+$/g, '')
+function linkifyUrlAnchor(display: string, key: string | number): ReactNode {
+  const href = normalizeUrlForHref(display.startsWith('http') ? display : `https://${display}`)
+  return (
+    <a
+      key={key}
+      href={href}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="search-results-lp-extra-tooltip-catalog-link"
+      onClick={(e) => e.stopPropagation()}
+    >
+      <span className="search-results-lp-extra-tooltip-catalog-link-text">{display}</span>
+      <PopOutIcon className="search-results-lp-extra-tooltip-catalog-link-icon" />
+    </a>
+  )
 }
 
 /**
  * Split plain text into fragments; substring that look like http(s) or www. URLs become links.
+ * Whole-string http(s) values (common for S3 image URLs with spaces in the path) link in full.
  */
 function linkifyTextWithUrls(text: string): ReactNode {
+  const trimmed = text.trim()
+  if (looksLikeStandaloneHttpUrl(trimmed)) {
+    const display = trimUrlTrailingPunctuation(trimmed)
+    if (display.length > 0) {
+      return linkifyUrlAnchor(display, 'lp-url-whole')
+    }
+  }
+
   const re = /(https?:\/\/[^\s<>"']+|www\.[^\s<>"']+)/gi
   const out: ReactNode[] = []
   let last = 0
@@ -287,22 +312,9 @@ function linkifyTextWithUrls(text: string): ReactNode {
     if (m.index > last) {
       out.push(text.slice(last, m.index))
     }
-    const trimmed = trimUrlDisplayAndHref(m[0])
-    if (trimmed.length > 0) {
-      const href = trimmed.startsWith('http') ? trimmed : `https://${trimmed}`
-      out.push(
-        <a
-          key={`lp-url-${key++}`}
-          href={href}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="search-results-lp-extra-tooltip-catalog-link"
-          onClick={(e) => e.stopPropagation()}
-        >
-          <span className="search-results-lp-extra-tooltip-catalog-link-text">{trimmed}</span>
-          <PopOutIcon className="search-results-lp-extra-tooltip-catalog-link-icon" />
-        </a>
-      )
+    const display = trimUrlTrailingPunctuation(m[0])
+    if (display.length > 0) {
+      out.push(linkifyUrlAnchor(display, `lp-url-${key++}`))
     }
     last = m.index + m[0].length
   }
@@ -780,7 +792,8 @@ function thumbnailColumnDef(
   isMobile = false,
   setRawSourceLightbox: ((state: { title: string; rawSourceItem: string } | null) => void) | null = null,
   hasThumbnails = true,
-  lpExtraHover: LpExtraHoverHandlers | null = null
+  lpExtraHover: LpExtraHoverHandlers | null = null,
+  languageCodeMap: LanguageCodeMap | null = null,
 ) {
   return {
     id: 'thumb',
@@ -847,7 +860,7 @@ function thumbnailColumnDef(
               linkIcon
             ) : url ? (
               <img
-                src={url}
+                src={normalizeUrlForHref(url)}
                 alt=""
                 className="search-thumb"
                 loading="lazy"
@@ -855,7 +868,7 @@ function thumbnailColumnDef(
             ) : null
           ) : showNonLpThumb ? (
             <img
-              src={url}
+              src={normalizeUrlForHref(url)}
               alt=""
               className="search-thumb"
               loading="lazy"
@@ -888,7 +901,7 @@ export function rawSourceDisplay(rawSourceItem: unknown): string {
   return (rawSourceItem != null && rawSourceItem !== '') ? String(rawSourceItem) : RAW_SOURCE_NOT_AVAILABLE
 }
 
-export function SearchResultsGrid({ data, sortBy = null, sortDir = 'asc', onSortChange, showScoreColumn = false, afterFilterSlot = null, viewMode = 'list', hideTroveInGallery = false, hideTroveInList = false, showPdfSashInGallery = false, showGalleryDecorations = true, isMobile = false, visibleExtraFieldKeys = null, onFetchAllForCopy = null, currentPage, totalPages, onPrevPage = null, onNextPage = null, languageCodeMap = null }: SearchResultsGridProps) {
+export function SearchResultsGrid({ data, sortBy = null, sortDir = 'asc', onSortChange, showScoreColumn = false, afterFilterSlot = null, viewMode = 'list', hideTroveInGallery = false, hideTroveInList = false, showPdfSashInGallery = false, showGalleryDecorations = true, isMobile = false, visibleExtraFieldKeys = null, onFetchAllForCopy = null, currentPage, totalPages, onPrevPage = null, onNextPage = null, languageCodeMap = null, troveIdsWithLocalDirectory = null }: SearchResultsGridProps) {
   const [globalFilter, setGlobalFilter] = useState('')
   const [expandedFileRowIds, setExpandedFileRowIds] = useState<Set<string>>(() => new Set())
   const toggleFileRowExpanded = useCallback((rowKey: string) => {
@@ -1034,9 +1047,9 @@ export function SearchResultsGrid({ data, sortBy = null, sortDir = 'asc', onSort
         ...col,
         cell: (info: { getValue: () => unknown; row: { id: string; original: SearchResultRow } }) => {
           const row = info.row.original
-          const metadataFiles = videoMetadataFilesFromRow(extraFieldsFromRow(row), row.rawSourceItem)
+          const expandableFiles = expandableFilesFromRow(row, extraFieldsFromRow(row))
           const rowKey = String(row.id ?? info.row.id)
-          const canExpand = metadataFiles.length > 0
+          const canExpand = expandableFiles.length > 0
           const expanded = expandedFileRowIds.has(rowKey)
           return (
             <span className="grid-title-cell">
@@ -1091,11 +1104,11 @@ export function SearchResultsGrid({ data, sortBy = null, sortDir = 'asc', onSort
     () => [
       ...(hasAnyThumbnail ? [thumbnailColumnDef((payload) => {
         setLightbox(payload)
-      }, isMobile, setRawSourceLightbox, hasThumbnails, lpExtraHoverHandlers)] : []),
+      }, isMobile, setRawSourceLightbox, hasThumbnails, lpExtraHoverHandlers, languageCodeMap)] : []),
       ...listTextColumns,
       ...extraFieldColumns,
     ],
-    [hasAnyThumbnail, hasThumbnails, isMobile, listTextColumns, lpExtraHoverHandlers, extraFieldColumns]
+    [hasAnyThumbnail, hasThumbnails, isMobile, listTextColumns, lpExtraHoverHandlers, extraFieldColumns, languageCodeMap]
   )
   const columns = useMemo(
     () => (showScoreColumn ? [...baseColumns, scoreColumn] : baseColumns),
@@ -1296,7 +1309,7 @@ export function SearchResultsGrid({ data, sortBy = null, sortDir = 'asc', onSort
         >
           Open{' '}
           <a
-            href={urlTooltipState.url}
+            href={normalizeUrlForHref(urlTooltipState.url)}
             target="_blank"
             rel="noopener noreferrer"
             onClick={(e) => e.stopPropagation()}
@@ -1321,7 +1334,7 @@ export function SearchResultsGrid({ data, sortBy = null, sortDir = 'asc', onSort
           onMouseLeave={() => setListUrlTooltipState(null)}
         >
           <a
-            href={listUrlTooltipState.url}
+            href={normalizeUrlForHref(listUrlTooltipState.url)}
             target="_blank"
             rel="noopener noreferrer"
             onClick={(e) => e.stopPropagation()}
@@ -1433,7 +1446,7 @@ export function SearchResultsGrid({ data, sortBy = null, sortDir = 'asc', onSort
               {desktopLpExtraBesideImage ? (
                 <div className="search-thumb-lightbox-media-panel">
                   <div className="search-thumb-lightbox-media-panel-image">
-                    <img src={lightbox.imageUrl!} alt="" />
+                    <img src={normalizeUrlForHref(lightbox.imageUrl!)} alt="" />
                   </div>
                   <div className="search-thumb-lightbox-media-panel-extra">
                     <div className="search-results-lp-extra-tooltip search-results-lp-extra-tooltip--in-lightbox search-results-lp-extra-tooltip--in-lightbox--beside-image">
@@ -1448,7 +1461,7 @@ export function SearchResultsGrid({ data, sortBy = null, sortDir = 'asc', onSort
                       <LittlePrinceExtraLinesRich lines={lpExtraLines} />
                     </div>
                   ) : null}
-                  {hasLightboxImage ? <img src={lightbox.imageUrl!} alt="" /> : null}
+                  {hasLightboxImage ? <img src={normalizeUrlForHref(lightbox.imageUrl!)} alt="" /> : null}
                 </>
               )}
             </div>
@@ -1458,24 +1471,24 @@ export function SearchResultsGrid({ data, sortBy = null, sortDir = 'asc', onSort
                   lightbox.imageUrls.map((imgUrl) => (
                     <a
                       key={imgUrl}
-                      href={imgUrl}
+                      href={normalizeUrlForHref(imgUrl)}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="search-thumb-lightbox-thumb"
                       aria-label="Open image"
                     >
-                      <img src={imgUrl} alt="" />
+                      <img src={normalizeUrlForHref(imgUrl)} alt="" />
                     </a>
                   ))}
                 {Array.isArray(lightbox.pdfs) &&
                   (lightbox.pdfs ?? []).map((url, idx) => (
-                    <a key={url} href={url} target="_blank" rel="noopener noreferrer" className="search-thumb-file-link">
+                    <a key={url} href={normalizeUrlForHref(url)} target="_blank" rel="noopener noreferrer" className="search-thumb-file-link">
                       {(lightbox.pdfs?.length ?? 0) > 1 ? `PDF ${idx + 1}` : 'PDF'}
                     </a>
                   ))}
                 {Array.isArray(lightbox.ebooks) &&
                   lightbox.ebooks.map((url) => (
-                    <a key={url} href={url} target="_blank" rel="noopener noreferrer" className="search-thumb-file-link">
+                    <a key={url} href={normalizeUrlForHref(url)} target="_blank" rel="noopener noreferrer" className="search-thumb-file-link">
                       {(/\.epub(\?|$)/i.test(url) ? 'EPUB' : 'MOBI')}
                     </a>
                   ))}
@@ -1483,7 +1496,7 @@ export function SearchResultsGrid({ data, sortBy = null, sortDir = 'asc', onSort
                   lightbox.videos.map((url) => {
                     const ext = (url.match(/\.([a-z0-9]+)(\?|$)/i) || [])[1] || 'video'
                     return (
-                      <a key={url} href={url} target="_blank" rel="noopener noreferrer" className="search-thumb-file-link">
+                      <a key={url} href={normalizeUrlForHref(url)} target="_blank" rel="noopener noreferrer" className="search-thumb-file-link">
                         {ext.toUpperCase()}
                       </a>
                     )
@@ -1492,7 +1505,7 @@ export function SearchResultsGrid({ data, sortBy = null, sortDir = 'asc', onSort
                   lightbox.audios.map((url) => {
                     const ext = (url.match(/\.([a-z0-9]+)(\?|$)/i) || [])[1] || 'audio'
                     return (
-                      <a key={url} href={url} target="_blank" rel="noopener noreferrer" className="search-thumb-file-link">
+                      <a key={url} href={normalizeUrlForHref(url)} target="_blank" rel="noopener noreferrer" className="search-thumb-file-link">
                         {ext.toUpperCase()}
                       </a>
                     )
@@ -1501,13 +1514,13 @@ export function SearchResultsGrid({ data, sortBy = null, sortDir = 'asc', onSort
                   lightbox.otherFiles.map((url) => {
                     const ext = (url.match(/\.([a-z0-9]+)(\?|$)/i) || [])[1] || 'file'
                     return (
-                      <a key={url} href={url} target="_blank" rel="noopener noreferrer" className="search-thumb-file-link">
+                      <a key={url} href={normalizeUrlForHref(url)} target="_blank" rel="noopener noreferrer" className="search-thumb-file-link">
                         {ext.toUpperCase()}
                       </a>
                     )
                   })}
                 {lightbox.itemUrl && (
-                  <a href={lightbox.itemUrl} target="_blank" rel="noopener noreferrer" className="search-thumb-file-link">
+                  <a href={normalizeUrlForHref(lightbox.itemUrl)} target="_blank" rel="noopener noreferrer" className="search-thumb-file-link">
                     Link
                   </a>
                 )}
@@ -1649,7 +1662,7 @@ export function SearchResultsGrid({ data, sortBy = null, sortDir = 'asc', onSort
               const openSashFile = (e, url) => {
                 e.preventDefault()
                 e.stopPropagation()
-                if (url) window.open(url, '_blank', 'noopener,noreferrer')
+                if (url) window.open(normalizeUrlForHref(url), '_blank', 'noopener,noreferrer')
               }
               const isPdf = (u) => typeof u === 'string' && /\.pdf(\?|$)/i.test(u)
               const isAudio = (u) => typeof u === 'string' && /\.(mp3|m4a|wav|ogg|flac|aac|wma)(\?|$)/i.test(u)
@@ -1776,7 +1789,7 @@ export function SearchResultsGrid({ data, sortBy = null, sortDir = 'asc', onSort
                   >
                   <span className="search-results-gallery-card-image">
                     {hasImage ? (
-                      <img src={typeof thumbUrl === 'string' ? thumbUrl : ''} alt="" loading="lazy" />
+                      <img src={typeof thumbUrl === 'string' ? normalizeUrlForHref(thumbUrl) : ''} alt="" loading="lazy" />
                     ) : showLinkIcon ? (
                       galleryLinkIcon
                     ) : (
@@ -1977,7 +1990,7 @@ export function SearchResultsGrid({ data, sortBy = null, sortDir = 'asc', onSort
                     }, 150)
                   }
                   : undefined
-                const metadataFiles = videoMetadataFilesFromRow(extraFieldsFromRow(rowData), rowData.rawSourceItem)
+                const expandableFiles = expandableFilesFromRow(rowData, extraFieldsFromRow(rowData))
                 const fileRowKey = String(rowData.id ?? row.id)
                 const filesExpanded = expandedFileRowIds.has(fileRowKey)
                 return (
@@ -2014,15 +2027,69 @@ export function SearchResultsGrid({ data, sortBy = null, sortDir = 'asc', onSort
                     ))}
                   </tr>
                   {filesExpanded &&
-                    metadataFiles.map((file, fileIndex) => (
+                    expandableFiles.map((entry, fileIndex) => {
+                      if (entry.kind === 'url') {
+                        const filename = urlFileBasename(entry.url)
+                        return (
+                          <tr key={`${row.id}-file-${fileIndex}`} className="grid-file-child-row">
+                            <td colSpan={columns.length}>
+                              <div className="grid-file-child-line">
+                                <a
+                                  href={normalizeUrlForHref(entry.url)}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="grid-file-child-link"
+                                  onClick={(e) => e.stopPropagation()}
+                                >
+                                  {filename}
+                                </a>
+                              </div>
+                            </td>
+                          </tr>
+                        )
+                      }
+                      const file = entry.file
+                      const sourcePath = videoFileSourcePath(file)
+                      const troveId = rowData.troveId != null ? String(rowData.troveId) : ''
+                      const canOpenLocal =
+                        troveId && sourcePath && troveIdsWithLocalDirectory?.has(troveId)
+                      const filename = videoFileBasename(isVideoMetadataFileEntry(file) ? file.source : null)
+                      const suffix = videoFileSummarySuffix(file)
+                      const handleOpenLocal = canOpenLocal
+                        ? async (e: MouseEvent<HTMLButtonElement>) => {
+                          e.stopPropagation()
+                          e.preventDefault()
+                          try {
+                            await openTroveLocalFile(troveId, sourcePath)
+                          } catch (err) {
+                            const msg = err instanceof Error ? err.message : 'Could not open local file.'
+                            showCopyFeedback(msg)
+                          }
+                        }
+                        : undefined
+                      return (
                       <tr key={`${row.id}-file-${fileIndex}`} className="grid-file-child-row">
                         <td colSpan={columns.length}>
                           <div className="grid-file-child-line">
-                            {formatVideoFileSummaryLine(file)}
+                            {canOpenLocal ? (
+                              <>
+                                <button
+                                  type="button"
+                                  className="grid-file-child-link"
+                                  onClick={handleOpenLocal}
+                                >
+                                  {filename}
+                                </button>
+                                {suffix}
+                              </>
+                            ) : (
+                              formatVideoFileSummaryLine(file)
+                            )}
                           </div>
                         </td>
                       </tr>
-                    ))}
+                      )
+                    })}
                   </Fragment>
                 )
               })

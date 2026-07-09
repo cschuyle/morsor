@@ -1,4 +1,4 @@
-import { useState, useEffect, useLayoutEffect, useRef, useMemo } from 'react'
+import { useState, useEffect, useLayoutEffect, useRef, useMemo, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import { Link, useSearchParams, useLocation } from 'react-router-dom'
 import type { SearchResultData, SearchResultRow, Trove, DuplicatesResultData, UniquesResultData } from './types'
@@ -47,6 +47,8 @@ import {
   type UniquesTabSession,
 } from './sessionTabState'
 import { fetchTroveSyncState } from './troveSyncStateApi'
+import { listConnectedTroveIds } from './troveDirectoryHandles'
+import { TroveLocalRootsPanel } from './TroveLocalRootsPanel'
 import { clearLanguageCodeMapCache, ensureLanguageCodeMap, type LanguageCodeMap } from './languageCodeLookup'
 import { SearchQueryHelpButton, SearchQueryHelpPopover } from './SearchQueryHelpPopover'
 import './MobileApp.css'
@@ -89,6 +91,15 @@ function hasUsableThumbnail(row: SearchResultRow | undefined | null): boolean {
 
 function MobileApp() {
   const [troves, setTroves] = useState<Trove[]>([])
+  const [connectedLocalTroveIds, setConnectedLocalTroveIds] = useState<Set<string>>(() => new Set())
+  const refreshConnectedLocalTroves = useCallback(async () => {
+    setConnectedLocalTroveIds(new Set(await listConnectedTroveIds()))
+  }, [])
+
+  useEffect(() => {
+    void refreshConnectedLocalTroves()
+  }, [refreshConnectedLocalTroves])
+
   const [languageCodeMap, setLanguageCodeMap] = useState<LanguageCodeMap | null>(null)
   const [searchParams, setSearchParams] = useSearchParams()
   const searchMode = (() => {
@@ -2803,6 +2814,11 @@ onClick={() => {
                 </span>
               )}
             </div>
+            <TroveLocalRootsPanel
+              troves={troves}
+              onConnectionChange={refreshConnectedLocalTroves}
+              troveFilter={trovePickerFilter}
+            />
             <ul className="mobile-trove-list">
               {isDupOrUniques && trovePickerSubTab === 'primary'
                 ? (() => {
@@ -3033,6 +3049,7 @@ onClick={() => {
                   visibleExtraFieldKeys={visibleExtraFieldKeysForGrid}
                   onFetchAllForCopy={async () => fullSearchResultsRef.current}
                   languageCodeMap={languageCodeMap}
+                  troveIdsWithLocalDirectory={connectedLocalTroveIds}
                   currentPage={page}
                   totalPages={totalPages}
                   onPrevPage={() => goToPage(page - 1)}

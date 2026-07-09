@@ -63,6 +63,16 @@ python3 scripts/generate-language-trove.py
 
 Reference troves are always loaded (even when excluded) and hidden from the trove picker. A bundled copy ships at `classpath:reference/iso639-languages.json` and is loaded automatically when the trove is missing from the main data source (e.g. S3 manifest). Video items gain a computed extra field **`subtitles(display)`** with resolved names; raw **`subtitles`** codes are unchanged for filtering (`COUNT(subtitles):3`). The **`subtitles:`** filter accepts a code or display name fragment when the term is at least three characters (e.g. `subtitles:russ` matches `Russian`, `subtitles:arab` matches `Arabic` and `Mozarabic`). Shorter terms use exact code/name matching only (e.g. `subtitles:ru` matches `rus` via the lookup table, not substring).
 
+## Local directories (browser only)
+
+Video troves can include per-file metadata with a relative {@code source} path (e.g. {@code Disc 1/movie.mkv}). In the trove sidebar, open **Local directories** and use **Choose folder…** for each trove. The browser stores a read-only folder handle in IndexedDB (not a path string the server can read).
+
+**Why not typed paths or {@code file://} links?** Web pages cannot open {@code file://} URLs (browsers block them as a sandbox escape). Typed absolute paths in localStorage do not grant the page permission to read those files.
+
+**How file links work:** After you connect a folder once, expanded list rows show clickable filenames. A click reads the file through the [File System Access API](https://developer.mozilla.org/en-US/docs/Web/API/File_System_Access_API) and opens a blob URL in a new tab (video can stream there). The morsor server is not involved.
+
+Supported browsers include Chromium (Chrome, Edge, Opera) and recent Safari. You may need to re-approve folder access after a restart if the browser prompts again.
+
 ## AWS S3
 
 `BUCKET/troves`

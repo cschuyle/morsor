@@ -6,8 +6,11 @@ import {
   formatIsoTimestamp,
   formatVideoFileSummaryLine,
   formatVideoResolution,
+  videoFileSummarySuffix,
   videoMetadataFilesFromExtra,
   videoMetadataFilesFromRow,
+  expandableFilesFromRow,
+  urlFileBasename,
 } from './videoMetadataFormat'
 
 describe('formatVideoDurationSeconds', () => {
@@ -41,6 +44,18 @@ describe('formatIsoTimestamp', () => {
   })
 })
 
+describe('videoFileSummarySuffix', () => {
+  it('returns the comma-prefixed tail after the filename', () => {
+    expect(
+      videoFileSummarySuffix({
+        source: 'movie.mkv',
+        duration_seconds: 120,
+        size_bytes: 100,
+      }),
+    ).toBe(', 2m, 100 bytes')
+  })
+})
+
 describe('formatVideoFileSummaryLine', () => {
   it('uses the filename and comma-separated duration, resolution, and size', () => {
     expect(
@@ -57,6 +72,59 @@ describe('formatVideoFileSummaryLine', () => {
 describe('formatVideoResolution', () => {
   it('formats width and height', () => {
     expect(formatVideoResolution({ width: 1280, height: 720 })).toBe('1280x720')
+  })
+})
+
+describe('expandableFilesFromRow', () => {
+  it('returns URL strings from row.files for troves like Little Prince', () => {
+    const files = expandableFilesFromRow(
+      {
+        files: [
+          'https://example.com/public/little-prince-ebooks/Spanish-08-El-Principito.pdf',
+        ],
+      },
+      null,
+    )
+    expect(files).toEqual([
+      { kind: 'url', url: 'https://example.com/public/little-prince-ebooks/Spanish-08-El-Principito.pdf' },
+    ])
+  })
+
+  it('prefers video metadata objects over row.files URL strings', () => {
+    const files = expandableFilesFromRow(
+      { files: ['https://example.com/ignored.pdf'] },
+      {
+        files: [{ source: 'Disc 1/movie.mkv', duration_seconds: 120 }],
+      },
+    )
+    expect(files).toHaveLength(1)
+    expect(files[0].kind).toBe('metadata')
+    if (files[0].kind === 'metadata') {
+      expect(files[0].file.source).toBe('Disc 1/movie.mkv')
+    }
+  })
+
+  it('falls back to raw source JSON for URL file arrays', () => {
+    expect(expandableFilesFromRow(null, null)).toEqual([])
+
+    const fromRaw = expandableFilesFromRow(
+      {
+        rawSourceItem: {
+          littlePrinceItem: {
+            title: 'Example',
+            files: ['https://example.com/book.pdf'],
+          },
+        },
+      },
+      null,
+    )
+    expect(fromRaw).toEqual([{ kind: 'url', url: 'https://example.com/book.pdf' }])
+  })
+})
+
+describe('urlFileBasename', () => {
+  it('extracts filename from URL paths', () => {
+    expect(urlFileBasename('https://example.com/path/my book.pdf?download=1')).toBe('my book.pdf')
   })
 })
 

@@ -122,6 +122,27 @@ export function formatVideoFileSummaryLine(file: unknown): string {
   return parts.join(', ')
 }
 
+export function videoFileSourcePath(file: unknown): string | null {
+  if (!isVideoMetadataFileEntry(file)) {
+    return null
+  }
+  const source = file.source
+  return typeof source === 'string' && source.trim() ? source.trim() : null
+}
+
+/** Comma-prefixed tail of {@link formatVideoFileSummaryLine} after the filename. */
+export function videoFileSummarySuffix(file: unknown): string {
+  const line = formatVideoFileSummaryLine(file)
+  const filename = videoFileBasename(isVideoMetadataFileEntry(file) ? file.source : null)
+  if (!line || line === filename) {
+    return ''
+  }
+  if (line.startsWith(`${filename}, `)) {
+    return line.slice(filename.length)
+  }
+  return line.slice(filename.length)
+}
+
 export function isVideoMetadataFileEntry(file: unknown): file is Record<string, unknown> {
   return file != null && typeof file === 'object' && !Array.isArray(file) && 'source' in file
 }
@@ -178,6 +199,65 @@ export function videoMetadataFilesFromRow(
     return []
   }
   return videoMetadataFilesFromExtra(unwrapRawSourceItem(parsed))
+}
+
+export type ExpandableListFile =
+  | { kind: 'metadata'; file: Record<string, unknown> }
+  | { kind: 'url'; url: string }
+
+function urlStringsFromFilesArray(value: unknown): string[] {
+  if (!Array.isArray(value)) {
+    return []
+  }
+  return value
+    .filter((entry): entry is string => typeof entry === 'string' && entry.trim() !== '')
+    .map((entry) => entry.trim())
+}
+
+function urlStringsFromRawSourceItem(rawSourceItem?: unknown): string[] {
+  const parsed = parseRawSourceRecord(rawSourceItem)
+  if (!parsed) {
+    return []
+  }
+  const fromTop = urlStringsFromFilesArray(parsed.files)
+  if (fromTop.length > 0) {
+    return fromTop
+  }
+  for (const key of Object.keys(parsed)) {
+    const value = parsed[key]
+    if (value != null && typeof value === 'object' && !Array.isArray(value)) {
+      const fromInner = urlStringsFromFilesArray((value as Record<string, unknown>).files)
+      if (fromInner.length > 0) {
+        return fromInner
+      }
+    }
+  }
+  return []
+}
+
+/** Basename for a URL or path in expandable file rows (strips query/hash first). */
+export function urlFileBasename(url: string): string {
+  const pathOnly = url.trim().replace(/[#?].*$/, '')
+  return videoFileBasename(pathOnly)
+}
+
+/**
+ * Per-file entries for expandable list rows: video metadata objects first, then URL strings
+ * from {@link SearchResultRow.files} (e.g. Little Prince ebooks).
+ */
+export function expandableFilesFromRow(
+  row: { files?: string[]; rawSourceItem?: unknown } | null | undefined,
+  extra: Record<string, unknown> | null | undefined,
+): ExpandableListFile[] {
+  const metadata = videoMetadataFilesFromRow(extra, row?.rawSourceItem)
+  if (metadata.length > 0) {
+    return metadata.map((file) => ({ kind: 'metadata' as const, file }))
+  }
+  let urls = urlStringsFromFilesArray(row?.files)
+  if (urls.length === 0) {
+    urls = urlStringsFromRawSourceItem(row?.rawSourceItem)
+  }
+  return urls.map((url) => ({ kind: 'url' as const, url }))
 }
 
 /** Per-file video metadata from `extraFields.files` (not URL string arrays on the row). */
