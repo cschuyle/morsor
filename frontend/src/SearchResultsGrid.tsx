@@ -138,6 +138,9 @@ export function formatLittlePrinceFieldLabel(key: string): string {
   if (lower === 'video_count') {
     return 'Count(Video)'
   }
+  if (lower === 'file_count') {
+    return 'Count(Files)'
+  }
   if (lower === 'embedded_count') {
     return 'Count(Embedded Subs)'
   }
