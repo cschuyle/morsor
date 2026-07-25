@@ -44,7 +44,7 @@ export function topMatchesFromSearchResult(
 /**
  * When enabled, debounce the query and run a regular search against the given
  * trove id(s). Used for the matches dropdown under the query box (search tab:
- * sole dynamic trove; dups tab: dynamic primary only — not the compare set).
+ * sole dynamic trove; dups tab: dynamic primary + compare troves).
  */
 export function useDupPrimaryTitleExists(
   enabled: boolean,

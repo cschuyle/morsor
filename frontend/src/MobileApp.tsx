@@ -1275,16 +1275,22 @@ function MobileApp() {
     return t?.dynamic === true ? primaryTroveId : null
   }, [searchMode, primaryTroveId, troves])
 
-  /** Trove id(s) for the debounced matches dropdown (dynamic smart mode): trove itself only. */
+  /** Trove id(s) for the debounced matches dropdown (dynamic smart mode). */
   const dynamicLookupTroveIds = useMemo(() => {
     if (searchMode === 'search' && soleDynamicTroveId) {
       return [soleDynamicTroveId]
     }
     if (searchMode === 'duplicates' && primaryDynamicTroveId) {
-      return [primaryDynamicTroveId]
+      const ids = new Set<string>([primaryDynamicTroveId])
+      for (const id of dupCompareTroveIds) {
+        if (id.trim()) {
+          ids.add(id.trim())
+        }
+      }
+      return [...ids]
     }
     return [] as string[]
-  }, [searchMode, soleDynamicTroveId, primaryDynamicTroveId])
+  }, [searchMode, soleDynamicTroveId, primaryDynamicTroveId, dupCompareTroveIds])
 
   const {
     matches: dupPrimaryMatches,
