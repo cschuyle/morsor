@@ -42,9 +42,9 @@ export function topMatchesFromSearchResult(
 }
 
 /**
- * When enabled (dups tab + dynamic primary), debounce the query and run a
- * regular search against the primary trove only. Exposes the top hits for a
- * dismissable flare.
+ * When enabled (dups tab with dynamic primary, or search tab with a sole
+ * dynamic trove), debounce the query and run a regular search against that
+ * trove. Exposes the top hits for a dropdown under the query box.
  */
 export function useDupPrimaryTitleExists(
   enabled: boolean,

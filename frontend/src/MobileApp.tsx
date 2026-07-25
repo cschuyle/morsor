@@ -1281,9 +1281,10 @@ function MobileApp() {
     dismiss: dismissDupPrimaryMatches,
     reopen: reopenDupPrimaryMatches,
   } = useDupPrimaryTitleExists(
-    searchMode === 'duplicates' && primaryDynamicTroveId != null,
-    primaryDynamicTroveId,
-    dupQuery,
+    (searchMode === 'duplicates' && primaryDynamicTroveId != null) ||
+      (searchMode === 'search' && soleDynamicTroveId != null),
+    searchMode === 'search' ? soleDynamicTroveId : primaryDynamicTroveId,
+    searchMode === 'search' ? searchQuery : dupQuery,
   )
   const dupPrimaryTitleExists = dupPrimaryMatches.length > 0
 
@@ -1390,10 +1391,11 @@ function MobileApp() {
         queryCache.clear()
         fetchUniques(0)
       } else {
-        queryRef.current = '*'
-        setSearchQuery('*')
+        // Clear the query box but leave results as-is; don't re-run search.
+        queryRef.current = ''
+        setSearchQuery('')
         await refreshTroves()
-        fetchSearch(0)
+        queryCache.clear()
       }
       showActionFlare(`Added item ${flareQuote(title)}`)
     } catch (e) {
@@ -2282,8 +2284,8 @@ onClick={() => {
                 <button
                   type="button"
                   className="mobile-search-exists-check"
-                  title="Show matches in primary trove"
-                  aria-label="Show matches in primary trove"
+                  title="Show matches in trove"
+                  aria-label="Show matches in trove"
                   onClick={() => reopenDupPrimaryMatches()}
                 >
                   <svg viewBox="0 0 20 20" width="16" height="16" focusable="false" aria-hidden="true">

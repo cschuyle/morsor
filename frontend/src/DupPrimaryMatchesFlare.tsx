@@ -80,7 +80,7 @@ export function DupPrimaryMatchesFlare({
       className="dup-primary-matches-dropdown"
       style={position}
       role="listbox"
-      aria-label="Matches in primary trove"
+      aria-label="Matches in trove"
     >
       <ul className="dup-primary-matches-dropdown-list">
         {matches.map((m, i) => (
