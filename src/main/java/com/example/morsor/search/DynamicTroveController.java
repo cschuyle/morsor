@@ -9,6 +9,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
@@ -82,10 +83,15 @@ public class DynamicTroveController {
         }
     }
 
-    @DeleteMapping("/{troveId}/items/{itemId}")
-    public ResponseEntity<Void> removeItem(@PathVariable String troveId, @PathVariable String itemId) {
-        log.info("DELETE /api/dynamic-troves/{}/items/{}", troveId, itemId);
-        boolean removed = searchDataService.removeDynamicTroveItem(troveId, itemId);
+    @DeleteMapping("/{troveId}/items")
+    public ResponseEntity<Void> removeItem(
+            @PathVariable String troveId,
+            @RequestParam String title) {
+        log.info("DELETE /api/dynamic-troves/{}/items: title.preview={}", troveId, previewForLog(title));
+        if (title == null || title.isBlank()) {
+            return ResponseEntity.badRequest().build();
+        }
+        boolean removed = searchDataService.removeDynamicTroveItem(troveId, title);
         if (!removed) {
             return ResponseEntity.notFound().build();
         }

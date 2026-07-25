@@ -13,7 +13,9 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestTemplate;
+import org.springframework.web.util.UriComponentsBuilder;
 
+import java.net.URI;
 import java.util.List;
 import java.util.UUID;
 
@@ -41,7 +43,8 @@ class DynamicTroveControllerTest {
 
     @Test
     void createEmptyDynamicTroveAddItemSearchDelete() {
-        String uniqueName = "DynTest-" + UUID.randomUUID();
+        String uniqueName = "Dyn Test " + UUID.randomUUID();
+        String expectedSlug = SearchDataService.normalizeDynamicTroveName(uniqueName);
         ResponseEntity<DynamicTroveRegistration> created = restTemplate.exchange(
                 base() + "/api/dynamic-troves",
                 HttpMethod.POST,
@@ -50,8 +53,8 @@ class DynamicTroveControllerTest {
 
         assertThat(created.getStatusCode()).isEqualTo(HttpStatus.CREATED);
         assertThat(created.getBody()).isNotNull();
-        assertThat(created.getBody().troveId()).startsWith("dyn-");
-        assertThat(created.getBody().name()).isEqualTo(uniqueName);
+        assertThat(created.getBody().troveId()).isEqualTo(expectedSlug);
+        assertThat(created.getBody().name()).isEqualTo(expectedSlug);
         assertThat(created.getBody().count()).isEqualTo(0);
 
         String troveId = created.getBody().troveId();
@@ -68,7 +71,7 @@ class DynamicTroveControllerTest {
                 .orElseThrow();
         assertThat(option.dynamic()).isTrue();
         assertThat(option.count()).isEqualTo(0);
-        assertThat(option.name()).isEqualTo(uniqueName);
+        assertThat(option.name()).isEqualTo(expectedSlug);
 
         ResponseEntity<DynamicTroveItemRegistration> item = restTemplate.exchange(
                 base() + "/api/dynamic-troves/" + troveId + "/items",
@@ -78,7 +81,7 @@ class DynamicTroveControllerTest {
         assertThat(item.getStatusCode()).isEqualTo(HttpStatus.CREATED);
         assertThat(item.getBody()).isNotNull();
         assertThat(item.getBody().title()).isEqualTo("Alpha Widget");
-        String itemId = item.getBody().id();
+        assertThat(item.getBody().id()).isEqualTo("Alpha Widget");
 
         ResponseEntity<SearchResponse> search = restTemplate.exchange(
                 base() + "/api/search?query=*&trove=" + troveId,
@@ -88,10 +91,16 @@ class DynamicTroveControllerTest {
         assertThat(search.getBody()).isNotNull();
         assertThat(search.getBody().results()).hasSize(1);
         assertThat(search.getBody().results().get(0).result().title()).isEqualTo("Alpha Widget");
-        assertThat(search.getBody().results().get(0).result().id()).isEqualTo(itemId);
+        assertThat(search.getBody().results().get(0).result().id()).isEqualTo("Alpha Widget");
 
+        URI deleteUri = UriComponentsBuilder
+                .fromUriString(base() + "/api/dynamic-troves/" + troveId + "/items")
+                .queryParam("title", "Alpha Widget")
+                .build()
+                .encode()
+                .toUri();
         ResponseEntity<Void> delItem = restTemplate.exchange(
-                base() + "/api/dynamic-troves/" + troveId + "/items/" + itemId,
+                deleteUri,
                 HttpMethod.DELETE,
                 null,
                 Void.class);
@@ -192,7 +201,7 @@ class DynamicTroveControllerTest {
 
     @Test
     void deleteUnknownDynamicTroveReturns404() {
-        String url = base() + "/api/dynamic-troves/dyn-00000000-0000-0000-0000-000000000000";
+        String url = base() + "/api/dynamic-troves/no-such-dynamic-trove";
         assertThatThrownBy(() -> restTemplate.exchange(url, HttpMethod.DELETE, null, Void.class))
                 .isInstanceOf(HttpClientErrorException.NotFound.class);
     }
@@ -262,5 +271,35 @@ class DynamicTroveControllerTest {
                 .isEqualTo("foo bar baz");
         assertThat(SearchDataService.normalizeDynamicTroveItemTitle("Hello World"))
                 .isEqualTo(SearchDataService.normalizeDynamicTroveItemTitle("hello   world"));
+    }
+
+    @Test
+    void normalizeDynamicTroveNameSlugifies() {
+        assertThat(SearchDataService.normalizeDynamicTroveName("  Hello, World!! "))
+                .isEqualTo("hello-world");
+        assertThat(SearchDataService.normalizeDynamicTroveName("My   Cool_List"))
+                .isEqualTo("my-coollist");
+        assertThat(SearchDataService.normalizeDynamicTroveName("Vinyl"))
+                .isEqualTo("vinyl");
+    }
+
+    @Test
+    void createDynamicTroveStoresNormalizedNameAsId() {
+        ResponseEntity<DynamicTroveRegistration> created = restTemplate.exchange(
+                base() + "/api/dynamic-troves",
+                HttpMethod.POST,
+                new HttpEntity<>("{\"name\":\"Hello, World " + UUID.randomUUID() + "\"}", jsonHeaders()),
+                DynamicTroveRegistration.class);
+        assertThat(created.getBody()).isNotNull();
+        String slug = created.getBody().troveId();
+        assertThat(slug).startsWith("hello-world-");
+        assertThat(created.getBody().name()).isEqualTo(slug);
+        assertThat(slug).matches("hello-world-[0-9a-f]+");
+
+        restTemplate.exchange(
+                base() + "/api/dynamic-troves/" + slug,
+                HttpMethod.DELETE,
+                null,
+                Void.class);
     }
 }

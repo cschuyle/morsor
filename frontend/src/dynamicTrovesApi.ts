@@ -8,6 +8,7 @@ export type DynamicTroveRegistration = {
 }
 
 export type DynamicTroveItemRegistration = {
+  /** Same as {@link title}; kept for older clients that read an id field. */
   id: string
   troveId: string
   title: string
@@ -98,10 +99,11 @@ export async function addDynamicTroveItem(
   return res.json() as Promise<DynamicTroveItemRegistration>
 }
 
-export async function deleteDynamicTroveItem(troveId: string, itemId: string): Promise<void> {
+export async function deleteDynamicTroveItem(troveId: string, title: string): Promise<void> {
   await ensureCsrf()
+  const qs = new URLSearchParams({ title })
   const res = await fetch(
-    `/api/dynamic-troves/${encodeURIComponent(troveId)}/items/${encodeURIComponent(itemId)}`,
+    `/api/dynamic-troves/${encodeURIComponent(troveId)}/items?${qs}`,
     {
       method: 'DELETE',
       credentials: 'include',

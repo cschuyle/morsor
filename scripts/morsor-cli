@@ -316,6 +316,10 @@ def is_local_command(token: str) -> bool:
     return token.lower().rstrip(":") == "local"
 
 
+def is_dynamic_command(token: str) -> bool:
+    return token.lower().rstrip(":") == "dynamic"
+
+
 def pad_right(s: str, n: int) -> str:
     return s if len(s) >= n else s + " " * (n - len(s))
 
@@ -1831,6 +1835,209 @@ def run_local_command(
         die(f"unknown local subcommand: {subcommand!r}  (expected: sisters, trove, troves, list, aliases, rename)")
 
 
+def _cli_auth_headers(
+    base: str,
+    bearer: str | None,
+    extra_headers: list[str],
+    *,
+    json_body: bool = False,
+) -> tuple[str | None, dict[str, str]]:
+    token = bearer
+    if (not token or not token.strip()) and is_likely_local_dev_base(base):
+        token = DEV_DEFAULT_TOKEN
+    headers: dict[str, str] = dict(_DEFAULT_HEADERS)
+    if json_body:
+        headers["Content-Type"] = "application/json"
+    if token and token.strip():
+        headers["Authorization"] = "Bearer " + token.strip()
+    for h in extra_headers:
+        if ":" not in h or h.index(":") <= 0:
+            die(f"header must be Name: value, got: {h}")
+        name, value = h.split(":", 1)
+        headers[name.strip()] = value.strip()
+    return token, headers
+
+
+def _http_json(
+    base: str,
+    method: str,
+    path: str,
+    bearer: str | None,
+    extra_headers: list[str],
+    debug: bool,
+    body_obj: dict | None = None,
+    *,
+    ok_empty: bool = False,
+) -> Any:
+    """JSON HTTP helper. Returns parsed JSON, or None when ok_empty and body is empty."""
+    _, headers = _cli_auth_headers(base, bearer, extra_headers, json_body=body_obj is not None)
+    url = strip_trailing_slash(base) + path
+    data = None if body_obj is None else json.dumps(body_obj).encode("utf-8")
+    req = urllib.request.Request(url, data=data, method=method, headers=headers)
+    if debug:
+        print(f"[debug] {method} {url}", file=sys.stderr)
+    try:
+        with urllib.request.urlopen(req, timeout=60) as resp:
+            raw = resp.read().decode("utf-8", errors="replace")
+            if ok_empty and (not raw or not raw.strip()):
+                return None
+            if not raw or not raw.strip():
+                return None
+            return json.loads(raw)
+    except HTTPError as e:
+        raw = e.read().decode("utf-8", errors="replace") if e.fp else ""
+        if e.code == 409:
+            msg = raw.strip() or "resource already exists (e.g. duplicate normalized title)"
+            die(f"conflict: {msg} (HTTP 409)", code=1)
+        if e.code == 404:
+            die(f"not found: {path} (HTTP 404)", code=1)
+        if e.code == 400:
+            try:
+                err_obj = json.loads(raw)
+                if isinstance(err_obj, dict) and err_obj.get("error"):
+                    die(str(err_obj["error"]), code=1)
+            except (json.JSONDecodeError, KeyError):
+                pass
+            die(f"bad request: HTTP 400 {raw.strip()}", code=1)
+        die(f"{method} {path} failed: HTTP {e.code} {raw.strip()}", code=1)
+    except URLError as e:
+        die(_server_unreachable(base, e))
+    except json.JSONDecodeError:
+        die(f"{method} {path}: could not parse JSON response")
+
+
+def _resolve_dynamic_trove_id(
+    base: str,
+    bearer: str | None,
+    extra_headers: list[str],
+    debug: bool,
+    trove_ref: str,
+) -> tuple[str, str]:
+    """Resolve a dynamic trove id or display name → (troveId, name)."""
+    ref = (trove_ref or "").strip()
+    if not ref:
+        die("dynamic item: trove id or name is required")
+    rows = _http_json(base, "GET", "/api/troves", bearer, extra_headers, debug)
+    if not isinstance(rows, list):
+        die("GET /api/troves: expected a JSON array")
+    dynamic = [
+        o for o in rows
+        if isinstance(o, dict) and o.get("dynamic") is True
+    ]
+    by_id = [o for o in dynamic if str(o.get("id", "")) == ref]
+    if by_id:
+        return str(by_id[0]["id"]), str(by_id[0].get("name") or by_id[0]["id"])
+    needle = ref.casefold()
+    by_name = [
+        o for o in dynamic
+        if str(o.get("name") or "").casefold() == needle
+    ]
+    if len(by_name) == 1:
+        return str(by_name[0]["id"]), str(by_name[0].get("name") or by_name[0]["id"])
+    if len(by_name) > 1:
+        die(f"ambiguous dynamic trove name {ref!r}: {[o.get('id') for o in by_name]}")
+    # Helpful hint if they named a non-dynamic trove.
+    any_match = [
+        o for o in rows
+        if isinstance(o, dict)
+        and (str(o.get("id", "")) == ref or str(o.get("name") or "").casefold() == needle)
+    ]
+    if any_match:
+        die(f"{ref!r} is not a dynamic trove (only dynamic troves support item add/delete)")
+    die(f"unknown dynamic trove: {ref!r}")
+
+
+def run_dynamic_item_add(
+    base: str,
+    bearer: str | None,
+    extra_headers: list[str],
+    debug: bool,
+    output_mode: str,
+    trove_ref: str,
+    title: str,
+) -> None:
+    trove_id, trove_name = _resolve_dynamic_trove_id(
+        base, bearer, extra_headers, debug, trove_ref
+    )
+    title = (title or "").strip()
+    if not title:
+        die("dynamic item add requires a non-empty title")
+    path = "/api/dynamic-troves/" + urllib.parse.quote(trove_id, safe="") + "/items"
+    reg = _http_json(
+        base, "POST", path, bearer, extra_headers, debug, body_obj={"title": title}
+    )
+    if not isinstance(reg, dict):
+        die("POST item: unexpected response")
+    if output_mode in ("json", "yaml"):
+        print_document_body(json.dumps(reg), output_mode if output_mode == "yaml" else "json")
+    else:
+        print(
+            f"Added {reg.get('title')!r} to dynamic trove "
+            f"{trove_name!r} ({trove_id})"
+        )
+
+
+def run_dynamic_item_delete(
+    base: str,
+    bearer: str | None,
+    extra_headers: list[str],
+    debug: bool,
+    trove_ref: str,
+    title: str,
+) -> None:
+    trove_id, trove_name = _resolve_dynamic_trove_id(
+        base, bearer, extra_headers, debug, trove_ref
+    )
+    title = (title or "").strip()
+    if not title:
+        die("dynamic item delete requires a title")
+    path = (
+        "/api/dynamic-troves/"
+        + urllib.parse.quote(trove_id, safe="")
+        + "/items?"
+        + urllib.parse.urlencode({"title": title})
+    )
+    _http_json(base, "DELETE", path, bearer, extra_headers, debug, ok_empty=True)
+    print(f"Deleted {title!r} from dynamic trove {trove_name!r} ({trove_id})")
+
+
+def run_dynamic_command(
+    args: list[str],
+    base: str,
+    bearer: str | None,
+    extra_headers: list[str],
+    debug: bool,
+    output_mode: str,
+) -> None:
+    if not args:
+        die("dynamic requires a subcommand: item")
+    subcommand = args[0].lower()
+    if subcommand in ("item", "items"):
+        if len(args) < 2:
+            die(f"dynamic {subcommand} requires a subcommand: add, delete")
+        op = args[1].lower()
+        if op == "add":
+            if len(args) < 4:
+                die("usage: morsor-cli dynamic item add <trove-id-or-name> <title...>")
+            trove_ref = args[2]
+            title = " ".join(args[3:]).strip()
+            run_dynamic_item_add(
+                base, bearer, extra_headers, debug, output_mode, trove_ref, title
+            )
+        elif op in ("delete", "del", "rm", "remove"):
+            if len(args) < 4:
+                die("usage: morsor-cli dynamic item delete <trove-id-or-name> <title...>")
+            trove_ref = args[2]
+            title = " ".join(args[3:]).strip()
+            run_dynamic_item_delete(
+                base, bearer, extra_headers, debug, trove_ref, title
+            )
+        else:
+            die(f"unknown subcommand: dynamic {subcommand} {op!r}  (expected: add, delete)")
+    else:
+        die(f"unknown dynamic subcommand: {subcommand!r}  (expected: item)")
+
+
 MORSOR_CLI_MAN_PAGE = """
 MORSOR-CLI(1)                    User Commands                    MORSOR-CLI(1)
 
@@ -1852,6 +2059,9 @@ SYNOPSIS
     morsor-cli [OPTIONS] local trove create [FILE]
     morsor-cli [OPTIONS] local trove delete <trove-id>
     morsor-cli [OPTIONS] local list
+
+    morsor-cli [OPTIONS] dynamic item add <trove> <title...>
+    morsor-cli [OPTIONS] dynamic item delete <trove> <title...>
 
        morsor-cli [OPTIONS] METHOD PATH [-- querystring]
 
@@ -2042,6 +2252,11 @@ ACTIONS
        local list              List all CLI-created ephemeral troves.
        local aliases           Print trove aliases from MORSOR_PROPERTIES_FILE.
        local rename <id> <name> Rename any ephemeral trove (sister or local).
+       dynamic item add <trove> <title...>
+                              Add a title to a DB-backed dynamic trove (trove id or name).
+       dynamic item delete <trove> <title...>
+                              Delete a dynamic-trove item by title (normalized match:
+                              case-insensitive, collapsed whitespace).
        login                  Authenticate; save token to ~/.morsor/session-token.json
                               and print export MORSOR_CLI_TOKEN=… for shell use
        logout                 Revoke all tokens; delete ~/.morsor/session-token.json
@@ -2098,6 +2313,11 @@ EXAMPLES
        List CLI-created ephemeral troves:
 
               ./scripts/morsor-cli local list
+
+       Add / delete titles on a dynamic (DB-backed) trove:
+
+              ./scripts/morsor-cli dynamic item add "My List" "Hello World"
+              ./scripts/morsor-cli dynamic item delete "My List" "Hello World"
 
        Duplicates: primary is ephemeral local trove; compare against vinyl and CDs;
        large page; JSON to jq (titles of primary rows):
@@ -2187,6 +2407,10 @@ LOCAL (EPHEMERAL) TROVES
   local aliases                       # Print configured trove aliases
   local rename <id> <new-name>        # Rename any ephemeral trove (sister or local)
 
+DYNAMIC (DB-BACKED) TROVES
+  dynamic item add <trove> <title...>     # Add a title (trove id or name)
+  dynamic item delete <trove> <title...>  # Delete by title
+
 ENV
   MORSOR_CLI_BASE_URL      Default base URL (overridden by -b/--base)
   MORSOR_CLI_TOKEN         Bearer token (used if ~/.morsor/session-token.json absent)
@@ -2202,6 +2426,8 @@ Examples:
   morsor-cli local sisters load
   morsor-cli local trove create /path/to/titles.txt
   cat /path/to/titles.txt | morsor-cli local trove create
+  morsor-cli dynamic item add "My List" "Hello World"
+  morsor-cli dynamic item delete "My List" "Hello World"
 """.strip()
     )
 
@@ -2383,6 +2609,15 @@ def main(argv: list[str]) -> None:
         )
         return
 
+    if is_dynamic_command(positional[0]):
+        if body_file:
+            die("--file is not valid with dynamic")
+        if local_trove_name_override is not None:
+            die("--name is not valid with dynamic")
+        run_dynamic_command(
+            positional[1:], base, bearer, extra_headers, debug, output_mode,
+        )
+        return
 
     if local_trove_name_override is not None:
         die("--name is only valid with local trove create")

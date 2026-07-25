@@ -618,12 +618,13 @@ function App() {
     }
   }
 
-  async function handleDeleteDynamicItem(row: { id?: string }) {
-    if (!soleDynamicTroveId || !row?.id) {
+  async function handleDeleteDynamicItem(row: { id?: string; title?: string }) {
+    const title = (row?.title ?? row?.id ?? '').toString().trim()
+    if (!soleDynamicTroveId || !title) {
       return
     }
     try {
-      await deleteDynamicTroveItem(soleDynamicTroveId, String(row.id))
+      await deleteDynamicTroveItem(soleDynamicTroveId, title)
       await refreshTroves()
       fetchSearch(0)
     } catch (e) {

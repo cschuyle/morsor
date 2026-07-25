@@ -555,7 +555,7 @@ public class SearchDataService {
         for (DynamicTroveItemRow item : items) {
             String name = dynamicTroveNames.getOrDefault(item.troveId(), item.troveId());
             List<SearchResult> list = byTrove.computeIfAbsent(item.troveId(), k -> new ArrayList<>());
-            list.add(dynamicItemToSearchResult(item.id(), item.title(), item.troveId(), name));
+            list.add(dynamicItemToSearchResult(item.title(), item.troveId(), name));
         }
         for (Map.Entry<String, List<SearchResult>> e : byTrove.entrySet()) {
             dynamicTroves.put(e.getKey(), List.copyOf(e.getValue()));
@@ -563,10 +563,11 @@ public class SearchDataService {
         log.info("Loaded {} dynamic trove(s) ({} item(s)) from DB", dynamicTroveNames.size(), items.size());
     }
 
-    private static SearchResult dynamicItemToSearchResult(String itemId, String title, String troveId, String troveName) {
+    /** SearchResult.id is the item title (dynamic items have no separate id). */
+    private static SearchResult dynamicItemToSearchResult(String title, String troveId, String troveName) {
         String t = title != null ? title : "";
         return new SearchResult(
-                itemId,
+                t,
                 "dynamicTitle",
                 t,
                 t,
@@ -615,59 +616,85 @@ public class SearchDataService {
     }
 
     /**
-     * Create an empty dynamic trove. Throws {@link IllegalArgumentException} for bad input,
-     * {@link IllegalStateException} when the name conflicts with an existing trove.
+     * Normalize a dynamic trove name to its id/label form: lowercase, strip non-alphanumeric
+     * characters (whitespace kept temporarily), then collapse whitespace runs to {@code '-'}.
+     */
+    public static String normalizeDynamicTroveName(String name) {
+        if (name == null) {
+            return "";
+        }
+        String lower = name.toLowerCase(java.util.Locale.ROOT);
+        String stripped = lower.replaceAll("[^a-z0-9\\s]", "");
+        return stripped.trim().replaceAll("\\s+", "-");
+    }
+
+    /**
+     * Create an empty dynamic trove. The stored id and name are both
+     * {@link #normalizeDynamicTroveName(String)}. Throws {@link IllegalArgumentException} for bad
+     * input, {@link IllegalStateException} when the normalized name conflicts with an existing trove.
      */
     public DynamicTroveRegistration createDynamicTrove(String name) {
         if (dynamicTroveRepository == null) {
             throw new IllegalStateException("Dynamic troves are not available (no repository)");
         }
-        String label = name == null ? "" : name.trim();
-        if (label.isEmpty()) {
+        String raw = name == null ? "" : name.trim();
+        if (raw.isEmpty()) {
             throw new IllegalArgumentException("name is required");
         }
-        if (label.length() > MAX_DYNAMIC_TROVE_NAME_LEN) {
+        if (raw.length() > MAX_DYNAMIC_TROVE_NAME_LEN) {
             throw new IllegalArgumentException("name exceeds max length " + MAX_DYNAMIC_TROVE_NAME_LEN);
         }
-        if (isTroveNameTaken(label)) {
-            throw new IllegalStateException("A trove named \"" + label + "\" already exists");
+        String slug = normalizeDynamicTroveName(raw);
+        if (slug.isEmpty()) {
+            throw new IllegalArgumentException("name must contain at least one letter or digit");
         }
-        String troveId = "dyn-" + UUID.randomUUID();
+        if (slug.length() > MAX_DYNAMIC_TROVE_NAME_LEN) {
+            throw new IllegalArgumentException("normalized name exceeds max length " + MAX_DYNAMIC_TROVE_NAME_LEN);
+        }
         synchronized (mergeLock) {
-            // Re-check under lock in case of concurrent create.
-            if (isTroveNameTakenLocked(label)) {
-                throw new IllegalStateException("A trove named \"" + label + "\" already exists");
+            if (isDynamicTroveSlugTakenLocked(slug)) {
+                throw new IllegalStateException("A trove named \"" + slug + "\" already exists");
             }
             try {
-                dynamicTroveRepository.insertTrove(troveId, label);
+                dynamicTroveRepository.insertTrove(slug, slug);
             } catch (DataIntegrityViolationException e) {
-                throw new IllegalStateException("A trove named \"" + label + "\" already exists", e);
+                throw new IllegalStateException("A trove named \"" + slug + "\" already exists", e);
             }
-            dynamicTroveNames.put(troveId, label);
-            dynamicTroves.put(troveId, List.of());
+            dynamicTroveNames.put(slug, slug);
+            dynamicTroves.put(slug, List.of());
             rebuildMergedIndexLocked();
         }
-        log.info("Created dynamic trove id=\"{}\" name=\"{}\"", troveId, label);
-        return new DynamicTroveRegistration(troveId, label, 0);
+        log.info("Created dynamic trove id=\"{}\" (from input \"{}\")", slug, raw);
+        return new DynamicTroveRegistration(slug, slug, 0);
     }
 
-    private boolean isTroveNameTakenLocked(String needle) {
+    /** True if any trove id or display name collides with this normalized dynamic-trove slug. */
+    private boolean isDynamicTroveSlugTakenLocked(String slug) {
+        if (dynamicTroveNames.containsKey(slug)) {
+            return true;
+        }
         for (String n : dynamicTroveNames.values()) {
-            if (n != null && n.equalsIgnoreCase(needle)) {
+            if (n != null && slug.equals(normalizeDynamicTroveName(n))) {
                 return true;
             }
+        }
+        if (ephemeralTroves.containsKey(slug)) {
+            return true;
         }
         for (List<SearchResult> list : ephemeralTroves.values()) {
             if (!list.isEmpty()) {
                 String n = list.get(0).trove();
-                if (n != null && n.equalsIgnoreCase(needle)) {
+                if (n != null && (slug.equalsIgnoreCase(n) || slug.equals(normalizeDynamicTroveName(n)))) {
                     return true;
                 }
             }
         }
         for (SearchResult r : persistedResults) {
+            if (r.troveId() != null && slug.equals(r.troveId())) {
+                return true;
+            }
             String n = r.trove();
-            if (n != null && n.equalsIgnoreCase(needle)) {
+            if (n != null && (slug.equalsIgnoreCase(n) || slug.equals(normalizeDynamicTroveName(n)))) {
                 return true;
             }
         }
@@ -724,7 +751,6 @@ public class SearchDataService {
             throw new IllegalArgumentException("title is required");
         }
         String id = troveId.trim();
-        String itemId = UUID.randomUUID().toString();
         synchronized (mergeLock) {
             String troveName = dynamicTroveNames.get(id);
             if (troveName == null) {
@@ -737,42 +763,61 @@ public class SearchDataService {
                             "An item with that title already exists in this trove (normalized form must be unique)");
                 }
             }
-            dynamicTroveRepository.insertItem(itemId, id, titleTrimmed);
-            SearchResult result = dynamicItemToSearchResult(itemId, titleTrimmed, id, troveName);
+            dynamicTroveRepository.insertItem(id, titleTrimmed);
+            SearchResult result = dynamicItemToSearchResult(titleTrimmed, id, troveName);
             List<SearchResult> updated = new ArrayList<>(existing.size() + 1);
             updated.addAll(existing);
             updated.add(result);
             dynamicTroves.put(id, List.copyOf(updated));
             rebuildMergedIndexLocked();
         }
-        log.info("Added item \"{}\" to dynamic trove \"{}\"", itemId, id);
-        return new DynamicTroveItemRegistration(itemId, id, titleTrimmed);
+        log.info("Added item title=\"{}\" to dynamic trove \"{}\"", titleTrimmed, id);
+        // id mirrors title for API clients that still read a registration "id" field.
+        return new DynamicTroveItemRegistration(titleTrimmed, id, titleTrimmed);
     }
 
-    /** Remove one item from a dynamic trove. Returns false if trove or item unknown. */
-    public boolean removeDynamicTroveItem(String troveId, String itemId) {
+    /**
+     * Remove one item from a dynamic trove by title. Matching uses the same normalization as
+     * uniqueness (case-insensitive, collapsed whitespace); the stored title row is deleted.
+     * Returns false if trove or item unknown.
+     */
+    public boolean removeDynamicTroveItem(String troveId, String title) {
         if (dynamicTroveRepository == null || troveId == null || troveId.isBlank()
-                || itemId == null || itemId.isBlank()) {
+                || title == null || title.isBlank()) {
             return false;
         }
         String tid = troveId.trim();
-        String iid = itemId.trim();
+        String normalized = normalizeDynamicTroveItemTitle(title);
+        if (normalized.isEmpty()) {
+            return false;
+        }
         synchronized (mergeLock) {
             if (!dynamicTroveNames.containsKey(tid)) {
                 return false;
             }
-            int deleted = dynamicTroveRepository.deleteItem(tid, iid);
+            List<SearchResult> existing = dynamicTroves.getOrDefault(tid, List.of());
+            String storedTitle = null;
+            for (SearchResult r : existing) {
+                if (normalized.equals(normalizeDynamicTroveItemTitle(r.title()))) {
+                    storedTitle = r.title();
+                    break;
+                }
+            }
+            if (storedTitle == null) {
+                return false;
+            }
+            int deleted = dynamicTroveRepository.deleteItem(tid, storedTitle);
             if (deleted == 0) {
                 return false;
             }
-            List<SearchResult> existing = dynamicTroves.getOrDefault(tid, List.of());
+            final String toRemove = storedTitle;
             List<SearchResult> updated = existing.stream()
-                    .filter(r -> !iid.equals(r.id()))
+                    .filter(r -> !toRemove.equals(r.title()))
                     .toList();
             dynamicTroves.put(tid, updated);
             rebuildMergedIndexLocked();
         }
-        log.info("Removed item \"{}\" from dynamic trove \"{}\"", iid, tid);
+        log.info("Removed item title=\"{}\" from dynamic trove \"{}\"", title.trim(), tid);
         return true;
     }
 

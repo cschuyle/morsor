@@ -1299,11 +1299,12 @@ function MobileApp() {
   }
 
   async function handleDeleteDynamicItem(row: SearchResultRow) {
-    if (!soleDynamicTroveId || !row?.id) {
+    const title = (row?.title ?? row?.id ?? '').toString().trim()
+    if (!soleDynamicTroveId || !title) {
       return
     }
     try {
-      await deleteDynamicTroveItem(soleDynamicTroveId, String(row.id))
+      await deleteDynamicTroveItem(soleDynamicTroveId, title)
       await refreshTroves()
       fetchSearch(0)
     } catch (e) {

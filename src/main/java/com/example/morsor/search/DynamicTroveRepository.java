@@ -22,7 +22,7 @@ public class DynamicTroveRepository {
             new DynamicTroveRow(rs.getString("id"), rs.getString("name"));
 
     private static final RowMapper<DynamicTroveItemRow> ITEM_MAPPER = (rs, rowNum) ->
-            new DynamicTroveItemRow(rs.getString("id"), rs.getString("trove_id"), rs.getString("title"));
+            new DynamicTroveItemRow(rs.getString("trove_id"), rs.getString("title"));
 
     public List<DynamicTroveRow> findAllTroves() {
         return jdbc.query(
@@ -40,13 +40,13 @@ public class DynamicTroveRepository {
 
     public List<DynamicTroveItemRow> findAllItems() {
         return jdbc.query(
-                "SELECT id, trove_id, title FROM dynamic_trove_items ORDER BY created_at, id",
+                "SELECT trove_id, title FROM dynamic_trove_items ORDER BY created_at, title",
                 ITEM_MAPPER);
     }
 
     public List<DynamicTroveItemRow> findItemsByTroveId(String troveId) {
         return jdbc.query(
-                "SELECT id, trove_id, title FROM dynamic_trove_items WHERE trove_id = ? ORDER BY created_at, id",
+                "SELECT trove_id, title FROM dynamic_trove_items WHERE trove_id = ? ORDER BY created_at, title",
                 ITEM_MAPPER,
                 troveId);
     }
@@ -64,20 +64,19 @@ public class DynamicTroveRepository {
         return jdbc.update("DELETE FROM dynamic_troves WHERE id = ?", id);
     }
 
-    public void insertItem(String id, String troveId, String title) {
+    public void insertItem(String troveId, String title) {
         jdbc.update(
-                "INSERT INTO dynamic_trove_items (id, trove_id, title, created_at) VALUES (?, ?, ?, ?)",
-                id,
+                "INSERT INTO dynamic_trove_items (trove_id, title, created_at) VALUES (?, ?, ?)",
                 troveId,
                 title,
                 Timestamp.from(Instant.now()));
     }
 
     /** @return rows deleted (0 or 1) */
-    public int deleteItem(String troveId, String itemId) {
+    public int deleteItem(String troveId, String title) {
         return jdbc.update(
-                "DELETE FROM dynamic_trove_items WHERE trove_id = ? AND id = ?",
+                "DELETE FROM dynamic_trove_items WHERE trove_id = ? AND title = ?",
                 troveId,
-                itemId);
+                title);
     }
 }
