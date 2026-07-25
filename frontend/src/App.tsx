@@ -766,10 +766,10 @@ function App() {
           (r) => primaryTitle(r) !== title,
         )
       }
+      // Invalidate client cache so a later page change cannot restore the deleted
+      // group from a stale full-result hit. Do not refetch — that remounts the table.
       queryCache.clear()
-      await refreshTroves()
-      const pageNum = typeof duplicatesResult?.page === 'number' ? duplicatesResult.page : duplicatesPage
-      fetchDuplicates(pageNum)
+      void refreshTroves()
       showActionFlare(`Deleted item ${flareQuote(title)}`)
     } catch (e) {
       window.alert(e instanceof Error ? e.message : String(e))
