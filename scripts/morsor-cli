@@ -1868,6 +1868,7 @@ def _http_json(
     body_obj: dict | None = None,
     *,
     ok_empty: bool = False,
+    timeout: int = 60,
 ) -> Any:
     """JSON HTTP helper. Returns parsed JSON, or None when ok_empty and body is empty."""
     _, headers = _cli_auth_headers(base, bearer, extra_headers, json_body=body_obj is not None)
@@ -1877,7 +1878,7 @@ def _http_json(
     if debug:
         print(f"[debug] {method} {url}", file=sys.stderr)
     try:
-        with urllib.request.urlopen(req, timeout=60) as resp:
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
             raw = resp.read().decode("utf-8", errors="replace")
             if ok_empty and (not raw or not raw.strip()):
                 return None
@@ -1977,6 +1978,101 @@ def run_dynamic_item_add(
         )
 
 
+def run_dynamic_item_load(
+    base: str,
+    bearer: str | None,
+    extra_headers: list[str],
+    debug: bool,
+    output_mode: str,
+    trove_ref: str,
+    rest: list[str],
+) -> None:
+    """Bulk-add titles from a file or stdin (one per line) in a single API request.
+
+    Titles that already exist in the trove (normalized match), or that duplicate an
+    earlier line in the same load, are skipped; after the load finishes they are
+    listed on stderr.
+    """
+    input_file: Path | None = None
+    if len(rest) > 1:
+        die("usage: morsor-cli dynamic item load <trove-id-or-name> [FILE]")
+    if len(rest) == 1:
+        token = rest[0]
+        if token.startswith("-") and token != "-":
+            die(f"unknown option for dynamic item load: {token}")
+        if token != "-":
+            input_file = Path(token).resolve()
+            if not input_file.is_file():
+                die(f"not a file: {input_file}")
+    if input_file is not None:
+        lines = input_file.read_text(encoding="utf-8", errors="replace").splitlines()
+        input_label = f"file {input_file}"
+    else:
+        lines = sys.stdin.read().splitlines()
+        input_label = "stdin"
+
+    titles = [line.strip() for line in lines if line.strip()]
+    if not titles:
+        die(f"dynamic item load: no non-empty titles in {input_label}")
+
+    trove_id, trove_name = _resolve_dynamic_trove_id(
+        base, bearer, extra_headers, debug, trove_ref
+    )
+    path = (
+        "/api/dynamic-troves/"
+        + urllib.parse.quote(trove_id, safe="")
+        + "/items/bulk"
+    )
+    result = _http_json(
+        base,
+        "POST",
+        path,
+        bearer,
+        extra_headers,
+        debug,
+        body_obj={"titles": titles},
+        timeout=max(60, min(600, 30 + len(titles) // 50)),
+    )
+    if not isinstance(result, dict):
+        die("POST items/bulk: unexpected response")
+    loaded = int(result.get("loaded") or 0)
+    duplicate_titles = result.get("duplicates") or []
+    if not isinstance(duplicate_titles, list):
+        die("POST items/bulk: unexpected duplicates field")
+    duplicate_titles = [str(t) for t in duplicate_titles]
+
+    if output_mode in ("json", "yaml"):
+        payload = {
+            "troveId": trove_id,
+            "name": trove_name,
+            "loaded": loaded,
+            "duplicateCount": len(duplicate_titles),
+            "duplicates": duplicate_titles,
+        }
+        print_document_body(json.dumps(payload), output_mode if output_mode == "yaml" else "json")
+    else:
+        print(
+            f"Loaded {loaded} title(s) into dynamic trove "
+            f"{trove_name!r} ({trove_id}) from {input_label}"
+        )
+
+    if duplicate_titles:
+        print(
+            f"morsor-cli: warning: skipped {len(duplicate_titles)} title(s) already in "
+            f"dynamic trove {trove_name!r}:",
+            file=sys.stderr,
+        )
+        for dup in duplicate_titles:
+            print(dup, file=sys.stderr)
+        print("--- End of duplicate item list---", file=sys.stderr)
+
+    if loaded == 0:
+        die(
+            f"dynamic item load: no titles added to dynamic trove {trove_name!r}",
+            code=1,
+        )
+
+
 def run_dynamic_item_delete(
     base: str,
     bearer: str | None,
@@ -2014,7 +2110,7 @@ def run_dynamic_command(
     subcommand = args[0].lower()
     if subcommand in ("item", "items"):
         if len(args) < 2:
-            die(f"dynamic {subcommand} requires a subcommand: add, delete")
+            die(f"dynamic {subcommand} requires a subcommand: add, load, delete")
         op = args[1].lower()
         if op == "add":
             if len(args) < 4:
@@ -2023,6 +2119,13 @@ def run_dynamic_command(
             title = " ".join(args[3:]).strip()
             run_dynamic_item_add(
                 base, bearer, extra_headers, debug, output_mode, trove_ref, title
+            )
+        elif op == "load":
+            if len(args) < 3:
+                die("usage: morsor-cli dynamic item load <trove-id-or-name> [FILE]")
+            trove_ref = args[2]
+            run_dynamic_item_load(
+                base, bearer, extra_headers, debug, output_mode, trove_ref, args[3:]
             )
         elif op in ("delete", "del", "rm", "remove"):
             if len(args) < 4:
@@ -2033,7 +2136,10 @@ def run_dynamic_command(
                 base, bearer, extra_headers, debug, trove_ref, title
             )
         else:
-            die(f"unknown subcommand: dynamic {subcommand} {op!r}  (expected: add, delete)")
+            die(
+                f"unknown subcommand: dynamic {subcommand} {op!r}  "
+                f"(expected: add, load, delete)"
+            )
     else:
         die(f"unknown dynamic subcommand: {subcommand!r}  (expected: item)")
 
@@ -2061,6 +2167,7 @@ SYNOPSIS
     morsor-cli [OPTIONS] local list
 
     morsor-cli [OPTIONS] dynamic item add <trove> <title...>
+    morsor-cli [OPTIONS] dynamic item load <trove> [FILE]
     morsor-cli [OPTIONS] dynamic item delete <trove> <title...>
 
        morsor-cli [OPTIONS] METHOD PATH [-- querystring]
@@ -2254,6 +2361,11 @@ ACTIONS
        local rename <id> <name> Rename any ephemeral trove (sister or local).
        dynamic item add <trove> <title...>
                               Add a title to a DB-backed dynamic trove (trove id or name).
+       dynamic item load <trove> [FILE]
+                              Bulk-add titles (one per line) from FILE, or stdin when
+                              FILE is omitted, in a single API request. Titles already
+                              in the trove (normalized match) are skipped; after the
+                              load finishes, every skipped duplicate is listed on stderr.
        dynamic item delete <trove> <title...>
                               Delete a dynamic-trove item by title (normalized match:
                               case-insensitive, collapsed whitespace).
@@ -2314,10 +2426,12 @@ EXAMPLES
 
               ./scripts/morsor-cli local list
 
-       Add / delete titles on a dynamic (DB-backed) trove:
+       Add / load / delete titles on a dynamic (DB-backed) trove:
 
-              ./scripts/morsor-cli dynamic item add "My List" "Hello World"
-              ./scripts/morsor-cli dynamic item delete "My List" "Hello World"
+              ./scripts/morsor-cli dynamic item add my-list "Hello World"
+              ./scripts/morsor-cli dynamic item load my-list /path/to/titles.txt
+              cat /path/to/titles.txt | ./scripts/morsor-cli dynamic item load my-list
+              ./scripts/morsor-cli dynamic item delete my-list "Hello World"
 
        Duplicates: primary is ephemeral local trove; compare against vinyl and CDs;
        large page; JSON to jq (titles of primary rows):
@@ -2409,6 +2523,7 @@ LOCAL (EPHEMERAL) TROVES
 
 DYNAMIC (DB-BACKED) TROVES
   dynamic item add <trove> <title...>     # Add a title (trove id or name)
+  dynamic item load <trove> [FILE]        # Bulk-add from file or stdin (one title/line)
   dynamic item delete <trove> <title...>  # Delete by title
 
 ENV
@@ -2426,8 +2541,10 @@ Examples:
   morsor-cli local sisters load
   morsor-cli local trove create /path/to/titles.txt
   cat /path/to/titles.txt | morsor-cli local trove create
-  morsor-cli dynamic item add "My List" "Hello World"
-  morsor-cli dynamic item delete "My List" "Hello World"
+  morsor-cli dynamic item add my-list "Hello World"
+  morsor-cli dynamic item load my-list /path/to/titles.txt
+  cat titles.txt | morsor-cli dynamic item load my-list
+  morsor-cli dynamic item delete my-list "Hello World"
 """.strip()
     )
 

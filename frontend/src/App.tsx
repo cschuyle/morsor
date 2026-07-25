@@ -62,7 +62,16 @@ import { listConnectedTroveIds } from './troveDirectoryHandles'
 import { TroveLocalRootsPanel } from './TroveLocalRootsPanel'
 import { clearLanguageCodeMapCache, ensureLanguageCodeMap, type LanguageCodeMap } from './languageCodeLookup'
 import { SearchQueryHelpButton, SearchQueryHelpPopover } from './SearchQueryHelpPopover'
+import { CopyFeedbackFlare, useCopyFeedback } from './CopyFeedback'
 import './App.css'
+
+function flareQuote(text: string, max = 42): string {
+  const t = text.trim()
+  if (t.length <= max) {
+    return `"${t}"`
+  }
+  return `"${t.slice(0, max - 1)}…"`
+}
 
 const DEFAULT_DUP_SESSION: DuplicatesTabSession = {
   dupQuery: '',
@@ -553,6 +562,8 @@ function App() {
     return t?.dynamic === true ? id : null
   }, [searchMode, searchSelectedTroveIds, troves])
 
+  const { copyFeedbackMessage: actionFlareMessage, showCopyFeedback: showActionFlare } = useCopyFeedback()
+
   const handleCreateDynamicTrove = useCallback(async () => {
     const raw = window.prompt('Name for the new dynamic trove')
     if (raw == null) {
@@ -566,10 +577,11 @@ function App() {
       const reg = await createDynamicTrove(name)
       await refreshTroves()
       setSearchSelectedTroveIds(new Set([reg.troveId]))
+      showActionFlare(`Created trove ${flareQuote(reg.name || reg.troveId)}`)
     } catch (e) {
       window.alert(e instanceof Error ? e.message : String(e))
     }
-  }, [refreshTroves])
+  }, [refreshTroves, showActionFlare])
 
   const handleDeleteDynamicTrove = useCallback(async (troveId: string, troveName: string) => {
     if (!window.confirm(`Delete dynamic trove "${troveName}"?`)) {
@@ -593,10 +605,11 @@ function App() {
         return next
       })
       await refreshTroves()
+      showActionFlare(`Deleted trove ${flareQuote(troveName || troveId)}`)
     } catch (e) {
       window.alert(e instanceof Error ? e.message : String(e))
     }
-  }, [refreshTroves])
+  }, [refreshTroves, showActionFlare])
 
   async function handleAddDynamicItem() {
     if (!soleDynamicTroveId) {
@@ -613,6 +626,7 @@ function App() {
       setFreezeTroveListOrder(false)
       await refreshTroves()
       fetchSearch(0)
+      showActionFlare(`Added item ${flareQuote(title)}`)
     } catch (e) {
       window.alert(e instanceof Error ? e.message : String(e))
     }
@@ -625,8 +639,33 @@ function App() {
     }
     try {
       await deleteDynamicTroveItem(soleDynamicTroveId, title)
+      const rowTitle = (r: { id?: string; title?: string }) =>
+        (r?.title ?? r?.id ?? '').toString().trim()
+      // Drop the row immediately; also invalidate client search cache so refetch
+      // cannot restore the deleted item from a stale full-result hit.
+      setSearchResult((prev) => {
+        if (!prev) {
+          return prev
+        }
+        const nextResults = prev.results.filter((r) => rowTitle(r) !== title)
+        if (nextResults.length === prev.results.length) {
+          return prev
+        }
+        const removed = prev.results.length - nextResults.length
+        const prevCount = typeof prev.count === 'number' ? prev.count : prev.results.length
+        return {
+          ...prev,
+          results: nextResults,
+          count: Math.max(0, prevCount - removed),
+        }
+      })
+      if (fullSearchResultsRef.current) {
+        fullSearchResultsRef.current = fullSearchResultsRef.current.filter((r) => rowTitle(r) !== title)
+      }
+      queryCache.clear()
       await refreshTroves()
       fetchSearch(0)
+      showActionFlare(`Deleted item ${flareQuote(title)}`)
     } catch (e) {
       window.alert(e instanceof Error ? e.message : String(e))
     }
@@ -1649,6 +1688,9 @@ function App() {
 
   return (
     <div className="desktop-app">
+      <div className="app-action-flare-host">
+        <CopyFeedbackFlare message={actionFlareMessage} />
+      </div>
       <h1 className="app-title">
         <span className="search-title-brand">Morsor</span> <span className="sidebar-title-note">More lists than you needed</span>
       </h1>

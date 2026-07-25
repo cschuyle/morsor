@@ -218,6 +218,65 @@ class DynamicTroveControllerTest {
     }
 
     @Test
+    void bulkLoadAddsTitlesAndSkipsDuplicatesInOneRequest() {
+        String uniqueName = "BulkLoad-" + UUID.randomUUID();
+        ResponseEntity<DynamicTroveRegistration> created = restTemplate.exchange(
+                base() + "/api/dynamic-troves",
+                HttpMethod.POST,
+                new HttpEntity<>("{\"name\":\"" + uniqueName + "\"}", jsonHeaders()),
+                DynamicTroveRegistration.class);
+        assertThat(created.getBody()).isNotNull();
+        String troveId = created.getBody().troveId();
+
+        restTemplate.exchange(
+                base() + "/api/dynamic-troves/" + troveId + "/items",
+                HttpMethod.POST,
+                new HttpEntity<>("{\"title\":\"Already Here\"}", jsonHeaders()),
+                DynamicTroveItemRegistration.class);
+
+        String body = """
+                {"titles":["New One","Already Here","  new   one  ","Brand New","Brand New"]}
+                """;
+        ResponseEntity<DynamicTroveItemBulkLoadResult> bulk = restTemplate.exchange(
+                base() + "/api/dynamic-troves/" + troveId + "/items/bulk",
+                HttpMethod.POST,
+                new HttpEntity<>(body, jsonHeaders()),
+                DynamicTroveItemBulkLoadResult.class);
+        assertThat(bulk.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(bulk.getBody()).isNotNull();
+        assertThat(bulk.getBody().troveId()).isEqualTo(troveId);
+        assertThat(bulk.getBody().loaded()).isEqualTo(2);
+        assertThat(bulk.getBody().added()).containsExactly("New One", "Brand New");
+        assertThat(bulk.getBody().duplicates())
+                .containsExactly("Already Here", "new   one", "Brand New");
+
+        ResponseEntity<SearchResponse> search = restTemplate.exchange(
+                base() + "/api/search?query=*&trove=" + troveId,
+                HttpMethod.GET,
+                null,
+                SearchResponse.class);
+        assertThat(search.getBody()).isNotNull();
+        assertThat(search.getBody().results()).extracting(r -> r.result().title())
+                .containsExactlyInAnyOrder("Already Here", "New One", "Brand New");
+
+        restTemplate.exchange(
+                base() + "/api/dynamic-troves/" + troveId,
+                HttpMethod.DELETE,
+                null,
+                Void.class);
+    }
+
+    @Test
+    void bulkLoadUnknownTroveReturns404() {
+        assertThatThrownBy(() -> restTemplate.exchange(
+                base() + "/api/dynamic-troves/no-such-dynamic-trove/items/bulk",
+                HttpMethod.POST,
+                new HttpEntity<>("{\"titles\":[\"x\"]}", jsonHeaders()),
+                DynamicTroveItemBulkLoadResult.class))
+                .isInstanceOf(HttpClientErrorException.NotFound.class);
+    }
+
+    @Test
     void addItemRejectsDuplicateNormalizedTitleWithinTrove() {
         String uniqueName = "NormDup-" + UUID.randomUUID();
         ResponseEntity<DynamicTroveRegistration> created = restTemplate.exchange(

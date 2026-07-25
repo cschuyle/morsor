@@ -539,6 +539,9 @@ public class SearchDataService {
     /** Max length for a dynamic trove item title. */
     public static final int MAX_DYNAMIC_ITEM_TITLE_LEN = 2000;
 
+    /** Max titles accepted in one bulk load request. */
+    public static final int MAX_DYNAMIC_BULK_ITEMS = 50_000;
+
     private void loadDynamicTrovesFromDbLocked() {
         dynamicTroves.clear();
         dynamicTroveNames.clear();
@@ -774,6 +777,77 @@ public class SearchDataService {
         log.info("Added item title=\"{}\" to dynamic trove \"{}\"", titleTrimmed, id);
         // id mirrors title for API clients that still read a registration "id" field.
         return new DynamicTroveItemRegistration(titleTrimmed, id, titleTrimmed);
+    }
+
+    /**
+     * Bulk-add titles to a dynamic trove in one transaction/index rebuild. Titles whose normalized
+     * form already exists in the trove (or earlier in this request) are skipped and returned in
+     * {@link DynamicTroveItemBulkLoadResult#duplicates()}.
+     */
+    public DynamicTroveItemBulkLoadResult addDynamicTroveItemsBulk(String troveId, List<String> titles) {
+        if (dynamicTroveRepository == null) {
+            throw new IllegalStateException("Dynamic troves are not available (no repository)");
+        }
+        if (troveId == null || troveId.isBlank()) {
+            throw new IllegalArgumentException("troveId is required");
+        }
+        if (titles == null) {
+            throw new IllegalArgumentException("titles is required");
+        }
+        if (titles.size() > MAX_DYNAMIC_BULK_ITEMS) {
+            throw new IllegalArgumentException("titles size exceeds limit " + MAX_DYNAMIC_BULK_ITEMS);
+        }
+        String id = troveId.trim();
+        List<String> added = new ArrayList<>();
+        List<String> duplicates = new ArrayList<>();
+        synchronized (mergeLock) {
+            String troveName = dynamicTroveNames.get(id);
+            if (troveName == null) {
+                throw new IllegalArgumentException("Unknown dynamic trove: " + id);
+            }
+            List<SearchResult> existing = dynamicTroves.getOrDefault(id, List.of());
+            Set<String> normalizedPresent = new HashSet<>();
+            for (SearchResult r : existing) {
+                String n = normalizeDynamicTroveItemTitle(r.title());
+                if (!n.isEmpty()) {
+                    normalizedPresent.add(n);
+                }
+            }
+            List<SearchResult> updated = new ArrayList<>(existing);
+            for (String title : titles) {
+                String titleTrimmed = title == null ? "" : title.trim();
+                if (titleTrimmed.isEmpty()) {
+                    continue;
+                }
+                if (titleTrimmed.length() > MAX_DYNAMIC_ITEM_TITLE_LEN) {
+                    throw new IllegalArgumentException(
+                            "title exceeds max length " + MAX_DYNAMIC_ITEM_TITLE_LEN);
+                }
+                String normalized = normalizeDynamicTroveItemTitle(titleTrimmed);
+                if (normalized.isEmpty()) {
+                    continue;
+                }
+                if (normalizedPresent.contains(normalized)) {
+                    duplicates.add(titleTrimmed);
+                    continue;
+                }
+                added.add(titleTrimmed);
+                normalizedPresent.add(normalized);
+                updated.add(dynamicItemToSearchResult(titleTrimmed, id, troveName));
+            }
+            if (!added.isEmpty()) {
+                dynamicTroveRepository.insertItems(id, added);
+                dynamicTroves.put(id, List.copyOf(updated));
+                rebuildMergedIndexLocked();
+            }
+        }
+        log.info(
+                "Bulk-loaded {} item(s) into dynamic trove \"{}\" ({} duplicate(s) skipped)",
+                added.size(),
+                id,
+                duplicates.size());
+        return new DynamicTroveItemBulkLoadResult(
+                id, added.size(), List.copyOf(added), List.copyOf(duplicates));
     }
 
     /**

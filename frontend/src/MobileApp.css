@@ -109,6 +109,77 @@
   height: 1.25rem;
   object-fit: contain;
 }
+.app-action-flare-host {
+  position: fixed;
+  top: 4.5rem;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 400;
+  pointer-events: none;
+}
+
+/* Self-contained so flares work even before SearchResultsGrid.css loads. */
+.app-action-flare-host .copy-feedback-flare {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  max-width: min(92vw, 36rem);
+  min-height: 2.25rem;
+  padding: 0.35rem 0.8rem 0.35rem 0.45rem;
+  border: 1px solid rgba(41, 128, 78, 0.24);
+  border-radius: 999px;
+  background:
+    radial-gradient(circle at left center, rgba(255, 255, 255, 0.95), rgba(255, 255, 255, 0) 35%),
+    linear-gradient(135deg, rgba(239, 255, 244, 0.98), rgba(209, 250, 223, 0.92));
+  color: #175b32;
+  box-shadow: 0 10px 24px rgba(33, 104, 63, 0.14);
+  overflow: hidden;
+  animation: copy-feedback-flare-fade 1.9s ease forwards;
+}
+
+.app-action-flare-host .copy-feedback-flare__check {
+  position: relative;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.35rem;
+  height: 1.35rem;
+  border-radius: 50%;
+  background: #1e7a43;
+  color: #fff;
+}
+
+.app-action-flare-host .copy-feedback-flare__text {
+  position: relative;
+  z-index: 1;
+  font-size: 0.88rem;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+@keyframes copy-feedback-flare-fade {
+  0% {
+    opacity: 0;
+    transform: translateY(6px) scale(0.96);
+  }
+  12% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  82% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-3px) scale(1.01);
+  }
+}
+
 .mobile-copied-flare {
   position: fixed;
   bottom: 5rem;

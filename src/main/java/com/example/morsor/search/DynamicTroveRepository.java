@@ -72,6 +72,22 @@ public class DynamicTroveRepository {
                 Timestamp.from(Instant.now()));
     }
 
+    public void insertItems(String troveId, List<String> titles) {
+        if (titles == null || titles.isEmpty()) {
+            return;
+        }
+        Timestamp now = Timestamp.from(Instant.now());
+        jdbc.batchUpdate(
+                "INSERT INTO dynamic_trove_items (trove_id, title, created_at) VALUES (?, ?, ?)",
+                titles,
+                titles.size(),
+                (ps, title) -> {
+                    ps.setString(1, troveId);
+                    ps.setString(2, title);
+                    ps.setTimestamp(3, now);
+                });
+    }
+
     /** @return rows deleted (0 or 1) */
     public int deleteItem(String troveId, String title) {
         return jdbc.update(

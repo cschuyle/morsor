@@ -2365,6 +2365,24 @@
   margin-bottom: 0.5rem;
 }
 
+.app-action-flare-host {
+  position: fixed;
+  top: 1.1rem;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 400;
+  pointer-events: none;
+}
+
+.app-action-flare-host .copy-feedback-flare {
+  max-width: min(92vw, 36rem);
+}
+
+.app-action-flare-host .copy-feedback-flare__text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .copy-feedback-flare {
   position: relative;
   display: inline-flex;
