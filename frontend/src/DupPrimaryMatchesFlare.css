@@ -1,0 +1,41 @@
+.dup-primary-matches-dropdown {
+  box-sizing: border-box;
+  max-height: min(50vh, 16rem);
+  overflow: auto;
+  border: 1px solid #ddd;
+  border-top: none;
+  border-radius: 0 0 8px 8px;
+  background: #fff;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.12);
+  color: #252525;
+  font-size: 0.875rem;
+  line-height: 1.35;
+}
+
+.dup-primary-matches-dropdown-list {
+  margin: 0;
+  padding: 0.25rem 0;
+  list-style: none;
+}
+
+.dup-primary-matches-dropdown-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  padding: 0.45rem 0.75rem;
+  text-align: left;
+}
+
+.dup-primary-matches-dropdown-item + .dup-primary-matches-dropdown-item {
+  border-top: 1px solid #f0f0f0;
+}
+
+.dup-primary-matches-dropdown-title {
+  color: #213547;
+  font-size: 0.9rem;
+}
+
+.dup-primary-matches-dropdown-meta {
+  font-size: 0.75rem;
+  color: #666;
+}

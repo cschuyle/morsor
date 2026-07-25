@@ -1,53 +1,97 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { getApiAuthHeaders, readApiErrorMessage } from './apiAuth'
-import {
-  normalizeDynamicTroveItemTitle,
-  resultsIncludeExactNormalizedTitle,
-} from './normalizeDynamicTroveItemTitle'
-import type { SearchResultData } from './types'
+import type { SearchResultData, SearchResultRow } from './types'
 
 const DEBOUNCE_MS = 300
-const FLASH_MS = 1000
-const LOOKUP_PAGE_SIZE = 500
+const TOP_N = 5
+
+export type DupPrimaryMatch = {
+  title: string
+  score?: number
+  trove?: string
+}
+
+/** First {@code limit} unique titles from a search response (API order). */
+export function topMatchesFromSearchResult(
+  data: SearchResultData | null | undefined,
+  limit = TOP_N,
+): DupPrimaryMatch[] {
+  const out: DupPrimaryMatch[] = []
+  const seen = new Set<string>()
+  for (const row of data?.results ?? []) {
+    const r = row as SearchResultRow
+    const title = (r.title ?? '').trim()
+    if (!title) {
+      continue
+    }
+    const key = title.toLowerCase()
+    if (seen.has(key)) {
+      continue
+    }
+    seen.add(key)
+    out.push({
+      title,
+      score: typeof r.score === 'number' ? r.score : undefined,
+      trove: (r.trove ?? r.troveId ?? '').toString() || undefined,
+    })
+    if (out.length >= limit) {
+      break
+    }
+  }
+  return out
+}
 
 /**
- * When enabled (dups tab + dynamic primary), debounce the query and search the
- * primary trove for an exact normalized title match. On hit: {@code exists} and
- * a one-shot {@code flash} (1s green fade).
+ * When enabled (dups tab + dynamic primary), debounce the query and run a
+ * regular search against the primary trove only. Exposes the top hits for a
+ * dismissable flare.
  */
 export function useDupPrimaryTitleExists(
   enabled: boolean,
   troveId: string | null,
   query: string,
-): { exists: boolean; flash: boolean } {
-  const [exists, setExists] = useState(false)
-  const [flash, setFlash] = useState(false)
+): {
+  matches: DupPrimaryMatch[]
+  open: boolean
+  dismiss: () => void
+  reopen: () => void
+} {
+  const [matches, setMatches] = useState<DupPrimaryMatch[]>([])
+  const [open, setOpen] = useState(false)
   const abortRef = useRef<AbortController | null>(null)
   const requestIdRef = useRef(0)
-  const flashTimerRef = useRef<number | null>(null)
+
+  const dismiss = useCallback(() => {
+    setOpen(false)
+  }, [])
+
+  const reopen = useCallback(() => {
+    if (matches.length > 0) {
+      setOpen(true)
+    }
+  }, [matches.length])
 
   useEffect(() => {
     abortRef.current?.abort()
     abortRef.current = null
 
     if (!enabled || !troveId?.trim()) {
-      setExists(false)
-      setFlash(false)
+      setMatches([])
+      setOpen(false)
       return
     }
 
     const trimmed = query.trim()
-    const normalized = normalizeDynamicTroveItemTitle(query)
-    if (!normalized || trimmed === '*') {
-      setExists(false)
-      setFlash(false)
+    if (!trimmed || trimmed === '*') {
+      setMatches([])
+      setOpen(false)
       return
     }
 
-    // Clear until the debounced lookup confirms, so a flash can fire on each new hit.
-    setExists(false)
-    setFlash(false)
+    setMatches([])
+    setOpen(false)
 
+    const primaryId = troveId.trim()
     const requestId = ++requestIdRef.current
     const timer = window.setTimeout(() => {
       abortRef.current?.abort()
@@ -57,9 +101,9 @@ export function useDupPrimaryTitleExists(
       const params = new URLSearchParams({
         query: trimmed,
         page: '0',
-        size: String(LOOKUP_PAGE_SIZE),
+        size: String(TOP_N),
       })
-      params.append('trove', troveId.trim())
+      params.append('trove', primaryId)
 
       fetch(`/api/search?${params}`, {
         credentials: 'include',
@@ -80,28 +124,17 @@ export function useDupPrimaryTitleExists(
           if (requestIdRef.current !== requestId) {
             return
           }
-          const hit = resultsIncludeExactNormalizedTitle(data.results ?? [], trimmed)
-          setExists(hit)
-          if (hit) {
-            if (flashTimerRef.current != null) {
-              window.clearTimeout(flashTimerRef.current)
-            }
-            setFlash(true)
-            flashTimerRef.current = window.setTimeout(() => {
-              flashTimerRef.current = null
-              if (requestIdRef.current === requestId) {
-                setFlash(false)
-              }
-            }, FLASH_MS)
-          }
+          const top = topMatchesFromSearchResult(data, TOP_N)
+          setMatches(top)
+          setOpen(top.length > 0)
         })
         .catch((err: unknown) => {
           if (err instanceof DOMException && err.name === 'AbortError') {
             return
           }
           if (requestIdRef.current === requestId) {
-            setExists(false)
-            setFlash(false)
+            setMatches([])
+            setOpen(false)
           }
         })
     }, DEBOUNCE_MS)
@@ -113,13 +146,5 @@ export function useDupPrimaryTitleExists(
     }
   }, [enabled, troveId, query])
 
-  useEffect(() => {
-    return () => {
-      if (flashTimerRef.current != null) {
-        window.clearTimeout(flashTimerRef.current)
-      }
-    }
-  }, [])
-
-  return { exists, flash }
+  return { matches, open, dismiss, reopen }
 }

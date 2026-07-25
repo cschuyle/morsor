@@ -315,19 +315,6 @@
   align-items: stretch;
 }
 
-.mobile-search-input-wrap--exists-flash {
-  animation: mobile-search-exists-flash 1s ease-out;
-}
-
-@keyframes mobile-search-exists-flash {
-  from {
-    background-color: #9eecc0;
-  }
-  to {
-    background-color: transparent;
-  }
-}
-
 .mobile-search-input {
   flex: 1;
   min-width: 0;
@@ -355,11 +342,19 @@
   transform: translateY(-50%);
   width: 1.5rem;
   height: 1.5rem;
+  padding: 0;
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  border: none;
+  background: transparent;
   color: #1a9f4b;
-  pointer-events: none;
+  cursor: pointer;
+  border-radius: 4px;
+}
+
+.mobile-search-exists-check:hover {
+  background: #e8f8ee;
 }
 
 .mobile-search-query-clear {

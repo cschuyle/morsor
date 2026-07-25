@@ -58,6 +58,7 @@ import { TroveLocalRootsPanel } from './TroveLocalRootsPanel'
 import { clearLanguageCodeMapCache, ensureLanguageCodeMap, type LanguageCodeMap } from './languageCodeLookup'
 import { SearchQueryHelpButton, SearchQueryHelpPopover } from './SearchQueryHelpPopover'
 import { CopyFeedbackFlare, useCopyFeedback } from './CopyFeedback'
+import { DupPrimaryMatchesFlare } from './DupPrimaryMatchesFlare'
 import { useDupPrimaryTitleExists } from './useDupPrimaryTitleExists'
 import './MobileApp.css'
 
@@ -1274,11 +1275,17 @@ function MobileApp() {
     return t?.dynamic === true ? primaryTroveId : null
   }, [searchMode, primaryTroveId, troves])
 
-  const { exists: dupPrimaryTitleExists, flash: dupPrimaryTitleExistsFlash } = useDupPrimaryTitleExists(
+  const {
+    matches: dupPrimaryMatches,
+    open: dupPrimaryMatchesOpen,
+    dismiss: dismissDupPrimaryMatches,
+    reopen: reopenDupPrimaryMatches,
+  } = useDupPrimaryTitleExists(
     searchMode === 'duplicates' && primaryDynamicTroveId != null,
     primaryDynamicTroveId,
     dupQuery,
   )
+  const dupPrimaryTitleExists = dupPrimaryMatches.length > 0
 
   const { copyFeedbackMessage: actionFlareMessage, showCopyFeedback: showActionFlare } = useCopyFeedback()
 
@@ -2047,6 +2054,12 @@ function MobileApp() {
       <div className="app-action-flare-host">
         <CopyFeedbackFlare message={actionFlareMessage} />
       </div>
+      <DupPrimaryMatchesFlare
+        open={dupPrimaryMatchesOpen}
+        matches={dupPrimaryMatches}
+        anchorRef={searchQueryWrapRef}
+        onClose={dismissDupPrimaryMatches}
+      />
       <header className="mobile-header">
         <Link to="/mobile" className="mobile-brand">Morsor</Link>
         <nav className="mobile-header-nav" aria-label="Header links">
@@ -2227,12 +2240,7 @@ onClick={() => {
                 +
               </button>
             )}
-            <div
-              className={
-                'mobile-search-input-wrap' +
-                (dupPrimaryTitleExistsFlash ? ' mobile-search-input-wrap--exists-flash' : '')
-              }
-            >
+            <div className="mobile-search-input-wrap">
               <input
                 type="search"
                 value={searchMode === 'search' ? searchQuery : searchMode === 'duplicates' ? dupQuery : uniqQuery}
@@ -2269,11 +2277,12 @@ onClick={() => {
                 aria-label="Query"
               />
               {dupPrimaryTitleExists && (
-                <span
+                <button
+                  type="button"
                   className="mobile-search-exists-check"
-                  title="Title already in primary trove"
-                  aria-label="Title already in primary trove"
-                  role="img"
+                  title="Show matches in primary trove"
+                  aria-label="Show matches in primary trove"
+                  onClick={() => reopenDupPrimaryMatches()}
                 >
                   <svg viewBox="0 0 20 20" width="16" height="16" focusable="false" aria-hidden="true">
                     <path
@@ -2285,7 +2294,7 @@ onClick={() => {
                       strokeLinejoin="round"
                     />
                   </svg>
-                </span>
+                </button>
               )}
               {(searchMode === 'search' ? searchQuery : searchMode === 'duplicates' ? dupQuery : uniqQuery) && (
                 <button
