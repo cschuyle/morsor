@@ -207,4 +207,60 @@ class DynamicTroveControllerTest {
                 DynamicTroveRegistration.class))
                 .isInstanceOf(HttpClientErrorException.Conflict.class);
     }
+
+    @Test
+    void addItemRejectsDuplicateNormalizedTitleWithinTrove() {
+        String uniqueName = "NormDup-" + UUID.randomUUID();
+        ResponseEntity<DynamicTroveRegistration> created = restTemplate.exchange(
+                base() + "/api/dynamic-troves",
+                HttpMethod.POST,
+                new HttpEntity<>("{\"name\":\"" + uniqueName + "\"}", jsonHeaders()),
+                DynamicTroveRegistration.class);
+        assertThat(created.getBody()).isNotNull();
+        String troveId = created.getBody().troveId();
+
+        ResponseEntity<DynamicTroveItemRegistration> first = restTemplate.exchange(
+                base() + "/api/dynamic-troves/" + troveId + "/items",
+                HttpMethod.POST,
+                new HttpEntity<>("{\"title\":\"Hello   World\"}", jsonHeaders()),
+                DynamicTroveItemRegistration.class);
+        assertThat(first.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+
+        assertThatThrownBy(() -> restTemplate.exchange(
+                base() + "/api/dynamic-troves/" + troveId + "/items",
+                HttpMethod.POST,
+                new HttpEntity<>("{\"title\":\"  hello world  \"}", jsonHeaders()),
+                DynamicTroveItemRegistration.class))
+                .isInstanceOf(HttpClientErrorException.Conflict.class);
+
+        // Same normalized title is allowed in a different dynamic trove.
+        String otherName = "NormDupOther-" + UUID.randomUUID();
+        ResponseEntity<DynamicTroveRegistration> other = restTemplate.exchange(
+                base() + "/api/dynamic-troves",
+                HttpMethod.POST,
+                new HttpEntity<>("{\"name\":\"" + otherName + "\"}", jsonHeaders()),
+                DynamicTroveRegistration.class);
+        assertThat(other.getBody()).isNotNull();
+        ResponseEntity<DynamicTroveItemRegistration> otherItem = restTemplate.exchange(
+                base() + "/api/dynamic-troves/" + other.getBody().troveId() + "/items",
+                HttpMethod.POST,
+                new HttpEntity<>("{\"title\":\"Hello World\"}", jsonHeaders()),
+                DynamicTroveItemRegistration.class);
+        assertThat(otherItem.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+
+        restTemplate.exchange(base() + "/api/dynamic-troves/" + troveId, HttpMethod.DELETE, null, Void.class);
+        restTemplate.exchange(
+                base() + "/api/dynamic-troves/" + other.getBody().troveId(),
+                HttpMethod.DELETE,
+                null,
+                Void.class);
+    }
+
+    @Test
+    void normalizeDynamicTroveItemTitleCollapsesWhitespaceAndCase() {
+        assertThat(SearchDataService.normalizeDynamicTroveItemTitle("  Foo \t  BAR \n baz  "))
+                .isEqualTo("foo bar baz");
+        assertThat(SearchDataService.normalizeDynamicTroveItemTitle("Hello World"))
+                .isEqualTo(SearchDataService.normalizeDynamicTroveItemTitle("hello   world"));
+    }
 }

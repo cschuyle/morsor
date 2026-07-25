@@ -76,6 +76,9 @@ public class DynamicTroveController {
                 return ResponseEntity.notFound().build();
             }
             return ResponseEntity.badRequest().build();
+        } catch (IllegalStateException e) {
+            log.warn("POST /api/dynamic-troves/{}/items: conflict: {}", troveId, e.getMessage());
+            return ResponseEntity.status(HttpStatus.CONFLICT).build();
         }
     }
 

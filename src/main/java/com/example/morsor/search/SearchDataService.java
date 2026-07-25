@@ -693,6 +693,18 @@ public class SearchDataService {
         return true;
     }
 
+    /**
+     * Normalize a dynamic-trove item title for uniqueness: trim, collapse all whitespace runs to a
+     * single space, then case-fold with {@link java.util.Locale#ROOT}.
+     */
+    public static String normalizeDynamicTroveItemTitle(String title) {
+        if (title == null) {
+            return "";
+        }
+        String collapsed = title.trim().replaceAll("\\s+", " ");
+        return collapsed.toLowerCase(java.util.Locale.ROOT);
+    }
+
     public DynamicTroveItemRegistration addDynamicTroveItem(String troveId, String title) {
         if (dynamicTroveRepository == null) {
             throw new IllegalStateException("Dynamic troves are not available (no repository)");
@@ -707,6 +719,10 @@ public class SearchDataService {
         if (titleTrimmed.length() > MAX_DYNAMIC_ITEM_TITLE_LEN) {
             throw new IllegalArgumentException("title exceeds max length " + MAX_DYNAMIC_ITEM_TITLE_LEN);
         }
+        String normalized = normalizeDynamicTroveItemTitle(titleTrimmed);
+        if (normalized.isEmpty()) {
+            throw new IllegalArgumentException("title is required");
+        }
         String id = troveId.trim();
         String itemId = UUID.randomUUID().toString();
         synchronized (mergeLock) {
@@ -714,9 +730,15 @@ public class SearchDataService {
             if (troveName == null) {
                 throw new IllegalArgumentException("Unknown dynamic trove: " + id);
             }
+            List<SearchResult> existing = dynamicTroves.getOrDefault(id, List.of());
+            for (SearchResult r : existing) {
+                if (normalized.equals(normalizeDynamicTroveItemTitle(r.title()))) {
+                    throw new IllegalStateException(
+                            "An item with that title already exists in this trove (normalized form must be unique)");
+                }
+            }
             dynamicTroveRepository.insertItem(itemId, id, titleTrimmed);
             SearchResult result = dynamicItemToSearchResult(itemId, titleTrimmed, id, troveName);
-            List<SearchResult> existing = dynamicTroves.getOrDefault(id, List.of());
             List<SearchResult> updated = new ArrayList<>(existing.size() + 1);
             updated.addAll(existing);
             updated.add(result);

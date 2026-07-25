@@ -89,6 +89,9 @@ export async function addDynamicTroveItem(
   if (res.status === 404) {
     throw new Error('Trove not found')
   }
+  if (res.status === 409) {
+    throw new Error('That title already exists in this trove')
+  }
   if (!res.ok) {
     throw new Error(await readApiErrorMessage(res))
   }
