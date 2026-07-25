@@ -696,19 +696,21 @@ function App() {
     }
     try {
       await addDynamicTroveItem(troveId, title)
-      queryRef.current = '*'
       setFreezeTroveListOrder(false)
       if (searchMode === 'duplicates') {
-        setDupQuery('*')
+        // Clear the query box but leave results as-is; don't re-run the dups search.
+        queryRef.current = ''
+        setDupQuery('')
         await refreshTroves()
         queryCache.clear()
-        fetchDuplicates(0)
       } else if (searchMode === 'uniques') {
+        queryRef.current = '*'
         setUniqQuery('*')
         await refreshTroves()
         queryCache.clear()
         fetchUniques(0)
       } else {
+        queryRef.current = '*'
         setSearchQuery('*')
         await refreshTroves()
         fetchSearch(0)
