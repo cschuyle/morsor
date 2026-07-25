@@ -1339,12 +1339,15 @@ function MobileApp() {
 
   async function handleAddDynamicItem() {
     const troveId =
-      searchMode === 'uniques' ? primaryDynamicTroveId : soleDynamicTroveId
+      searchMode === 'duplicates' || searchMode === 'uniques'
+        ? primaryDynamicTroveId
+        : soleDynamicTroveId
     if (!troveId) {
       return
     }
     const troveName = troves.find((t) => t.id === troveId)?.name ?? troveId
-    const currentQuery = searchMode === 'uniques' ? uniqQuery : searchQuery
+    const currentQuery =
+      searchMode === 'duplicates' ? dupQuery : searchMode === 'uniques' ? uniqQuery : searchQuery
     const suggested = currentQuery.trim() === '*' ? '' : currentQuery
     const raw = window.prompt(
       `Add <title> to ${formatTroveDisplayName(troveName)} trove`,
@@ -1361,7 +1364,12 @@ function MobileApp() {
       await addDynamicTroveItem(troveId, title)
       queryRef.current = '*'
       setFreezeTroveListOrder(false)
-      if (searchMode === 'uniques') {
+      if (searchMode === 'duplicates') {
+        setDupQuery('*')
+        await refreshTroves()
+        queryCache.clear()
+        fetchDuplicates(0)
+      } else if (searchMode === 'uniques') {
         setUniqQuery('*')
         await refreshTroves()
         queryCache.clear()
@@ -2185,24 +2193,27 @@ onClick={() => {
         <form onSubmit={handleSearch} className="mobile-search-form">
           <div className="mobile-search-query-wrap" ref={searchQueryWrapRef}>
             {((soleDynamicTroveId && searchMode === 'search') ||
-              (primaryDynamicTroveId && searchMode === 'uniques')) && (
+              (primaryDynamicTroveId &&
+                (searchMode === 'duplicates' || searchMode === 'uniques'))) && (
               <button
                 type="button"
                 className="mobile-search-add-item-btn"
                 title={
-                  searchMode === 'uniques'
+                  searchMode === 'duplicates' || searchMode === 'uniques'
                     ? 'Add title to primary dynamic trove'
                     : 'Add title to dynamic trove'
                 }
                 aria-label={
-                  searchMode === 'uniques'
+                  searchMode === 'duplicates' || searchMode === 'uniques'
                     ? 'Add title to primary dynamic trove'
                     : 'Add title to dynamic trove'
                 }
                 disabled={
-                  searchMode === 'uniques'
-                    ? !uniqQuery.trim() || uniqQuery.trim() === '*'
-                    : !searchQuery.trim() || searchQuery.trim() === '*'
+                  searchMode === 'duplicates'
+                    ? !dupQuery.trim() || dupQuery.trim() === '*'
+                    : searchMode === 'uniques'
+                      ? !uniqQuery.trim() || uniqQuery.trim() === '*'
+                      : !searchQuery.trim() || searchQuery.trim() === '*'
                 }
                 onClick={() => { void handleAddDynamicItem() }}
               >
