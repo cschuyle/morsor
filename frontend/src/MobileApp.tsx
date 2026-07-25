@@ -68,12 +68,22 @@ function flareQuote(text: string, max = 42): string {
   return `"${t.slice(0, max - 1)}…"`
 }
 
-/** Turn a slug like vids-wish-list into "Vids Wish List". */
-function humanizeTroveName(name: string): string {
-  return name
-    .split(/[-_]+/)
+/**
+ * Display label for a trove name. Keeps real display names as-is; title-cases
+ * legacy slug-only names (when id and name were both stored as the slug).
+ */
+function formatTroveDisplayName(name: string): string {
+  const t = (name || '').trim()
+  if (!t) {
+    return t
+  }
+  if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(t)) {
+    return t
+  }
+  return t
+    .split('-')
     .filter(Boolean)
-    .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
     .join(' ')
 }
 
@@ -1337,7 +1347,7 @@ function MobileApp() {
     const currentQuery = searchMode === 'uniques' ? uniqQuery : searchQuery
     const suggested = currentQuery.trim() === '*' ? '' : currentQuery
     const raw = window.prompt(
-      `Add <title> to ${humanizeTroveName(troveName)} trove`,
+      `Add <title> to ${formatTroveDisplayName(troveName)} trove`,
       suggested,
     )
     if (raw == null) {

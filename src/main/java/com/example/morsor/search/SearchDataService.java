@@ -632,9 +632,10 @@ public class SearchDataService {
     }
 
     /**
-     * Create an empty dynamic trove. The stored id and name are both
-     * {@link #normalizeDynamicTroveName(String)}. Throws {@link IllegalArgumentException} for bad
-     * input, {@link IllegalStateException} when the normalized name conflicts with an existing trove.
+     * Create an empty dynamic trove. The id is {@link #normalizeDynamicTroveName(String)}; the
+     * display name is the trimmed input (shown in the UI). Throws {@link IllegalArgumentException}
+     * for bad input, {@link IllegalStateException} when the normalized id conflicts with an
+     * existing trove.
      */
     public DynamicTroveRegistration createDynamicTrove(String name) {
         if (dynamicTroveRepository == null) {
@@ -659,16 +660,16 @@ public class SearchDataService {
                 throw new IllegalStateException("A trove named \"" + slug + "\" already exists");
             }
             try {
-                dynamicTroveRepository.insertTrove(slug, slug);
+                dynamicTroveRepository.insertTrove(slug, raw);
             } catch (DataIntegrityViolationException e) {
                 throw new IllegalStateException("A trove named \"" + slug + "\" already exists", e);
             }
-            dynamicTroveNames.put(slug, slug);
+            dynamicTroveNames.put(slug, raw);
             dynamicTroves.put(slug, List.of());
             rebuildMergedIndexLocked();
         }
-        log.info("Created dynamic trove id=\"{}\" (from input \"{}\")", slug, raw);
-        return new DynamicTroveRegistration(slug, slug, 0);
+        log.info("Created dynamic trove id=\"{}\" name=\"{}\"", slug, raw);
+        return new DynamicTroveRegistration(slug, raw, 0);
     }
 
     /** True if any trove id or display name collides with this normalized dynamic-trove slug. */
