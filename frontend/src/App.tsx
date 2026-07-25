@@ -565,7 +565,15 @@ function App() {
   const { copyFeedbackMessage: actionFlareMessage, showCopyFeedback: showActionFlare } = useCopyFeedback()
 
   const handleCreateDynamicTrove = useCallback(async () => {
-    const raw = window.prompt('Name for the new dynamic trove')
+    const suggested = (() => {
+      const fromFilter = troveFilter.trim()
+      if (fromFilter) {
+        return fromFilter
+      }
+      const fromQuery = searchQuery.trim()
+      return fromQuery && fromQuery !== '*' ? fromQuery : ''
+    })()
+    const raw = window.prompt('Name for the new dynamic trove', suggested)
     if (raw == null) {
       return
     }
@@ -581,10 +589,17 @@ function App() {
     } catch (e) {
       window.alert(e instanceof Error ? e.message : String(e))
     }
-  }, [refreshTroves, showActionFlare])
+  }, [refreshTroves, searchQuery, showActionFlare, troveFilter])
 
-  const handleDeleteDynamicTrove = useCallback(async (troveId: string, troveName: string) => {
-    if (!window.confirm(`Delete dynamic trove "${troveName}"?`)) {
+  const handleDeleteDynamicTrove = useCallback(async (
+    troveId: string,
+    troveName: string,
+    itemCount: number,
+  ) => {
+    const countLabel = formatCount(itemCount)
+    if (!window.confirm(
+      `ARE YOU SURE you want to delete dynamic trove "${troveName}", which has ${countLabel} items?`,
+    )) {
       return
     }
     try {
@@ -615,7 +630,12 @@ function App() {
     if (!soleDynamicTroveId) {
       return
     }
-    const title = searchQuery.trim()
+    const suggested = searchQuery.trim() === '*' ? '' : searchQuery
+    const raw = window.prompt('Title to add to dynamic trove', suggested)
+    if (raw == null) {
+      return
+    }
+    const title = raw.trim()
     if (!title || title === '*') {
       return
     }
@@ -2117,7 +2137,7 @@ function App() {
                     onClick={(e) => {
                       e.preventDefault()
                       e.stopPropagation()
-                      void handleDeleteDynamicTrove(t.id, t.name)
+                      void handleDeleteDynamicTrove(t.id, t.name, t.count ?? 0)
                     }}
                   >
                     ×
@@ -2179,7 +2199,7 @@ function App() {
                     onClick={(e) => {
                       e.preventDefault()
                       e.stopPropagation()
-                      void handleDeleteDynamicTrove(t.id, t.name)
+                      void handleDeleteDynamicTrove(t.id, t.name, t.count ?? 0)
                     }}
                   >
                     ×
