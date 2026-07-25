@@ -47,6 +47,12 @@ import {
   type UniquesTabSession,
 } from './sessionTabState'
 import { fetchTroveSyncState } from './troveSyncStateApi'
+import {
+  addDynamicTroveItem,
+  createDynamicTrove,
+  deleteDynamicTrove,
+  deleteDynamicTroveItem,
+} from './dynamicTrovesApi'
 import { listConnectedTroveIds } from './troveDirectoryHandles'
 import { TroveLocalRootsPanel } from './TroveLocalRootsPanel'
 import { clearLanguageCodeMapCache, ensureLanguageCodeMap, type LanguageCodeMap } from './languageCodeLookup'
@@ -1197,19 +1203,113 @@ function MobileApp() {
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [showTrovePicker])
 
+  const refreshTroves = useCallback(async () => {
+    try {
+      const res = await fetch('/api/troves', { credentials: 'include', headers: { ...getApiAuthHeaders() } })
+      if (res.status === 401) {
+        window.location.href = '/login'
+        return
+      }
+      const data = res.ok ? await res.json() : []
+      setTroves(Array.isArray(data) ? data : [])
+    } catch {
+      setTroves([])
+    }
+  }, [])
+
   useEffect(() => {
-    fetch('/api/troves', { credentials: 'include', headers: { ...getApiAuthHeaders() } })
-      .then((res) => {
-        if (res.status === 401) { window.location.href = '/login'; return null }
-        return res.ok ? res.json() : Promise.resolve([])
-      })
-      .then((data) => (Array.isArray(data) ? data : []))
-      .then(setTroves)
-      .catch(() => setTroves([]))
+    void refreshTroves()
     ensureLanguageCodeMap(getApiAuthHeaders())
       .then(setLanguageCodeMap)
       .catch(() => setLanguageCodeMap(null))
-  }, [])
+  }, [refreshTroves])
+
+  const soleDynamicTroveId = useMemo(() => {
+    if (searchMode !== 'search' || selectedTroveIds.size !== 1) {
+      return null
+    }
+    const id = [...selectedTroveIds][0]
+    const t = troves.find((x) => x.id === id)
+    return t?.dynamic === true ? id : null
+  }, [searchMode, selectedTroveIds, troves])
+
+  const handleCreateDynamicTrove = useCallback(async () => {
+    const raw = window.prompt('Name for the new dynamic trove')
+    if (raw == null) {
+      return
+    }
+    const name = raw.trim()
+    if (!name) {
+      return
+    }
+    try {
+      const reg = await createDynamicTrove(name)
+      await refreshTroves()
+      setSelectedTroveIds(new Set([reg.troveId]))
+    } catch (e) {
+      window.alert(e instanceof Error ? e.message : String(e))
+    }
+  }, [refreshTroves])
+
+  const handleDeleteDynamicTrove = useCallback(async (troveId: string, troveName: string) => {
+    if (!window.confirm(`Delete dynamic trove "${troveName}"?`)) {
+      return
+    }
+    try {
+      await deleteDynamicTrove(troveId)
+      setSelectedTroveIds((prev) => {
+        const next = new Set(prev)
+        next.delete(troveId)
+        return next
+      })
+      setDupCompareTroveIds((prev) => {
+        const next = new Set(prev)
+        next.delete(troveId)
+        return next
+      })
+      setUniqCompareTroveIds((prev) => {
+        const next = new Set(prev)
+        next.delete(troveId)
+        return next
+      })
+      await refreshTroves()
+    } catch (e) {
+      window.alert(e instanceof Error ? e.message : String(e))
+    }
+  }, [refreshTroves])
+
+  async function handleAddDynamicItem() {
+    if (!soleDynamicTroveId) {
+      return
+    }
+    const title = searchQuery.trim()
+    if (!title || title === '*') {
+      return
+    }
+    try {
+      await addDynamicTroveItem(soleDynamicTroveId, title)
+      queryRef.current = '*'
+      setSearchQuery('*')
+      setFreezeTroveListOrder(false)
+      await refreshTroves()
+      fetchSearch(0)
+    } catch (e) {
+      window.alert(e instanceof Error ? e.message : String(e))
+    }
+  }
+
+  async function handleDeleteDynamicItem(row: SearchResultRow) {
+    if (!soleDynamicTroveId || !row?.id) {
+      return
+    }
+    try {
+      await deleteDynamicTroveItem(soleDynamicTroveId, String(row.id))
+      await refreshTroves()
+      fetchSearch(0)
+    } catch (e) {
+      window.alert(e instanceof Error ? e.message : String(e))
+    }
+  }
 
   useEffect(() => {
     if (searchMode !== 'search') return
@@ -1936,6 +2036,18 @@ onClick={() => {
 
         <form onSubmit={handleSearch} className="mobile-search-form">
           <div className="mobile-search-query-wrap" ref={searchQueryWrapRef}>
+            {soleDynamicTroveId && searchMode === 'search' && (
+              <button
+                type="button"
+                className="mobile-search-add-item-btn"
+                title="Add title to dynamic trove"
+                aria-label="Add title to dynamic trove"
+                disabled={!searchQuery.trim() || searchQuery.trim() === '*'}
+                onClick={() => { void handleAddDynamicItem() }}
+              >
+                +
+              </button>
+            )}
             <div className="mobile-search-input-wrap">
               <input
                 type="search"
@@ -2751,6 +2863,17 @@ onClick={() => {
             })()}
             <div className="mobile-trove-filter-row">
               <div className="mobile-trove-filter-wrap">
+                {!isDupOrUniques && (
+                  <button
+                    type="button"
+                    className="mobile-trove-create-btn"
+                    title="Create dynamic trove"
+                    aria-label="Create dynamic trove"
+                    onClick={() => { void handleCreateDynamicTrove() }}
+                  >
+                    +
+                  </button>
+                )}
                 <input
                   type="text"
                   value={trovePickerFilter}
@@ -2900,6 +3023,21 @@ onClick={() => {
                             : 0
                         return (
                           <li key={t.id} className={`mobile-trove-item${selectedTroveIds.has(t.id) ? ' mobile-trove-item--selected' : ''}${searchResult != null && resultCount > 0 ? ' mobile-trove-item--has-results' : ''}`}>
+                            {t.dynamic === true && (
+                              <button
+                                type="button"
+                                className="mobile-trove-delete-btn"
+                                title={`Delete dynamic trove ${t.name}`}
+                                aria-label={`Delete dynamic trove ${t.name}`}
+                                onClick={(e) => {
+                                  e.preventDefault()
+                                  e.stopPropagation()
+                                  void handleDeleteDynamicTrove(t.id, t.name)
+                                }}
+                              >
+                                ×
+                              </button>
+                            )}
                             <label className="mobile-trove-label">
                               <input type="checkbox" checked={selectedTroveIds.has(t.id)} onChange={() => toggleTrove(t.id)} />
                               <span className={t.id.startsWith('sister-1-of-') ? 'mobile-trove-name--sister' : undefined}>
@@ -3054,6 +3192,8 @@ onClick={() => {
                   totalPages={totalPages}
                   onPrevPage={() => goToPage(page - 1)}
                   onNextPage={() => goToPage(page + 1)}
+                  showDeleteItem={soleDynamicTroveId != null}
+                  onDeleteItem={soleDynamicTroveId != null ? handleDeleteDynamicItem : null}
                 />
               </div>
             )}

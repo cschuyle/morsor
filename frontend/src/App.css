@@ -604,6 +604,51 @@
   margin-bottom: 0.75rem;
 }
 
+.sidebar-trove-create-btn {
+  flex-shrink: 0;
+  width: 2rem;
+  min-width: 2rem;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.2rem;
+  line-height: 1;
+  border: none;
+  border-right: 1px solid #e5e5e5;
+  background: transparent;
+  color: #333;
+  cursor: pointer;
+  border-radius: 0;
+}
+
+.sidebar-trove-create-btn:hover {
+  background: #ede8ff;
+}
+
+.trove-delete-btn {
+  flex-shrink: 0;
+  width: 1.75rem;
+  min-width: 1.75rem;
+  align-self: stretch;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.05rem;
+  line-height: 1;
+  border: none;
+  background: transparent;
+  color: #666;
+  cursor: pointer;
+  border-radius: 0;
+}
+
+.trove-delete-btn:hover {
+  background: #ede8ff;
+  color: #333;
+}
+
 .sidebar-trove-filter-input {
   flex: 1;
   min-width: 0;
@@ -1047,6 +1092,30 @@
   border-radius: 6px;
   overflow: hidden;
   background: #fff;
+}
+.search-query-add-item-btn {
+  flex-shrink: 0;
+  width: 2rem;
+  min-width: 2rem;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.2rem;
+  line-height: 1;
+  border: none;
+  border-right: 1px solid #ddd;
+  background: transparent;
+  color: #333;
+  cursor: pointer;
+  border-radius: 0;
+}
+.search-query-add-item-btn:hover:not(:disabled) {
+  background: #ede8ff;
+}
+.search-query-add-item-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
 }
 .search-query-input-wrap {
   flex: 1;

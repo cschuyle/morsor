@@ -32,8 +32,10 @@ import org.apache.lucene.index.StoredFields;
 import org.apache.lucene.index.IndexableField;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.env.Environment;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.core.env.Profiles;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.support.ResourcePatternResolver;
@@ -118,12 +120,17 @@ public class SearchDataService {
 
     private final Environment environment;
     private final LanguageCodeLookup languageCodeLookup;
+    private final DynamicTroveRepository dynamicTroveRepository;
 
     private List<SearchResult> allResults = List.of();
-    /** Last successful reload payload (before ephemeral merge). */
+    /** Last successful reload payload (before ephemeral / dynamic merge). */
     private List<SearchResult> persistedResults = List.of();
     private final Map<String, List<SearchResult>> ephemeralTroves = new ConcurrentHashMap<>();
     private final Set<String> cliCreatedEphemeralTroveIds = ConcurrentHashMap.newKeySet();
+    /** DB-backed interactive troves (titles only). Survives reload; source of truth is the DB. */
+    private final Map<String, List<SearchResult>> dynamicTroves = new ConcurrentHashMap<>();
+    /** Display names for dynamic troves (including empty ones that have no results yet). */
+    private final Map<String, String> dynamicTroveNames = new ConcurrentHashMap<>();
     /*
      * Sister-trove model (many-to-many):
      *
@@ -164,10 +171,18 @@ public class SearchDataService {
 
     public SearchDataService(ResourcePatternResolver resourceResolver, ObjectMapper objectMapper,
             Environment environment, LanguageCodeLookup languageCodeLookup) {
+        this(resourceResolver, objectMapper, environment, languageCodeLookup, null);
+    }
+
+    @Autowired
+    public SearchDataService(ResourcePatternResolver resourceResolver, ObjectMapper objectMapper,
+            Environment environment, LanguageCodeLookup languageCodeLookup,
+            DynamicTroveRepository dynamicTroveRepository) {
         this.resourceResolver = resourceResolver;
         this.objectMapper = objectMapper;
         this.environment = environment;
         this.languageCodeLookup = languageCodeLookup;
+        this.dynamicTroveRepository = dynamicTroveRepository;
         log.info("SearchDataService created; active profiles: {}", Arrays.toString(environment.getActiveProfiles()));
     }
 
@@ -243,6 +258,7 @@ public class SearchDataService {
                     .collect(Collectors.toCollection(HashSet::new));
             loadMissingReferenceTroves(kept, troveIdsPresent, loadErrors);
             persistedResults = List.copyOf(applyLanguageEnrichment(kept));
+            // Dynamic troves are DB-backed and unchanged by partial S3/classpath reload.
             rebuildMergedIndexLocked();
         }
         log.info("SearchDataService.reloadDataPartial() finished: {} new results, {} total", freshResults.size(), allResults.size());
@@ -303,6 +319,7 @@ public class SearchDataService {
         }
         synchronized (mergeLock) {
             persistedResults = List.copyOf(applyLanguageEnrichment(combined));
+            loadDynamicTrovesFromDbLocked();
             rebuildMergedIndexLocked();
         }
         log.info("SearchDataService.reloadData() finished: {} results, {} trove options", allResults.size(), getTroveOptions().size());
@@ -501,13 +518,247 @@ public class SearchDataService {
         for (List<SearchResult> list : ephemeralTroves.values()) {
             extra += list.size();
         }
+        for (List<SearchResult> list : dynamicTroves.values()) {
+            extra += list.size();
+        }
         List<SearchResult> merged = new ArrayList<>(persistedResults.size() + extra);
         merged.addAll(persistedResults);
         for (List<SearchResult> list : ephemeralTroves.values()) {
             merged.addAll(list);
         }
+        for (List<SearchResult> list : dynamicTroves.values()) {
+            merged.addAll(list);
+        }
         allResults = List.copyOf(merged);
         buildLuceneIndex(merged);
+    }
+
+    /** Max length for a dynamic trove display name. */
+    public static final int MAX_DYNAMIC_TROVE_NAME_LEN = 512;
+
+    /** Max length for a dynamic trove item title. */
+    public static final int MAX_DYNAMIC_ITEM_TITLE_LEN = 2000;
+
+    private void loadDynamicTrovesFromDbLocked() {
+        dynamicTroves.clear();
+        dynamicTroveNames.clear();
+        if (dynamicTroveRepository == null) {
+            return;
+        }
+        List<DynamicTroveRow> troves = dynamicTroveRepository.findAllTroves();
+        List<DynamicTroveItemRow> items = dynamicTroveRepository.findAllItems();
+        Map<String, List<SearchResult>> byTrove = new HashMap<>();
+        for (DynamicTroveRow trove : troves) {
+            dynamicTroveNames.put(trove.id(), trove.name());
+            byTrove.put(trove.id(), new ArrayList<>());
+        }
+        for (DynamicTroveItemRow item : items) {
+            String name = dynamicTroveNames.getOrDefault(item.troveId(), item.troveId());
+            List<SearchResult> list = byTrove.computeIfAbsent(item.troveId(), k -> new ArrayList<>());
+            list.add(dynamicItemToSearchResult(item.id(), item.title(), item.troveId(), name));
+        }
+        for (Map.Entry<String, List<SearchResult>> e : byTrove.entrySet()) {
+            dynamicTroves.put(e.getKey(), List.copyOf(e.getValue()));
+        }
+        log.info("Loaded {} dynamic trove(s) ({} item(s)) from DB", dynamicTroveNames.size(), items.size());
+    }
+
+    private static SearchResult dynamicItemToSearchResult(String itemId, String title, String troveId, String troveName) {
+        String t = title != null ? title : "";
+        return new SearchResult(
+                itemId,
+                "dynamicTitle",
+                t,
+                t,
+                troveName,
+                troveId,
+                false,
+                null,
+                null,
+                t,
+                List.of(),
+                null,
+                null);
+    }
+
+    /**
+     * True if any loaded trove (persisted, ephemeral, dynamic, or hidden reference) already uses this
+     * display name, case-insensitively.
+     */
+    public boolean isTroveNameTaken(String name) {
+        if (name == null || name.isBlank()) {
+            return false;
+        }
+        String needle = name.trim();
+        synchronized (mergeLock) {
+            for (String n : dynamicTroveNames.values()) {
+                if (n != null && n.equalsIgnoreCase(needle)) {
+                    return true;
+                }
+            }
+            for (List<SearchResult> list : ephemeralTroves.values()) {
+                if (!list.isEmpty()) {
+                    String n = list.get(0).trove();
+                    if (n != null && n.equalsIgnoreCase(needle)) {
+                        return true;
+                    }
+                }
+            }
+            for (SearchResult r : persistedResults) {
+                String n = r.trove();
+                if (n != null && n.equalsIgnoreCase(needle)) {
+                    return true;
+                }
+            }
+            return false;
+        }
+    }
+
+    /**
+     * Create an empty dynamic trove. Throws {@link IllegalArgumentException} for bad input,
+     * {@link IllegalStateException} when the name conflicts with an existing trove.
+     */
+    public DynamicTroveRegistration createDynamicTrove(String name) {
+        if (dynamicTroveRepository == null) {
+            throw new IllegalStateException("Dynamic troves are not available (no repository)");
+        }
+        String label = name == null ? "" : name.trim();
+        if (label.isEmpty()) {
+            throw new IllegalArgumentException("name is required");
+        }
+        if (label.length() > MAX_DYNAMIC_TROVE_NAME_LEN) {
+            throw new IllegalArgumentException("name exceeds max length " + MAX_DYNAMIC_TROVE_NAME_LEN);
+        }
+        if (isTroveNameTaken(label)) {
+            throw new IllegalStateException("A trove named \"" + label + "\" already exists");
+        }
+        String troveId = "dyn-" + UUID.randomUUID();
+        synchronized (mergeLock) {
+            // Re-check under lock in case of concurrent create.
+            if (isTroveNameTakenLocked(label)) {
+                throw new IllegalStateException("A trove named \"" + label + "\" already exists");
+            }
+            try {
+                dynamicTroveRepository.insertTrove(troveId, label);
+            } catch (DataIntegrityViolationException e) {
+                throw new IllegalStateException("A trove named \"" + label + "\" already exists", e);
+            }
+            dynamicTroveNames.put(troveId, label);
+            dynamicTroves.put(troveId, List.of());
+            rebuildMergedIndexLocked();
+        }
+        log.info("Created dynamic trove id=\"{}\" name=\"{}\"", troveId, label);
+        return new DynamicTroveRegistration(troveId, label, 0);
+    }
+
+    private boolean isTroveNameTakenLocked(String needle) {
+        for (String n : dynamicTroveNames.values()) {
+            if (n != null && n.equalsIgnoreCase(needle)) {
+                return true;
+            }
+        }
+        for (List<SearchResult> list : ephemeralTroves.values()) {
+            if (!list.isEmpty()) {
+                String n = list.get(0).trove();
+                if (n != null && n.equalsIgnoreCase(needle)) {
+                    return true;
+                }
+            }
+        }
+        for (SearchResult r : persistedResults) {
+            String n = r.trove();
+            if (n != null && n.equalsIgnoreCase(needle)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /** Remove a dynamic trove and its items. Returns false if unknown. */
+    public boolean removeDynamicTrove(String troveId) {
+        if (dynamicTroveRepository == null || troveId == null || troveId.isBlank()) {
+            return false;
+        }
+        String id = troveId.trim();
+        synchronized (mergeLock) {
+            if (!dynamicTroveNames.containsKey(id)) {
+                return false;
+            }
+            dynamicTroveRepository.deleteTrove(id);
+            dynamicTroveNames.remove(id);
+            dynamicTroves.remove(id);
+            rebuildMergedIndexLocked();
+        }
+        log.info("Removed dynamic trove \"{}\"", id);
+        return true;
+    }
+
+    public DynamicTroveItemRegistration addDynamicTroveItem(String troveId, String title) {
+        if (dynamicTroveRepository == null) {
+            throw new IllegalStateException("Dynamic troves are not available (no repository)");
+        }
+        if (troveId == null || troveId.isBlank()) {
+            throw new IllegalArgumentException("troveId is required");
+        }
+        String titleTrimmed = title == null ? "" : title.trim();
+        if (titleTrimmed.isEmpty()) {
+            throw new IllegalArgumentException("title is required");
+        }
+        if (titleTrimmed.length() > MAX_DYNAMIC_ITEM_TITLE_LEN) {
+            throw new IllegalArgumentException("title exceeds max length " + MAX_DYNAMIC_ITEM_TITLE_LEN);
+        }
+        String id = troveId.trim();
+        String itemId = UUID.randomUUID().toString();
+        synchronized (mergeLock) {
+            String troveName = dynamicTroveNames.get(id);
+            if (troveName == null) {
+                throw new IllegalArgumentException("Unknown dynamic trove: " + id);
+            }
+            dynamicTroveRepository.insertItem(itemId, id, titleTrimmed);
+            SearchResult result = dynamicItemToSearchResult(itemId, titleTrimmed, id, troveName);
+            List<SearchResult> existing = dynamicTroves.getOrDefault(id, List.of());
+            List<SearchResult> updated = new ArrayList<>(existing.size() + 1);
+            updated.addAll(existing);
+            updated.add(result);
+            dynamicTroves.put(id, List.copyOf(updated));
+            rebuildMergedIndexLocked();
+        }
+        log.info("Added item \"{}\" to dynamic trove \"{}\"", itemId, id);
+        return new DynamicTroveItemRegistration(itemId, id, titleTrimmed);
+    }
+
+    /** Remove one item from a dynamic trove. Returns false if trove or item unknown. */
+    public boolean removeDynamicTroveItem(String troveId, String itemId) {
+        if (dynamicTroveRepository == null || troveId == null || troveId.isBlank()
+                || itemId == null || itemId.isBlank()) {
+            return false;
+        }
+        String tid = troveId.trim();
+        String iid = itemId.trim();
+        synchronized (mergeLock) {
+            if (!dynamicTroveNames.containsKey(tid)) {
+                return false;
+            }
+            int deleted = dynamicTroveRepository.deleteItem(tid, iid);
+            if (deleted == 0) {
+                return false;
+            }
+            List<SearchResult> existing = dynamicTroves.getOrDefault(tid, List.of());
+            List<SearchResult> updated = existing.stream()
+                    .filter(r -> !iid.equals(r.id()))
+                    .toList();
+            dynamicTroves.put(tid, updated);
+            rebuildMergedIndexLocked();
+        }
+        log.info("Removed item \"{}\" from dynamic trove \"{}\"", iid, tid);
+        return true;
+    }
+
+    public boolean isDynamicTrove(String troveId) {
+        if (troveId == null || troveId.isBlank()) {
+            return false;
+        }
+        return dynamicTroveNames.containsKey(troveId.trim());
     }
 
     private static SearchResult ephemeralItemToSearchResult(EphemeralManifestItem item, String troveId, String troveLabel) {
@@ -1663,7 +1914,7 @@ public class SearchDataService {
         return name != null ? name : ephemeralTroveId;
     }
 
-    /** Returns every trove ID currently searchable: all non-ephemeral IDs plus all ephemeral IDs. */
+    /** Returns every trove ID currently searchable: persisted, ephemeral, and dynamic (including empty). */
     public Set<String> getAllKnownTroveIds() {
         Set<String> ids = new java.util.HashSet<>();
         allResults.stream()
@@ -1671,6 +1922,7 @@ public class SearchDataService {
                 .map(SearchResult::troveId)
                 .forEach(ids::add);
         ids.addAll(ephemeralTroves.keySet());
+        ids.addAll(dynamicTroveNames.keySet());
         return Set.copyOf(ids);
     }
 
@@ -1760,18 +2012,36 @@ public class SearchDataService {
 
     public List<TroveOption> getTroveOptions() {
         Set<String> hiddenReferenceTroves = referenceTroveIdSet();
-        return allResults.stream()
+        Map<String, TroveOption> byId = new LinkedHashMap<>();
+        allResults.stream()
                 .filter(r -> r.troveId() != null && !r.troveId().isBlank())
                 .filter(r -> !hiddenReferenceTroves.contains(r.troveId()))
                 .collect(Collectors.groupingBy(SearchResult::troveId))
-                .entrySet().stream()
-                .map(e -> {
-                    String id = e.getKey();
-                    List<SearchResult> items = e.getValue();
+                .forEach((id, items) -> {
                     String name = items.isEmpty() ? id : (items.get(0).trove() != null ? items.get(0).trove() : id);
                     String updateTimestamp = troveMetadata.getOrDefault(id, null);
-                    return new TroveOption(id, name, items.size(), cliCreatedEphemeralTroveIds.contains(id), updateTimestamp);
-                })
+                    boolean dynamic = dynamicTroveNames.containsKey(id);
+                    byId.put(id, new TroveOption(
+                            id,
+                            name,
+                            items.size(),
+                            cliCreatedEphemeralTroveIds.contains(id),
+                            updateTimestamp,
+                            dynamic));
+                });
+        // Empty dynamic troves have no rows in allResults but must still appear in the picker.
+        for (Map.Entry<String, String> e : dynamicTroveNames.entrySet()) {
+            if (!byId.containsKey(e.getKey())) {
+                byId.put(e.getKey(), new TroveOption(
+                        e.getKey(),
+                        e.getValue(),
+                        0,
+                        false,
+                        null,
+                        true));
+            }
+        }
+        return byId.values().stream()
                 .sorted(java.util.Comparator.comparing(TroveOption::name, String.CASE_INSENSITIVE_ORDER))
                 .toList();
     }

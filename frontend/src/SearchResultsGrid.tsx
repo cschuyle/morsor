@@ -47,6 +47,10 @@ export interface SearchResultsGridProps {
   languageCodeMap?: LanguageCodeMap | null
   /** Trove ids with a connected local folder (File System Access API; see TroveLocalRootsPanel). */
   troveIdsWithLocalDirectory?: ReadonlySet<string> | null
+  /** When true, show a leading × control to delete a dynamic-trove item. */
+  showDeleteItem?: boolean
+  /** Called when the user clicks the delete-item control. */
+  onDeleteItem?: ((row: SearchResultRow) => void) | null
 }
 
 const AMAZON_PLACEHOLDER_THUMB = 'https://m.media-amazon.com/images/I/01RmK+J4pJL._SS135_.gif'
@@ -904,7 +908,7 @@ export function rawSourceDisplay(rawSourceItem: unknown): string {
   return (rawSourceItem != null && rawSourceItem !== '') ? String(rawSourceItem) : RAW_SOURCE_NOT_AVAILABLE
 }
 
-export function SearchResultsGrid({ data, sortBy = null, sortDir = 'asc', onSortChange, showScoreColumn = false, afterFilterSlot = null, viewMode = 'list', hideTroveInGallery = false, hideTroveInList = false, showPdfSashInGallery = false, showGalleryDecorations = true, isMobile = false, visibleExtraFieldKeys = null, onFetchAllForCopy = null, currentPage, totalPages, onPrevPage = null, onNextPage = null, languageCodeMap = null, troveIdsWithLocalDirectory = null }: SearchResultsGridProps) {
+export function SearchResultsGrid({ data, sortBy = null, sortDir = 'asc', onSortChange, showScoreColumn = false, afterFilterSlot = null, viewMode = 'list', hideTroveInGallery = false, hideTroveInList = false, showPdfSashInGallery = false, showGalleryDecorations = true, isMobile = false, visibleExtraFieldKeys = null, onFetchAllForCopy = null, currentPage, totalPages, onPrevPage = null, onNextPage = null, languageCodeMap = null, troveIdsWithLocalDirectory = null, showDeleteItem = false, onDeleteItem = null }: SearchResultsGridProps) {
   const [globalFilter, setGlobalFilter] = useState('')
   const [expandedFileRowIds, setExpandedFileRowIds] = useState<Set<string>>(() => new Set())
   const toggleFileRowExpanded = useCallback((rowKey: string) => {
@@ -1103,15 +1107,45 @@ export function SearchResultsGrid({ data, sortBy = null, sortDir = 'asc', onSort
       maxSize: 520,
     }))
   }, [viewMode, visibleExtraFieldKeys, onSortChange, languageCodeMap])
+  const deleteItemColumn = useMemo(() => {
+    if (!showDeleteItem || !onDeleteItem) {
+      return null
+    }
+    return {
+      id: 'deleteItem',
+      header: '',
+      enableSorting: false,
+      size: 36,
+      minSize: 32,
+      maxSize: 40,
+      cell: (info: { row: { original: SearchResultRow } }) => (
+        <button
+          type="button"
+          className="search-results-delete-item-btn"
+          title="Delete item"
+          aria-label="Delete item"
+          onClick={(e) => {
+            e.preventDefault()
+            e.stopPropagation()
+            onDeleteItem(info.row.original)
+          }}
+        >
+          ×
+        </button>
+      ),
+    }
+  }, [showDeleteItem, onDeleteItem])
+
   const baseColumns = useMemo(
     () => [
+      ...(deleteItemColumn ? [deleteItemColumn] : []),
       ...(hasAnyThumbnail ? [thumbnailColumnDef((payload) => {
         setLightbox(payload)
       }, isMobile, setRawSourceLightbox, hasThumbnails, lpExtraHoverHandlers, languageCodeMap)] : []),
       ...listTextColumns,
       ...extraFieldColumns,
     ],
-    [hasAnyThumbnail, hasThumbnails, isMobile, listTextColumns, lpExtraHoverHandlers, extraFieldColumns, languageCodeMap]
+    [deleteItemColumn, hasAnyThumbnail, hasThumbnails, isMobile, listTextColumns, lpExtraHoverHandlers, extraFieldColumns, languageCodeMap]
   )
   const columns = useMemo(
     () => (showScoreColumn ? [...baseColumns, scoreColumn] : baseColumns),
@@ -1751,6 +1785,21 @@ export function SearchResultsGrid({ data, sortBy = null, sortDir = 'asc', onSort
                   onMouseMove={showUrlTooltip ? undefined : lpLines.length > 0 ? handleLpExtraMouseMove : undefined}
                   onMouseLeave={showUrlTooltip ? handleUrlTooltipLeave : lpLines.length > 0 ? handleLpExtraMouseLeave : undefined}
                 >
+                  {showDeleteItem && onDeleteItem && (
+                    <button
+                      type="button"
+                      className="search-results-delete-item-btn search-results-delete-item-btn--gallery"
+                      title="Delete item"
+                      aria-label="Delete item"
+                      onClick={(e) => {
+                        e.preventDefault()
+                        e.stopPropagation()
+                        onDeleteItem(row)
+                      }}
+                    >
+                      ×
+                    </button>
+                  )}
                   <div
                     role="button"
                     tabIndex={0}

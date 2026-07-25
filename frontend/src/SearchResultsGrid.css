@@ -903,6 +903,40 @@
   border-radius: 8px;
 }
 
+.search-results-delete-item-btn {
+  width: 1.75rem;
+  height: 1.75rem;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.1rem;
+  line-height: 1;
+  border: none;
+  background: transparent;
+  color: #666;
+  cursor: pointer;
+  border-radius: 4px;
+}
+
+.search-results-delete-item-btn:hover {
+  background: #ede8ff;
+  color: #333;
+}
+
+.search-results-delete-item-btn--gallery {
+  position: absolute;
+  top: 0.25rem;
+  left: 0.25rem;
+  z-index: 2;
+  background: rgba(255, 255, 255, 0.9);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+}
+
+.search-results-delete-item-btn--gallery:hover {
+  background: #ede8ff;
+}
+
 .search-results-gallery-card-wrap .search-results-gallery-card {
   overflow: hidden;
   border-radius: 8px;

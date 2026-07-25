@@ -1,0 +1,210 @@
+package com.example.morsor.search;
+
+import org.junit.jupiter.api.Test;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.web.server.LocalServerPort;
+import org.springframework.core.ParameterizedTypeReference;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
+import org.springframework.test.context.ActiveProfiles;
+import org.springframework.web.client.HttpClientErrorException;
+import org.springframework.web.client.RestTemplate;
+
+import java.util.List;
+import java.util.UUID;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+
+@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+@ActiveProfiles("test")
+class DynamicTroveControllerTest {
+
+    @LocalServerPort
+    int port;
+
+    private final RestTemplate restTemplate = new RestTemplate();
+
+    private String base() {
+        return "http://localhost:" + port;
+    }
+
+    private HttpHeaders jsonHeaders() {
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        return headers;
+    }
+
+    @Test
+    void createEmptyDynamicTroveAddItemSearchDelete() {
+        String uniqueName = "DynTest-" + UUID.randomUUID();
+        ResponseEntity<DynamicTroveRegistration> created = restTemplate.exchange(
+                base() + "/api/dynamic-troves",
+                HttpMethod.POST,
+                new HttpEntity<>("{\"name\":\"" + uniqueName + "\"}", jsonHeaders()),
+                DynamicTroveRegistration.class);
+
+        assertThat(created.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+        assertThat(created.getBody()).isNotNull();
+        assertThat(created.getBody().troveId()).startsWith("dyn-");
+        assertThat(created.getBody().name()).isEqualTo(uniqueName);
+        assertThat(created.getBody().count()).isEqualTo(0);
+
+        String troveId = created.getBody().troveId();
+
+        ResponseEntity<List<TroveOption>> troves = restTemplate.exchange(
+                base() + "/api/troves",
+                HttpMethod.GET,
+                null,
+                new ParameterizedTypeReference<List<TroveOption>>() {});
+        assertThat(troves.getBody()).isNotNull();
+        TroveOption option = troves.getBody().stream()
+                .filter(t -> troveId.equals(t.id()))
+                .findFirst()
+                .orElseThrow();
+        assertThat(option.dynamic()).isTrue();
+        assertThat(option.count()).isEqualTo(0);
+        assertThat(option.name()).isEqualTo(uniqueName);
+
+        ResponseEntity<DynamicTroveItemRegistration> item = restTemplate.exchange(
+                base() + "/api/dynamic-troves/" + troveId + "/items",
+                HttpMethod.POST,
+                new HttpEntity<>("{\"title\":\"Alpha Widget\"}", jsonHeaders()),
+                DynamicTroveItemRegistration.class);
+        assertThat(item.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+        assertThat(item.getBody()).isNotNull();
+        assertThat(item.getBody().title()).isEqualTo("Alpha Widget");
+        String itemId = item.getBody().id();
+
+        ResponseEntity<SearchResponse> search = restTemplate.exchange(
+                base() + "/api/search?query=*&trove=" + troveId,
+                HttpMethod.GET,
+                null,
+                SearchResponse.class);
+        assertThat(search.getBody()).isNotNull();
+        assertThat(search.getBody().results()).hasSize(1);
+        assertThat(search.getBody().results().get(0).result().title()).isEqualTo("Alpha Widget");
+        assertThat(search.getBody().results().get(0).result().id()).isEqualTo(itemId);
+
+        ResponseEntity<Void> delItem = restTemplate.exchange(
+                base() + "/api/dynamic-troves/" + troveId + "/items/" + itemId,
+                HttpMethod.DELETE,
+                null,
+                Void.class);
+        assertThat(delItem.getStatusCode().is2xxSuccessful()).isTrue();
+
+        ResponseEntity<SearchResponse> searchAfter = restTemplate.exchange(
+                base() + "/api/search?query=*&trove=" + troveId,
+                HttpMethod.GET,
+                null,
+                SearchResponse.class);
+        assertThat(searchAfter.getBody()).isNotNull();
+        assertThat(searchAfter.getBody().results()).isEmpty();
+
+        ResponseEntity<Void> delTrove = restTemplate.exchange(
+                base() + "/api/dynamic-troves/" + troveId,
+                HttpMethod.DELETE,
+                null,
+                Void.class);
+        assertThat(delTrove.getStatusCode().is2xxSuccessful()).isTrue();
+
+        ResponseEntity<List<TroveOption>> trovesAfter = restTemplate.exchange(
+                base() + "/api/troves",
+                HttpMethod.GET,
+                null,
+                new ParameterizedTypeReference<List<TroveOption>>() {});
+        assertThat(trovesAfter.getBody()).isNotNull();
+        assertThat(trovesAfter.getBody().stream().map(TroveOption::id).toList()).doesNotContain(troveId);
+    }
+
+    @Test
+    void createDynamicTroveRejectsDuplicateNameCaseInsensitive() {
+        String uniqueName = "DupName-" + UUID.randomUUID();
+        ResponseEntity<DynamicTroveRegistration> created = restTemplate.exchange(
+                base() + "/api/dynamic-troves",
+                HttpMethod.POST,
+                new HttpEntity<>("{\"name\":\"" + uniqueName + "\"}", jsonHeaders()),
+                DynamicTroveRegistration.class);
+        assertThat(created.getBody()).isNotNull();
+        String troveId = created.getBody().troveId();
+
+        assertThatThrownBy(() -> restTemplate.exchange(
+                base() + "/api/dynamic-troves",
+                HttpMethod.POST,
+                new HttpEntity<>("{\"name\":\"" + uniqueName.toUpperCase() + "\"}", jsonHeaders()),
+                DynamicTroveRegistration.class))
+                .isInstanceOf(HttpClientErrorException.Conflict.class);
+
+        restTemplate.exchange(
+                base() + "/api/dynamic-troves/" + troveId,
+                HttpMethod.DELETE,
+                null,
+                Void.class);
+    }
+
+    @Test
+    void reloadKeepsDynamicTrove() {
+        String uniqueName = "ReloadDyn-" + UUID.randomUUID();
+        ResponseEntity<DynamicTroveRegistration> created = restTemplate.exchange(
+                base() + "/api/dynamic-troves",
+                HttpMethod.POST,
+                new HttpEntity<>(
+                        "{\"name\":\"" + uniqueName + "\"}",
+                        jsonHeaders()),
+                DynamicTroveRegistration.class);
+        assertThat(created.getBody()).isNotNull();
+        String troveId = created.getBody().troveId();
+
+        restTemplate.exchange(
+                base() + "/api/dynamic-troves/" + troveId + "/items",
+                HttpMethod.POST,
+                new HttpEntity<>("{\"title\":\"Stay\"}", jsonHeaders()),
+                DynamicTroveItemRegistration.class);
+
+        restTemplate.postForEntity(base() + "/api/troves/reload", null, Void.class);
+
+        ResponseEntity<List<TroveOption>> troves = restTemplate.exchange(
+                base() + "/api/troves",
+                HttpMethod.GET,
+                null,
+                new ParameterizedTypeReference<List<TroveOption>>() {});
+        assertThat(troves.getBody()).isNotNull();
+        assertThat(troves.getBody().stream().map(TroveOption::id).toList()).contains(troveId);
+
+        ResponseEntity<SearchResponse> search = restTemplate.exchange(
+                base() + "/api/search?query=Stay&trove=" + troveId,
+                HttpMethod.GET,
+                null,
+                SearchResponse.class);
+        assertThat(search.getBody()).isNotNull();
+        assertThat(search.getBody().results()).hasSize(1);
+
+        restTemplate.exchange(
+                base() + "/api/dynamic-troves/" + troveId,
+                HttpMethod.DELETE,
+                null,
+                Void.class);
+    }
+
+    @Test
+    void deleteUnknownDynamicTroveReturns404() {
+        String url = base() + "/api/dynamic-troves/dyn-00000000-0000-0000-0000-000000000000";
+        assertThatThrownBy(() -> restTemplate.exchange(url, HttpMethod.DELETE, null, Void.class))
+                .isInstanceOf(HttpClientErrorException.NotFound.class);
+    }
+
+    @Test
+    void createDynamicTroveRejectsNameMatchingExistingFixtureTrove() {
+        // "Vinyl" is the display name for the vinyl fixture trove.
+        assertThatThrownBy(() -> restTemplate.exchange(
+                base() + "/api/dynamic-troves",
+                HttpMethod.POST,
+                new HttpEntity<>("{\"name\":\"Vinyl\"}", jsonHeaders()),
+                DynamicTroveRegistration.class))
+                .isInstanceOf(HttpClientErrorException.Conflict.class);
+    }
+}

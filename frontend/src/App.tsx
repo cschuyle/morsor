@@ -52,6 +52,12 @@ import {
 } from './sessionTabState'
 import { paginationPageWindow } from './paginationPageWindow'
 import { fetchTroveSyncState } from './troveSyncStateApi'
+import {
+  addDynamicTroveItem,
+  createDynamicTrove,
+  deleteDynamicTrove,
+  deleteDynamicTroveItem,
+} from './dynamicTrovesApi'
 import { listConnectedTroveIds } from './troveDirectoryHandles'
 import { TroveLocalRootsPanel } from './TroveLocalRootsPanel'
 import { clearLanguageCodeMapCache, ensureLanguageCodeMap, type LanguageCodeMap } from './languageCodeLookup'
@@ -517,19 +523,113 @@ function App() {
     }
   }, [searchResultsViewMode])
 
+  const refreshTroves = useCallback(async () => {
+    try {
+      const res = await fetch('/api/troves', { credentials: 'include', headers: { ...getApiAuthHeaders() } })
+      if (res.status === 401) {
+        window.location.href = '/login'
+        return
+      }
+      const data = res.ok ? await res.json() : []
+      setTroves(Array.isArray(data) ? data : [])
+    } catch {
+      setTroves([])
+    }
+  }, [])
+
   useEffect(() => {
-    fetch('/api/troves', { credentials: 'include', headers: { ...getApiAuthHeaders() } })
-      .then((res) => {
-        if (res.status === 401) { window.location.href = '/login'; return null }
-        return res.ok ? res.json() : Promise.resolve([])
-      })
-      .then((data) => Array.isArray(data) ? data : [])
-      .then(setTroves)
-      .catch(() => setTroves([]))
+    void refreshTroves()
     ensureLanguageCodeMap(getApiAuthHeaders())
       .then(setLanguageCodeMap)
       .catch(() => setLanguageCodeMap(null))
-  }, [])
+  }, [refreshTroves])
+
+  const soleDynamicTroveId = useMemo(() => {
+    if (searchMode !== 'search' || searchSelectedTroveIds.size !== 1) {
+      return null
+    }
+    const id = [...searchSelectedTroveIds][0]
+    const t = troves.find((x) => x.id === id)
+    return t?.dynamic === true ? id : null
+  }, [searchMode, searchSelectedTroveIds, troves])
+
+  const handleCreateDynamicTrove = useCallback(async () => {
+    const raw = window.prompt('Name for the new dynamic trove')
+    if (raw == null) {
+      return
+    }
+    const name = raw.trim()
+    if (!name) {
+      return
+    }
+    try {
+      const reg = await createDynamicTrove(name)
+      await refreshTroves()
+      setSearchSelectedTroveIds(new Set([reg.troveId]))
+    } catch (e) {
+      window.alert(e instanceof Error ? e.message : String(e))
+    }
+  }, [refreshTroves])
+
+  const handleDeleteDynamicTrove = useCallback(async (troveId: string, troveName: string) => {
+    if (!window.confirm(`Delete dynamic trove "${troveName}"?`)) {
+      return
+    }
+    try {
+      await deleteDynamicTrove(troveId)
+      setSearchSelectedTroveIds((prev) => {
+        const next = new Set(prev)
+        next.delete(troveId)
+        return next
+      })
+      setDupCompareTroveIds((prev) => {
+        const next = new Set(prev)
+        next.delete(troveId)
+        return next
+      })
+      setUniqCompareTroveIds((prev) => {
+        const next = new Set(prev)
+        next.delete(troveId)
+        return next
+      })
+      await refreshTroves()
+    } catch (e) {
+      window.alert(e instanceof Error ? e.message : String(e))
+    }
+  }, [refreshTroves])
+
+  async function handleAddDynamicItem() {
+    if (!soleDynamicTroveId) {
+      return
+    }
+    const title = searchQuery.trim()
+    if (!title || title === '*') {
+      return
+    }
+    try {
+      await addDynamicTroveItem(soleDynamicTroveId, title)
+      queryRef.current = '*'
+      setSearchQuery('*')
+      setFreezeTroveListOrder(false)
+      await refreshTroves()
+      fetchSearch(0)
+    } catch (e) {
+      window.alert(e instanceof Error ? e.message : String(e))
+    }
+  }
+
+  async function handleDeleteDynamicItem(row: { id?: string }) {
+    if (!soleDynamicTroveId || !row?.id) {
+      return
+    }
+    try {
+      await deleteDynamicTroveItem(soleDynamicTroveId, String(row.id))
+      await refreshTroves()
+      fetchSearch(0)
+    } catch (e) {
+      window.alert(e instanceof Error ? e.message : String(e))
+    }
+  }
 
   function urlTroveId(value, troveList) {
     if (!value || !troveList?.length) return value || null
@@ -1923,6 +2023,17 @@ function App() {
             </label>
           </div>
           <div className="sidebar-trove-filter-wrap">
+            {searchMode === 'search' && (
+              <button
+                type="button"
+                className="sidebar-trove-create-btn"
+                title="Create dynamic trove"
+                aria-label="Create dynamic trove"
+                onClick={() => { void handleCreateDynamicTrove() }}
+              >
+                +
+              </button>
+            )}
             <input
               type="text"
               value={troveFilter}
@@ -1954,6 +2065,21 @@ function App() {
                 key={t.id}
                 className={`trove-item ${selectedTroveIds.has(t.id) ? 'trove-item--selected' : ''} ${searchResult != null && t.resultCount > 0 ? 'trove-item--has-results' : ''}`}
               >
+                {t.dynamic === true && (
+                  <button
+                    type="button"
+                    className="trove-delete-btn"
+                    title={`Delete dynamic trove ${t.name}`}
+                    aria-label={`Delete dynamic trove ${t.name}`}
+                    onClick={(e) => {
+                      e.preventDefault()
+                      e.stopPropagation()
+                      void handleDeleteDynamicTrove(t.id, t.name)
+                    }}
+                  >
+                    ×
+                  </button>
+                )}
                 <label className="trove-checkbox">
                   <input
                     type="checkbox"
@@ -2001,6 +2127,21 @@ function App() {
                 key={t.id}
                 className={`trove-item ${selectedTroveIds.has(t.id) ? 'trove-item--selected' : ''} ${searchResult != null && t.resultCount > 0 ? 'trove-item--has-results' : ''}`}
               >
+                {t.dynamic === true && (
+                  <button
+                    type="button"
+                    className="trove-delete-btn"
+                    title={`Delete dynamic trove ${t.name}`}
+                    aria-label={`Delete dynamic trove ${t.name}`}
+                    onClick={(e) => {
+                      e.preventDefault()
+                      e.stopPropagation()
+                      void handleDeleteDynamicTrove(t.id, t.name)
+                    }}
+                  >
+                    ×
+                  </button>
+                )}
                 <label className="trove-checkbox">
                   <input
                     type="checkbox"
@@ -2161,6 +2302,18 @@ function App() {
             <form onSubmit={handleSearch} className="search-form">
               <div className="search-form-row">
                 <div className="search-query-wrap" ref={searchQueryWrapRef}>
+                  {soleDynamicTroveId && searchMode === 'search' && (
+                    <button
+                      type="button"
+                      className="search-query-add-item-btn"
+                      title="Add title to dynamic trove"
+                      aria-label="Add title to dynamic trove"
+                      disabled={!searchQuery.trim() || searchQuery.trim() === '*'}
+                      onClick={() => { void handleAddDynamicItem() }}
+                    >
+                      +
+                    </button>
+                  )}
                   <div className="search-query-input-wrap">
                     <input
                       type="text"
@@ -3076,6 +3229,8 @@ function App() {
                       onFetchAllForCopy={async () => fullSearchResultsRef.current}
                       languageCodeMap={languageCodeMap}
                       troveIdsWithLocalDirectory={connectedLocalTroveIds}
+                      showDeleteItem={soleDynamicTroveId != null}
+                      onDeleteItem={soleDynamicTroveId != null ? handleDeleteDynamicItem : null}
                     />
                   </>
                 )
@@ -3291,6 +3446,8 @@ function App() {
                     totalPages={totalPages}
                     onPrevPage={() => goToPage(pageNum - 1)}
                     onNextPage={() => goToPage(pageNum + 1)}
+                    showDeleteItem={soleDynamicTroveId != null}
+                    onDeleteItem={soleDynamicTroveId != null ? handleDeleteDynamicItem : null}
                   />
                 </>
               )

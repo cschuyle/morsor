@@ -39,6 +39,8 @@ export interface Trove {
   name: string
   count: number
   cliCreated?: boolean
+  /** DB-backed interactive trove (titles only). */
+  dynamic?: boolean
   updateTimestamp?: string | null
   [key: string]: unknown
 }
