@@ -315,6 +315,19 @@
   align-items: stretch;
 }
 
+.mobile-search-input-wrap--exists-flash {
+  animation: mobile-search-exists-flash 1s ease-out;
+}
+
+@keyframes mobile-search-exists-flash {
+  from {
+    background-color: #9eecc0;
+  }
+  to {
+    background-color: transparent;
+  }
+}
+
 .mobile-search-input {
   flex: 1;
   min-width: 0;
@@ -329,6 +342,24 @@
   -webkit-appearance: none;
   appearance: none;
   box-sizing: border-box;
+}
+
+.mobile-search-input--exists {
+  padding-right: 3.75rem;
+}
+
+.mobile-search-exists-check {
+  position: absolute;
+  top: 50%;
+  right: 2rem;
+  transform: translateY(-50%);
+  width: 1.5rem;
+  height: 1.5rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #1a9f4b;
+  pointer-events: none;
 }
 
 .mobile-search-query-clear {

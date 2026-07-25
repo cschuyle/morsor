@@ -63,6 +63,7 @@ import { TroveLocalRootsPanel } from './TroveLocalRootsPanel'
 import { clearLanguageCodeMapCache, ensureLanguageCodeMap, type LanguageCodeMap } from './languageCodeLookup'
 import { SearchQueryHelpButton, SearchQueryHelpPopover } from './SearchQueryHelpPopover'
 import { CopyFeedbackFlare, useCopyFeedback } from './CopyFeedback'
+import { useDupPrimaryTitleExists } from './useDupPrimaryTitleExists'
 import './App.css'
 
 function flareQuote(text: string, max = 42): string {
@@ -592,6 +593,12 @@ function App() {
     const t = troves.find((x) => x.id === primaryTroveId)
     return t?.dynamic === true ? primaryTroveId : null
   }, [searchMode, primaryTroveId, troves])
+
+  const { exists: dupPrimaryTitleExists, flash: dupPrimaryTitleExistsFlash } = useDupPrimaryTitleExists(
+    searchMode === 'duplicates' && primaryDynamicTroveId != null,
+    primaryDynamicTroveId,
+    dupQuery,
+  )
 
   const { copyFeedbackMessage: actionFlareMessage, showCopyFeedback: showActionFlare } = useCopyFeedback()
 
@@ -2486,7 +2493,12 @@ function App() {
                       +
                     </button>
                   )}
-                  <div className="search-query-input-wrap">
+                  <div
+                    className={
+                      'search-query-input-wrap' +
+                      (dupPrimaryTitleExistsFlash ? ' search-query-input-wrap--exists-flash' : '')
+                    }
+                  >
                     <input
                       type="text"
                       value={searchMode === 'search' ? searchQuery : searchMode === 'duplicates' ? dupQuery : uniqQuery}
@@ -2514,9 +2526,31 @@ function App() {
                         }
                       }}
                       placeholder="e.g. Greek, Prince, Albanian, Alien — or * for all"
-                      className="search-query-input"
+                      className={
+                        'search-query-input' +
+                        (dupPrimaryTitleExists ? ' search-query-input--exists' : '')
+                      }
                       aria-label="Query"
                     />
+                    {dupPrimaryTitleExists && (
+                      <span
+                        className="search-query-exists-check"
+                        title="Title already in primary trove"
+                        aria-label="Title already in primary trove"
+                        role="img"
+                      >
+                        <svg viewBox="0 0 20 20" width="16" height="16" focusable="false" aria-hidden="true">
+                          <path
+                            d="M5 10.2 8.2 13.5 15.2 6.5"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2.2"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          />
+                        </svg>
+                      </span>
+                    )}
                     {(searchMode === 'search' ? searchQuery : searchMode === 'duplicates' ? dupQuery : uniqQuery) && (
                       <button
                         type="button"

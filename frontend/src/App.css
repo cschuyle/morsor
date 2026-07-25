@@ -1124,6 +1124,17 @@
   display: flex;
   align-items: stretch;
 }
+.search-query-input-wrap--exists-flash {
+  animation: search-query-exists-flash 1s ease-out;
+}
+@keyframes search-query-exists-flash {
+  from {
+    background-color: #9eecc0;
+  }
+  to {
+    background-color: transparent;
+  }
+}
 .search-section input,
 .search-section select {
   padding: 0.5rem;
@@ -1138,6 +1149,22 @@
   background: transparent;
   color: #252525;
   box-sizing: border-box;
+}
+.search-query-input--exists {
+  padding-right: 3.75rem;
+}
+.search-query-exists-check {
+  position: absolute;
+  top: 50%;
+  right: 2rem;
+  transform: translateY(-50%);
+  width: 1.5rem;
+  height: 1.5rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #1a9f4b;
+  pointer-events: none;
 }
 .search-query-clear {
   position: absolute;

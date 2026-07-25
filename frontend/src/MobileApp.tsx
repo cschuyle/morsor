@@ -58,6 +58,7 @@ import { TroveLocalRootsPanel } from './TroveLocalRootsPanel'
 import { clearLanguageCodeMapCache, ensureLanguageCodeMap, type LanguageCodeMap } from './languageCodeLookup'
 import { SearchQueryHelpButton, SearchQueryHelpPopover } from './SearchQueryHelpPopover'
 import { CopyFeedbackFlare, useCopyFeedback } from './CopyFeedback'
+import { useDupPrimaryTitleExists } from './useDupPrimaryTitleExists'
 import './MobileApp.css'
 
 function flareQuote(text: string, max = 42): string {
@@ -1273,6 +1274,12 @@ function MobileApp() {
     return t?.dynamic === true ? primaryTroveId : null
   }, [searchMode, primaryTroveId, troves])
 
+  const { exists: dupPrimaryTitleExists, flash: dupPrimaryTitleExistsFlash } = useDupPrimaryTitleExists(
+    searchMode === 'duplicates' && primaryDynamicTroveId != null,
+    primaryDynamicTroveId,
+    dupQuery,
+  )
+
   const { copyFeedbackMessage: actionFlareMessage, showCopyFeedback: showActionFlare } = useCopyFeedback()
 
   const handleCreateDynamicTrove = useCallback(async () => {
@@ -2220,7 +2227,12 @@ onClick={() => {
                 +
               </button>
             )}
-            <div className="mobile-search-input-wrap">
+            <div
+              className={
+                'mobile-search-input-wrap' +
+                (dupPrimaryTitleExistsFlash ? ' mobile-search-input-wrap--exists-flash' : '')
+              }
+            >
               <input
                 type="search"
                 value={searchMode === 'search' ? searchQuery : searchMode === 'duplicates' ? dupQuery : uniqQuery}
@@ -2248,11 +2260,33 @@ onClick={() => {
                   }
                 }}
                 placeholder="e.g. Greek, Prince, Albanian, Alien — or * for all"
-                className="mobile-search-input"
+                className={
+                  'mobile-search-input' +
+                  (dupPrimaryTitleExists ? ' mobile-search-input--exists' : '')
+                }
                 autoCapitalize="off"
                 autoCorrect="off"
                 aria-label="Query"
               />
+              {dupPrimaryTitleExists && (
+                <span
+                  className="mobile-search-exists-check"
+                  title="Title already in primary trove"
+                  aria-label="Title already in primary trove"
+                  role="img"
+                >
+                  <svg viewBox="0 0 20 20" width="16" height="16" focusable="false" aria-hidden="true">
+                    <path
+                      d="M5 10.2 8.2 13.5 15.2 6.5"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2.2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                </span>
+              )}
               {(searchMode === 'search' ? searchQuery : searchMode === 'duplicates' ? dupQuery : uniqQuery) && (
                 <button
                   type="button"
