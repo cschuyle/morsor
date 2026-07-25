@@ -42,13 +42,13 @@ export function topMatchesFromSearchResult(
 }
 
 /**
- * When enabled (dups tab with dynamic primary, or search tab with a sole
- * dynamic trove), debounce the query and run a regular search against that
- * trove. Exposes the top hits for a dropdown under the query box.
+ * When enabled, debounce the query and run a regular search against the given
+ * trove id(s). Used for the matches dropdown under the query box (search tab:
+ * sole dynamic trove; dups tab: dynamic primary only — not the compare set).
  */
 export function useDupPrimaryTitleExists(
   enabled: boolean,
-  troveId: string | null,
+  troveIds: string[] | null,
   query: string,
 ): {
   matches: DupPrimaryMatch[]
@@ -71,11 +71,14 @@ export function useDupPrimaryTitleExists(
     }
   }, [matches.length])
 
+  const troveKey = (troveIds ?? []).map((id) => id.trim()).filter(Boolean).sort().join(',')
+
   useEffect(() => {
     abortRef.current?.abort()
     abortRef.current = null
 
-    if (!enabled || !troveId?.trim()) {
+    const ids = troveKey ? troveKey.split(',') : []
+    if (!enabled || ids.length === 0) {
       setMatches([])
       setOpen(false)
       return
@@ -91,7 +94,6 @@ export function useDupPrimaryTitleExists(
     setMatches([])
     setOpen(false)
 
-    const primaryId = troveId.trim()
     const requestId = ++requestIdRef.current
     const timer = window.setTimeout(() => {
       abortRef.current?.abort()
@@ -103,7 +105,9 @@ export function useDupPrimaryTitleExists(
         page: '0',
         size: String(TOP_N),
       })
-      params.append('trove', primaryId)
+      for (const id of ids) {
+        params.append('trove', id)
+      }
 
       fetch(`/api/search?${params}`, {
         credentials: 'include',
@@ -144,7 +148,7 @@ export function useDupPrimaryTitleExists(
       abortRef.current?.abort()
       abortRef.current = null
     }
-  }, [enabled, troveId, query])
+  }, [enabled, troveKey, query])
 
   return { matches, open, dismiss, reopen }
 }

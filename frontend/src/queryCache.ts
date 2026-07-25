@@ -49,4 +49,27 @@ function clear(): void {
   cache.clear()
 }
 
-export const queryCache = { get, set, clear }
+/** Drop cache entries whose key mentions any of the given trove ids (as query params). */
+function clearForTroves(troveIds: string[]): void {
+  const ids = troveIds.map((id) => id.trim()).filter(Boolean)
+  if (ids.length === 0) {
+    return
+  }
+  for (const key of [...cache.keys()]) {
+    // Keys look like: full:/api/search?query=...&trove=foo or ...&primaryTrove=foo&compareTrove=bar
+    const hit = ids.some(
+      (id) =>
+        key.includes(`trove=${encodeURIComponent(id)}`) ||
+        key.includes(`trove=${id}`) ||
+        key.includes(`primaryTrove=${encodeURIComponent(id)}`) ||
+        key.includes(`primaryTrove=${id}`) ||
+        key.includes(`compareTrove=${encodeURIComponent(id)}`) ||
+        key.includes(`compareTrove=${id}`),
+    )
+    if (hit) {
+      cache.delete(key)
+    }
+  }
+}
+
+export const queryCache = { get, set, clear, clearForTroves }

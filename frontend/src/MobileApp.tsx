@@ -1275,15 +1275,25 @@ function MobileApp() {
     return t?.dynamic === true ? primaryTroveId : null
   }, [searchMode, primaryTroveId, troves])
 
+  /** Trove id(s) for the debounced matches dropdown (dynamic smart mode): trove itself only. */
+  const dynamicLookupTroveIds = useMemo(() => {
+    if (searchMode === 'search' && soleDynamicTroveId) {
+      return [soleDynamicTroveId]
+    }
+    if (searchMode === 'duplicates' && primaryDynamicTroveId) {
+      return [primaryDynamicTroveId]
+    }
+    return [] as string[]
+  }, [searchMode, soleDynamicTroveId, primaryDynamicTroveId])
+
   const {
     matches: dupPrimaryMatches,
     open: dupPrimaryMatchesOpen,
     dismiss: dismissDupPrimaryMatches,
     reopen: reopenDupPrimaryMatches,
   } = useDupPrimaryTitleExists(
-    (searchMode === 'duplicates' && primaryDynamicTroveId != null) ||
-      (searchMode === 'search' && soleDynamicTroveId != null),
-    searchMode === 'search' ? soleDynamicTroveId : primaryDynamicTroveId,
+    dynamicLookupTroveIds.length > 0,
+    dynamicLookupTroveIds,
     searchMode === 'search' ? searchQuery : dupQuery,
   )
   const dupPrimaryTitleExists = dupPrimaryMatches.length > 0
@@ -1378,12 +1388,20 @@ function MobileApp() {
     try {
       await addDynamicTroveItem(troveId, title)
       setFreezeTroveListOrder(false)
+      // Keep local trove metadata in sync immediately; refresh confirms from the server.
+      setTroves((prev) =>
+        prev.map((t) =>
+          t.id === troveId
+            ? { ...t, count: typeof t.count === 'number' ? t.count + 1 : 1 }
+            : t,
+        ),
+      )
+      queryCache.clearForTroves([troveId])
       if (searchMode === 'duplicates') {
         // Clear the query box but leave results as-is; don't re-run the dups search.
         queryRef.current = ''
         setDupQuery('')
         await refreshTroves()
-        queryCache.clear()
       } else if (searchMode === 'uniques') {
         queryRef.current = '*'
         setUniqQuery('*')
@@ -1395,7 +1413,6 @@ function MobileApp() {
         queryRef.current = ''
         setSearchQuery('')
         await refreshTroves()
-        queryCache.clear()
       }
       showActionFlare(`Added item ${flareQuote(title)}`)
     } catch (e) {
