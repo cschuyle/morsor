@@ -73,6 +73,15 @@ function flareQuote(text: string, max = 42): string {
   return `"${t.slice(0, max - 1)}…"`
 }
 
+/** Turn a slug like vids-wish-list into "Vids Wish List". */
+function humanizeTroveName(name: string): string {
+  return name
+    .split(/[-_]+/)
+    .filter(Boolean)
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+    .join(' ')
+}
+
 const DEFAULT_DUP_SESSION: DuplicatesTabSession = {
   dupQuery: '',
   dupPrimaryTroveId: '',
@@ -562,6 +571,18 @@ function App() {
     return t?.dynamic === true ? id : null
   }, [searchMode, searchSelectedTroveIds, troves])
 
+  /** Dups/Uniques smart mode: primary trove is dynamic. */
+  const primaryDynamicTroveId = useMemo(() => {
+    if (
+      (searchMode !== 'duplicates' && searchMode !== 'uniques') ||
+      !primaryTroveId.trim()
+    ) {
+      return null
+    }
+    const t = troves.find((x) => x.id === primaryTroveId)
+    return t?.dynamic === true ? primaryTroveId : null
+  }, [searchMode, primaryTroveId, troves])
+
   const { copyFeedbackMessage: actionFlareMessage, showCopyFeedback: showActionFlare } = useCopyFeedback()
 
   const handleCreateDynamicTrove = useCallback(async () => {
@@ -627,11 +648,18 @@ function App() {
   }, [refreshTroves, showActionFlare])
 
   async function handleAddDynamicItem() {
-    if (!soleDynamicTroveId) {
+    const troveId =
+      searchMode === 'uniques' ? primaryDynamicTroveId : soleDynamicTroveId
+    if (!troveId) {
       return
     }
-    const suggested = searchQuery.trim() === '*' ? '' : searchQuery
-    const raw = window.prompt('Title to add to dynamic trove', suggested)
+    const troveName = troves.find((t) => t.id === troveId)?.name ?? troveId
+    const currentQuery = searchMode === 'uniques' ? uniqQuery : searchQuery
+    const suggested = currentQuery.trim() === '*' ? '' : currentQuery
+    const raw = window.prompt(
+      `Add <title> to ${humanizeTroveName(troveName)} trove`,
+      suggested,
+    )
     if (raw == null) {
       return
     }
@@ -640,12 +668,19 @@ function App() {
       return
     }
     try {
-      await addDynamicTroveItem(soleDynamicTroveId, title)
+      await addDynamicTroveItem(troveId, title)
       queryRef.current = '*'
-      setSearchQuery('*')
       setFreezeTroveListOrder(false)
-      await refreshTroves()
-      fetchSearch(0)
+      if (searchMode === 'uniques') {
+        setUniqQuery('*')
+        await refreshTroves()
+        queryCache.clear()
+        fetchUniques(0)
+      } else {
+        setSearchQuery('*')
+        await refreshTroves()
+        fetchSearch(0)
+      }
       showActionFlare(`Added item ${flareQuote(title)}`)
     } catch (e) {
       window.alert(e instanceof Error ? e.message : String(e))
@@ -685,6 +720,46 @@ function App() {
       queryCache.clear()
       await refreshTroves()
       fetchSearch(0)
+      showActionFlare(`Deleted item ${flareQuote(title)}`)
+    } catch (e) {
+      window.alert(e instanceof Error ? e.message : String(e))
+    }
+  }
+
+  async function handleDeleteDupPrimary(primary: { id?: string; title?: string }) {
+    const title = (primary?.title ?? primary?.id ?? '').toString().trim()
+    if (!primaryDynamicTroveId || !title) {
+      return
+    }
+    try {
+      await deleteDynamicTroveItem(primaryDynamicTroveId, title)
+      const primaryTitle = (row: { primary?: { id?: string; title?: string } | null }) =>
+        (row.primary?.title ?? row.primary?.id ?? '').toString().trim()
+      setDuplicatesResult((prev) => {
+        if (!prev) {
+          return prev
+        }
+        const nextRows = prev.rows.filter((r) => primaryTitle(r) !== title)
+        if (nextRows.length === prev.rows.length) {
+          return prev
+        }
+        const removed = prev.rows.length - nextRows.length
+        const prevTotal = typeof prev.total === 'number' ? prev.total : prev.rows.length
+        return {
+          ...prev,
+          rows: nextRows,
+          total: Math.max(0, prevTotal - removed),
+        }
+      })
+      if (fullDuplicatesRowsRef.current) {
+        fullDuplicatesRowsRef.current = fullDuplicatesRowsRef.current.filter(
+          (r) => primaryTitle(r) !== title,
+        )
+      }
+      queryCache.clear()
+      await refreshTroves()
+      const pageNum = typeof duplicatesResult?.page === 'number' ? duplicatesResult.page : duplicatesPage
+      fetchDuplicates(pageNum)
       showActionFlare(`Deleted item ${flareQuote(title)}`)
     } catch (e) {
       window.alert(e instanceof Error ? e.message : String(e))
@@ -2365,13 +2440,26 @@ function App() {
             <form onSubmit={handleSearch} className="search-form">
               <div className="search-form-row">
                 <div className="search-query-wrap" ref={searchQueryWrapRef}>
-                  {soleDynamicTroveId && searchMode === 'search' && (
+                  {((soleDynamicTroveId && searchMode === 'search') ||
+                    (primaryDynamicTroveId && searchMode === 'uniques')) && (
                     <button
                       type="button"
                       className="search-query-add-item-btn"
-                      title="Add title to dynamic trove"
-                      aria-label="Add title to dynamic trove"
-                      disabled={!searchQuery.trim() || searchQuery.trim() === '*'}
+                      title={
+                        searchMode === 'uniques'
+                          ? 'Add title to primary dynamic trove'
+                          : 'Add title to dynamic trove'
+                      }
+                      aria-label={
+                        searchMode === 'uniques'
+                          ? 'Add title to primary dynamic trove'
+                          : 'Add title to dynamic trove'
+                      }
+                      disabled={
+                        searchMode === 'uniques'
+                          ? !uniqQuery.trim() || uniqQuery.trim() === '*'
+                          : !searchQuery.trim() || searchQuery.trim() === '*'
+                      }
                       onClick={() => { void handleAddDynamicItem() }}
                     >
                       +
@@ -3124,6 +3212,8 @@ function App() {
                     onSortChange={(col, dir) => fetchDuplicates(0, null, col, dir)}
                     onOpenRawSource={(payload) => setCompareRawSourceLightbox(payload)}
                     onFetchAllRowsForCopy={async () => fullDuplicatesRowsRef.current}
+                    showDeletePrimary={primaryDynamicTroveId != null}
+                    onDeletePrimary={primaryDynamicTroveId != null ? handleDeleteDupPrimary : null}
                   />
                 </>
               )

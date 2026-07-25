@@ -1,5 +1,5 @@
 import { Fragment } from 'react'
-import type { DuplicateRow } from './types'
+import type { DuplicateRow, SearchResultRow } from './types'
 import { CopyFeedbackFlare, useCopyFeedback } from './CopyFeedback'
 import { rawSourceDisplay } from './SearchResultsGrid'
 
@@ -35,13 +35,26 @@ interface DuplicateResultsViewProps {
   onOpenRawSource?: (payload: { title: string; rawSourceItem: string }) => void
   /** Returns the full result set (all pages) for copy. Falls back to current page rows if null. */
   onFetchAllRowsForCopy?: (() => Promise<DuplicateRow[] | null>) | null
+  /** When true, show × on primary rows (smart mode: primary is a dynamic trove). */
+  showDeletePrimary?: boolean
+  /** Called when the user clicks × on a primary row. */
+  onDeletePrimary?: ((primary: SearchResultRow) => void) | null
 }
 
 /**
  * Renders duplicate-finder results: each row has one primary item and N match rows (different style).
  * sortBy / sortDir / onSortChange: optional column sort (title, trove, score). Sorting uses primary row only.
  */
-export function DuplicateResultsView({ rows = [], sortBy = null, sortDir = 'asc', onSortChange, onOpenRawSource, onFetchAllRowsForCopy = null }: DuplicateResultsViewProps) {
+export function DuplicateResultsView({
+  rows = [],
+  sortBy = null,
+  sortDir = 'asc',
+  onSortChange,
+  onOpenRawSource,
+  onFetchAllRowsForCopy = null,
+  showDeletePrimary = false,
+  onDeletePrimary = null,
+}: DuplicateResultsViewProps) {
   const { copyFeedbackMessage, showCopyFeedback } = useCopyFeedback()
 
   const handleSort = (columnId: string) => {
@@ -214,6 +227,9 @@ export function DuplicateResultsView({ rows = [], sortBy = null, sortDir = 'asc'
       <table className="duplicate-results-table">
         <thead>
           <tr>
+            {showDeletePrimary && onDeletePrimary && (
+              <th className="col-primary-action" scope="col" aria-label="Delete primary item" />
+            )}
             <th className="col-thumb" scope="col">
               {/* Thumbnail */}
             </th>
@@ -256,6 +272,7 @@ export function DuplicateResultsView({ rows = [], sortBy = null, sortDir = 'asc'
             }, -Infinity)
             const primaryScore = maxScore === -Infinity ? '—' : maxScore.toFixed(2)
             const primaryThumb = typeof row.primary?.thumbnailUrl === 'string' ? row.primary.thumbnailUrl : null
+            const primary = row.primary
             return (
             <Fragment key={rowIdx}>
               <tr
@@ -266,6 +283,25 @@ export function DuplicateResultsView({ rows = [], sortBy = null, sortDir = 'asc'
                 } : undefined}
                 title={onOpenRawSource ? 'Click to view raw source' : undefined}
               >
+                {showDeletePrimary && onDeletePrimary && (
+                  <td className="col-primary-action">
+                    <button
+                      type="button"
+                      className="search-results-delete-item-btn"
+                      title="Delete item from primary dynamic trove"
+                      aria-label="Delete item from primary dynamic trove"
+                      onClick={(e) => {
+                        e.preventDefault()
+                        e.stopPropagation()
+                        if (primary) {
+                          onDeletePrimary(primary)
+                        }
+                      }}
+                    >
+                      ×
+                    </button>
+                  </td>
+                )}
                 <td className="col-thumb">
                   {primaryThumb ? (
                     <img src={primaryThumb} alt="" className="dup-thumb" loading="lazy" />
@@ -289,6 +325,9 @@ export function DuplicateResultsView({ rows = [], sortBy = null, sortDir = 'asc'
                   } : undefined}
                   title={onOpenRawSource ? 'Click to view raw source' : undefined}
                 >
+                  {showDeletePrimary && onDeletePrimary && (
+                    <td className="col-primary-action" />
+                  )}
                   <td className="col-thumb">
                     {matchThumb ? (
                       <img src={matchThumb} alt="" className="dup-thumb" loading="lazy" />

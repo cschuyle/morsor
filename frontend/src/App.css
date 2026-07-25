@@ -2587,6 +2587,18 @@
   white-space: nowrap;
 }
 
+.duplicate-results-table .col-primary-action {
+  width: 1%;
+  white-space: nowrap;
+  padding-left: 0.25rem;
+  padding-right: 0.15rem;
+  vertical-align: middle;
+}
+
+.duplicate-row-match td.col-primary-action {
+  padding-left: 0.25rem;
+}
+
 .dup-thumb {
   display: block;
   width: 3.2rem;

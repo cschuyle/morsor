@@ -2458,6 +2458,18 @@
   white-space: nowrap;
 }
 
+.mobile-dup-uniques-results .duplicate-results-table .col-primary-action {
+  width: 1%;
+  white-space: nowrap;
+  padding-left: 0.2rem;
+  padding-right: 0.1rem;
+  vertical-align: middle;
+}
+
+.mobile-dup-uniques-results .duplicate-row-match td.col-primary-action {
+  padding-left: 0.2rem;
+}
+
 .mobile-dup-uniques-results .dup-thumb {
   display: block;
   width: 2.5rem;
