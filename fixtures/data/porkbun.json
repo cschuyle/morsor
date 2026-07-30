@@ -1,0 +1,55 @@
+{
+  "id": "porkbun",
+  "name": "Porkbun",
+  "shortName": "Porkbun",
+  "items": [
+    {
+      "domain": {
+        "domain-name": "whowhat.how",
+        "title": "whowhat.how",
+        "expiration-date": "2026-11-02 07:04:29",
+        "auto-renew": "true"
+      }
+    },
+    {
+      "domain": {
+        "domain-name": "whotrumps.com",
+        "title": "whotrumps.com",
+        "expiration-date": "2026-11-02 07:04:29",
+        "auto-renew": "true"
+      }
+    },
+    {
+      "domain": {
+        "domain-name": "pigsty.ai",
+        "title": "pigsty.ai",
+        "expiration-date": "2027-08-22 08:41:06",
+        "auto-renew": "true"
+      }
+    },
+    {
+      "domain": {
+        "domain-name": "bigot.ai",
+        "title": "bigot.ai",
+        "expiration-date": "2027-11-02 07:04:30",
+        "auto-renew": "true"
+      }
+    },
+    {
+      "domain": {
+        "domain-name": "spurn.ai",
+        "title": "spurn.ai",
+        "expiration-date": "2027-11-02 07:04:30",
+        "auto-renew": "true"
+      }
+    },
+    {
+      "domain": {
+        "domain-name": "chicharra.ai",
+        "title": "chicharra.ai",
+        "expiration-date": "2028-04-30 23:25:11",
+        "auto-renew": "true"
+      }
+    }
+  ]
+}
