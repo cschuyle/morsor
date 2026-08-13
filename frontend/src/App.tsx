@@ -23,6 +23,7 @@ import { searchHistoryLabels, duplicatesHistoryLabels, uniquesHistoryLabels } fr
 import type { QueryResultTiming } from './queryResultTiming'
 import { QueryTimingText } from './QueryTimingText'
 import { formatCount, formatCacheBytes } from './formatCount'
+import { stableSet } from './stableSet'
 import {
   ALL_KNOWN_FILE_TYPES,
   groupFileTypes,
@@ -876,15 +877,15 @@ function App() {
     const x = s
     if (!x) return
     setSearchQuery(x.searchQuery)
-    setSearchSelectedTroveIds(new Set(x.searchSelectedTroveIds))
+    setSearchSelectedTroveIds((prev) => stableSet(prev, new Set(x.searchSelectedTroveIds)))
     setPageSize(x.pageSize)
-    setFileTypeFilters(new Set(x.fileTypeFilters.map(normalizeFileTypeToken)))
-    setRequiredFileTypes(new Set((x.requiredFileTypes ?? []).map(normalizeFileTypeToken)))
+    setFileTypeFilters((prev) => stableSet(prev, new Set(x.fileTypeFilters.map(normalizeFileTypeToken))))
+    setRequiredFileTypes((prev) => stableSet(prev, new Set((x.requiredFileTypes ?? []).map(normalizeFileTypeToken))))
     setFileTypeQuickMode(x.fileTypeQuickMode)
     setThumbnailOnly(x.thumbnailOnly)
     setBoostTroveId(x.boostTroveId)
     setSearchResultsViewMode(x.searchResultsViewMode)
-    setExtraGridFieldsSelected(new Set(x.extraGridFields))
+    setExtraGridFieldsSelected((prev) => stableSet(prev, new Set(x.extraGridFields)))
     setStarSortBy(x.starSortBy)
     setStarSortDir(x.starSortDir)
     setOtherSortBy(x.otherSortBy)
@@ -895,7 +896,7 @@ function App() {
     const x = s ?? DEFAULT_DUP_SESSION
     setDupQuery(x.dupQuery)
     setDupPrimaryTroveId(x.dupPrimaryTroveId)
-    setDupCompareTroveIds(new Set(x.dupCompareTroveIds))
+    setDupCompareTroveIds((prev) => stableSet(prev, new Set(x.dupCompareTroveIds)))
     setDupPageSize(x.dupPageSize)
     setDuplicatesSortBy(x.duplicatesSortBy)
     setDuplicatesSortDir(x.duplicatesSortDir)
@@ -905,7 +906,7 @@ function App() {
     const x = s ?? DEFAULT_UNIQ_SESSION
     setUniqQuery(x.uniqQuery)
     setUniqPrimaryTroveId(x.uniqPrimaryTroveId)
-    setUniqCompareTroveIds(new Set(x.uniqCompareTroveIds))
+    setUniqCompareTroveIds((prev) => stableSet(prev, new Set(x.uniqCompareTroveIds)))
     setUniqPageSize(x.uniqPageSize)
     setUniquesSortBy(x.uniquesSortBy)
     setUniquesSortDir(x.uniquesSortDir)
@@ -920,15 +921,15 @@ function App() {
 
     if (u.mode === 'search') {
       setSearchQuery(u.searchQuery)
-      setSearchSelectedTroveIds(new Set(u.searchTroveIds))
+      setSearchSelectedTroveIds((prev) => stableSet(prev, new Set(u.searchTroveIds)))
       if (u.pageSize != null) setPageSize(u.pageSize)
-      setFileTypeFilters(new Set(u.fileTypeFilters.map(normalizeFileTypeToken)))
-      setRequiredFileTypes(new Set(u.requireFileTypes.map(normalizeFileTypeToken)))
+      setFileTypeFilters((prev) => stableSet(prev, new Set(u.fileTypeFilters.map(normalizeFileTypeToken))))
+      setRequiredFileTypes((prev) => stableSet(prev, new Set(u.requireFileTypes.map(normalizeFileTypeToken))))
       setFileTypeQuickMode(u.fileTypeQuickMode)
       setThumbnailOnly(u.thumbnailOnly)
       setBoostTroveId(u.boostTroveId)
       setSearchResultsViewMode(u.searchView)
-      setExtraGridFieldsSelected(new Set(u.extraGridFields))
+      setExtraGridFieldsSelected((prev) => stableSet(prev, new Set(u.extraGridFields)))
       const sq = u.searchQuery.trim()
       const isStar = sq === '*'
       if (u.searchSortBy) {
@@ -953,7 +954,7 @@ function App() {
     } else if (u.mode === 'duplicates') {
       setDupQuery(u.dupQuery)
       setDupPrimaryTroveId(u.dupPrimary)
-      setDupCompareTroveIds(new Set(u.dupCompare))
+      setDupCompareTroveIds((prev) => stableSet(prev, new Set(u.dupCompare)))
       if (u.dupPageSize != null) setDupPageSize(u.dupPageSize)
       setDuplicatesSortBy(u.duplicatesSortBy)
       setDuplicatesSortDir(u.duplicatesSortDir)
@@ -962,7 +963,7 @@ function App() {
     } else {
       setUniqQuery(u.uniqQuery)
       setUniqPrimaryTroveId(u.uniqPrimary)
-      setUniqCompareTroveIds(new Set(u.uniqCompare))
+      setUniqCompareTroveIds((prev) => stableSet(prev, new Set(u.uniqCompare)))
       if (u.uniqPageSize != null) setUniqPageSize(u.uniqPageSize)
       setUniquesSortBy(u.uniquesSortBy)
       setUniquesSortDir(u.uniquesSortDir)

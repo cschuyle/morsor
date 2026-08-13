@@ -12,6 +12,7 @@ import { searchHistoryLabels, duplicatesHistoryLabels, uniquesHistoryLabels } fr
 import type { QueryResultTiming } from './queryResultTiming'
 import { QueryTimingText } from './QueryTimingText'
 import { formatCount } from './formatCount'
+import { stableSet } from './stableSet'
 import { groupFileTypes, getGroupNameIfFullySelected, ALL_KNOWN_FILE_TYPES } from './fileTypeGroups'
 import { FileTypeQuickMode, normalizeFileTypeQuickMode } from './fileTypeQuickMode'
 import { fileTypeSetHas, normalizeFileTypeToken, pruneRequiredFileTypes } from './fileTypeRequireUtils'
@@ -349,16 +350,16 @@ function MobileApp() {
     if (!s) return
     setSearchQuery(s.searchQuery)
     const ids = new Set(s.searchSelectedTroveIds)
-    setUrlSearchTroveIds(ids)
-    setSelectedTroveIds(ids)
+    setUrlSearchTroveIds((prev) => stableSet(prev, ids))
+    setSelectedTroveIds((prev) => stableSet(prev, ids))
     setPageSize(s.pageSize)
-    setFileTypeFilters(new Set(s.fileTypeFilters.map(normalizeFileTypeToken)))
-    setRequiredFileTypes(new Set((s.requiredFileTypes ?? []).map(normalizeFileTypeToken)))
+    setFileTypeFilters((prev) => stableSet(prev, new Set(s.fileTypeFilters.map(normalizeFileTypeToken))))
+    setRequiredFileTypes((prev) => stableSet(prev, new Set((s.requiredFileTypes ?? []).map(normalizeFileTypeToken))))
     setFileTypeQuickMode(s.fileTypeQuickMode)
     setThumbnailOnly(s.thumbnailOnly)
     setBoostTroveId(s.boostTroveId)
     setSearchResultsViewMode(s.searchResultsViewMode)
-    setExtraGridFieldsSelected(new Set(s.extraGridFields))
+    setExtraGridFieldsSelected((prev) => stableSet(prev, new Set(s.extraGridFields)))
     setStarSortBy(s.starSortBy)
     setStarSortDir(s.starSortDir)
     setOtherSortBy(s.otherSortBy)
@@ -369,7 +370,7 @@ function MobileApp() {
     const x = s ?? DEFAULT_DUP_SESSION
     setDupQuery(x.dupQuery)
     setDupPrimaryTroveId(x.dupPrimaryTroveId)
-    setDupCompareTroveIds(new Set(x.dupCompareTroveIds))
+    setDupCompareTroveIds((prev) => stableSet(prev, new Set(x.dupCompareTroveIds)))
     setDupPageSize(x.dupPageSize)
     setDuplicatesSortBy(x.duplicatesSortBy)
     setDuplicatesSortDir(x.duplicatesSortDir)
@@ -379,7 +380,7 @@ function MobileApp() {
     const x = s ?? DEFAULT_UNIQ_SESSION
     setUniqQuery(x.uniqQuery)
     setUniqPrimaryTroveId(x.uniqPrimaryTroveId)
-    setUniqCompareTroveIds(new Set(x.uniqCompareTroveIds))
+    setUniqCompareTroveIds((prev) => stableSet(prev, new Set(x.uniqCompareTroveIds)))
     setUniqPageSize(x.uniqPageSize)
     setUniquesSortBy(x.uniquesSortBy)
     setUniquesSortDir(x.uniquesSortDir)
@@ -395,17 +396,17 @@ function MobileApp() {
     if (u.mode === 'search') {
       setSearchQuery(u.searchQuery)
       const st = new Set(u.searchTroveIds)
-      setUrlSearchTroveIds(st)
-      setSelectedTroveIds(st)
+      setUrlSearchTroveIds((prev) => stableSet(prev, st))
+      setSelectedTroveIds((prev) => stableSet(prev, st))
       if (u.pageSize != null) setPageSize(u.pageSize)
       if (u.searchPageOneBased != null) setPage(u.searchPageOneBased - 1)
-      setFileTypeFilters(new Set(u.fileTypeFilters.map(normalizeFileTypeToken)))
-      setRequiredFileTypes(new Set(u.requireFileTypes.map(normalizeFileTypeToken)))
+      setFileTypeFilters((prev) => stableSet(prev, new Set(u.fileTypeFilters.map(normalizeFileTypeToken))))
+      setRequiredFileTypes((prev) => stableSet(prev, new Set(u.requireFileTypes.map(normalizeFileTypeToken))))
       setFileTypeQuickMode(u.fileTypeQuickMode)
       setThumbnailOnly(u.thumbnailOnly)
       setBoostTroveId(u.boostTroveId)
       setSearchResultsViewMode(u.searchView)
-      setExtraGridFieldsSelected(new Set(u.extraGridFields))
+      setExtraGridFieldsSelected((prev) => stableSet(prev, new Set(u.extraGridFields)))
       const sq = u.searchQuery.trim()
       const isStar = sq === '*'
       if (u.searchSortBy) {
@@ -430,7 +431,7 @@ function MobileApp() {
     } else if (u.mode === 'duplicates') {
       setDupQuery(u.dupQuery)
       setDupPrimaryTroveId(u.dupPrimary)
-      setDupCompareTroveIds(new Set(u.dupCompare))
+      setDupCompareTroveIds((prev) => stableSet(prev, new Set(u.dupCompare)))
       if (u.dupPageSize != null) setDupPageSize(u.dupPageSize)
       if (u.dupPageOneBased != null) setDuplicatesPage(u.dupPageOneBased - 1)
       setDuplicatesSortBy(u.duplicatesSortBy)
@@ -440,7 +441,7 @@ function MobileApp() {
     } else {
       setUniqQuery(u.uniqQuery)
       setUniqPrimaryTroveId(u.uniqPrimary)
-      setUniqCompareTroveIds(new Set(u.uniqCompare))
+      setUniqCompareTroveIds((prev) => stableSet(prev, new Set(u.uniqCompare)))
       if (u.uniqPageSize != null) setUniqPageSize(u.uniqPageSize)
       if (u.uniqPageOneBased != null) setUniquesPage(u.uniqPageOneBased - 1)
       setUniquesSortBy(u.uniquesSortBy)
