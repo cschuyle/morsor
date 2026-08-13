@@ -735,10 +735,9 @@ function App() {
         queryCache.clear()
         fetchUniques(0)
       } else {
-        // Clear the query box but leave results as-is; don't re-run search.
-        queryRef.current = ''
-        setSearchQuery('')
+        // Keep the query as-is and re-run the search so the newly added item shows up.
         await refreshTroves()
+        fetchSearch(0)
       }
       showActionFlare(`Added item ${flareQuote(title)}`)
     } catch (e) {
