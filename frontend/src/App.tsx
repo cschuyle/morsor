@@ -726,8 +726,12 @@ function App() {
       queryCache.clearForTroves([troveId])
       if (searchMode === 'duplicates') {
         // Clear the query box but leave results as-is; don't re-run the dups search.
+        // Also clear the URL's q param synchronously: refreshTroves() below changes the
+        // troves identity, which re-fires the URL-hydration effect before the URL-persist
+        // effect can catch up, and a stale q param would resurrect the just-cleared query.
         queryRef.current = ''
         setDupQuery('')
+        setSearchParams(buildAppUrlParams({ dupQuery: '' }), { replace: true })
         await refreshTroves()
       } else if (searchMode === 'uniques') {
         queryRef.current = '*'
