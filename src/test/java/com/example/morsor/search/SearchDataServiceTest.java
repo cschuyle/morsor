@@ -161,6 +161,48 @@ class SearchDataServiceTest {
                         && "007 James Bond 17 - Goldeneye (1995)".equals(u.item().title()));
     }
 
+    /**
+     * The plain-text search endpoint (used by the Dups compare-trove "matches" dropdown) must
+     * apply the same indeterminate-year heuristic as duplicate detection: a query with a trailing
+     * "(YYYY)" should still match a candidate title that has no year of its own. Regression for
+     * "Fringe (2008)" not matching a compare-trove item titled "Fringe".
+     */
+    @Test
+    void searchWithYearSuffixMatchesTitleWithNoYear() throws Exception {
+        Files.writeString(tempDir.resolve("primary.json"), """
+                {
+                  "id": "primary",
+                  "shortName": "Primary",
+                  "titles": ["Fringe (2008)"]
+                }
+                """);
+        Files.writeString(tempDir.resolve("compare.json"), """
+                {
+                  "id": "compare",
+                  "shortName": "Compare",
+                  "titles": ["Fringe", "Fringe (1996)"]
+                }
+                """);
+
+        SearchDataService service = new SearchDataService(
+                new PathMatchingResourcePatternResolver(),
+                new ObjectMapper(),
+                new MockEnvironment(),
+                new LanguageCodeLookup()
+        );
+        ReflectionTestUtils.setField(service, "dataLocation", "file:" + tempDir.toAbsolutePath() + "/*.json");
+        ReflectionTestUtils.setField(service, "onlyTroveIds", "");
+        ReflectionTestUtils.setField(service, "excludeTroveIds", "");
+        service.reloadData();
+
+        List<ScoredSearchResult> results = service.search(List.of("primary", "compare"), "Fringe (2008)");
+        assertThat(results)
+                .as("indeterminate-year title should match a query with an explicit year")
+                .extracting(sr -> sr.result().title())
+                .contains("Fringe (2008)", "Fringe")
+                .doesNotContain("Fringe (1996)");
+    }
+
     @Test
     void duplicateRerankPlacesExactMatchesBeforeYearSuffixOnlyMatches() throws Exception {
         SearchDataService service = new SearchDataService(

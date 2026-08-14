@@ -1388,6 +1388,13 @@ public class SearchDataService {
         List<SearchFieldFilters.FieldFilter> fieldFilters = parsed.filters();
         boolean noTextQuery = textQuery.isEmpty();
 
+        // A trailing "(YYYY)" is treated as an indeterminate-year hint, not a mandatory token:
+        // candidates without a parseable year of their own still match (matching the dup-heuristic
+        // in passesYearHeuristic), while candidates with a different explicit year are excluded.
+        TitleWithYear queryTitleWithYear = parseTitleWithYear(textQuery);
+        Integer queryYear = queryTitleWithYear.year();
+        String searchTextQuery = queryYear != null ? queryTitleWithYear.core() : textQuery;
+
         if (noTextQuery) {
             Stream<SearchResult> stream = allResults.stream();
             if (!troveIdSet.isEmpty()) {
@@ -1425,7 +1432,8 @@ public class SearchDataService {
         }
 
         if (luceneSearcher == null) {
-            List<ScoredSearchResult> fallback = searchFallbackScored(troveIdSet, textQuery, fieldFilters);
+            List<ScoredSearchResult> fallback = filterByQueryYear(
+                    searchFallbackScored(troveIdSet, searchTextQuery, fieldFilters), queryYear);
             return finalizeSearchResults(fallback, boostId);
         }
         try {
@@ -1434,11 +1442,11 @@ public class SearchDataService {
                 List<BytesRef> terms = troveIdSet.stream().map(BytesRef::new).toList();
                 bq.add(new TermInSetQuery("troveId", terms), BooleanClause.Occur.FILTER);
             }
-            Query luceneTextQuery = buildFuzzyQuery(textQuery);
+            Query luceneTextQuery = buildFuzzyQuery(searchTextQuery);
             if (luceneTextQuery == null) {
                 QueryParser parser = new QueryParser(CONTENT_FIELD, luceneAnalyzer);
                 parser.setDefaultOperator(QueryParser.Operator.AND);
-                luceneTextQuery = parser.parse(QueryParser.escape(textQuery));
+                luceneTextQuery = parser.parse(QueryParser.escape(searchTextQuery));
             }
             bq.add(luceneTextQuery, BooleanClause.Occur.MUST);
             if (boostId != null) {
@@ -1457,16 +1465,36 @@ public class SearchDataService {
                     }
                 }
             }
-            return finalizeSearchResults(out, fieldFilters, boostId);
+            return finalizeSearchResults(filterByQueryYear(out, queryYear), fieldFilters, boostId);
         } catch (ParseException e) {
             log.debug("Lucene parse failed for query \"{}\", falling back to substring match: {}", textQuery, e.getMessage());
-            List<ScoredSearchResult> fallback = searchFallbackScored(troveIdSet, textQuery, fieldFilters);
+            List<ScoredSearchResult> fallback = filterByQueryYear(
+                    searchFallbackScored(troveIdSet, searchTextQuery, fieldFilters), queryYear);
             return finalizeSearchResults(fallback, boostId);
         } catch (IOException e) {
             log.warn("Lucene search failed: {}, falling back to substring match", e.getMessage());
-            List<ScoredSearchResult> fallback = searchFallbackScored(troveIdSet, textQuery, fieldFilters);
+            List<ScoredSearchResult> fallback = filterByQueryYear(
+                    searchFallbackScored(troveIdSet, searchTextQuery, fieldFilters), queryYear);
             return finalizeSearchResults(fallback, boostId);
         }
+    }
+
+    /**
+     * When the query specified an explicit year (trailing "(YYYY)"), drop results whose own
+     * title has a different explicit year. Results with no parseable year of their own are
+     * treated as indeterminate and kept, matching {@link #passesYearHeuristic}.
+     */
+    private static List<ScoredSearchResult> filterByQueryYear(List<ScoredSearchResult> results, Integer queryYear) {
+        if (queryYear == null || results.isEmpty()) {
+            return results;
+        }
+        return results.stream()
+                .filter(sr -> {
+                    Integer candidateYear = parseTitleWithYear(
+                            sr.result().title() != null ? sr.result().title() : "").year();
+                    return candidateYear == null || candidateYear.equals(queryYear);
+                })
+                .toList();
     }
 
     private List<ScoredSearchResult> finalizeSearchResults(
