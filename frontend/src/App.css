@@ -2597,6 +2597,7 @@
 
 .duplicate-results-table .col-score {
   width: 1%;
+  max-width: 4.5rem;
   white-space: nowrap;
 }
 
@@ -2607,6 +2608,7 @@
 
 .duplicate-results-table .col-thumb {
   width: 1%;
+  max-width: 4.75rem;
   white-space: nowrap;
 }
 
