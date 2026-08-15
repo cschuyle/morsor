@@ -702,7 +702,9 @@ function App() {
       searchMode === 'duplicates' ? dupQuery : searchMode === 'uniques' ? uniqQuery : searchQuery
     const suggested = currentQuery.trim() === '*' ? '' : currentQuery
     const raw = window.prompt(
-      `Add <title> to ${formatTroveDisplayName(troveName)} trove`,
+      suggested
+        ? `Add "${suggested}" to ${formatTroveDisplayName(troveName)} trove`
+        : `Add title to ${formatTroveDisplayName(troveName)} trove`,
       suggested,
     )
     if (raw == null) {
