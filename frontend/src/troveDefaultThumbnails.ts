@@ -138,6 +138,7 @@ const TROVE_ID_LIST = [
   'spotify',
   'synology-courses',
   'synology-documentaries',
+  'synology-ebooks',
   'synology-movies',
   'synology-music-videos',
   'synology-nsfw',
@@ -180,6 +181,7 @@ const ICON = {
   audiobooks: '/audioboon-icon.png',
   languageLessons: '/language-lessons-icon.png',
   netflix: '/netflix-icon.png',
+  ebook: '/icon-ebook.png',
 } as const
 
 function iconsFor(ids: readonly TroveId[], icon: string): Partial<Record<TroveId, string>> {
@@ -222,6 +224,7 @@ export const TROVE_DEFAULT_THUMBNAIL: Partial<Record<TroveId, string>> = {
   'kai-series': ICON.filmClapperboard,
   'synology-courses': ICON.videoCameraRecording,
   'synology-documentaries': ICON.videoCameraRecording,
+  'synology-ebooks': ICON.ebook,
   'synology-movies': ICON.videoCameraRecording,
   'synology-music-videos': ICON.videoCameraRecording,
   'synology-nsfw': ICON.videoCameraRecording,
