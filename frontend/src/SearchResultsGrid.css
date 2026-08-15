@@ -608,6 +608,19 @@
   flex-shrink: 0;
 }
 
+/* Per-trove default icon: shown in place of the generic link icon when an item has no thumbnail of its own. */
+.search-thumb-default {
+  box-sizing: border-box;
+  width: 3.2rem;
+  height: 3.2rem;
+  max-width: 3.2rem;
+  max-height: 3.2rem;
+  padding: 0.6rem;
+  object-fit: contain;
+  border-radius: 4px;
+  background: rgba(102, 51, 204, 0.08);
+}
+
 .search-thumb-lightbox {
   position: fixed;
   inset: 0;
@@ -1443,6 +1456,23 @@
   display: block;
   width: 2rem;
   height: 2rem;
+  flex-shrink: 0;
+}
+
+/* Per-trove default icon: shown in place of the letter-avatar/link-icon fallback when an item has no thumbnail of its own. */
+.search-results-gallery-card-default-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 106.67px;
+  background: rgba(102, 51, 204, 0.08);
+}
+
+.search-results-gallery-card-default-icon-img {
+  display: block;
+  width: 2.75rem;
+  height: 2.75rem;
   flex-shrink: 0;
 }
 

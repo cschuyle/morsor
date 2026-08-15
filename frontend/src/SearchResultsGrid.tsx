@@ -12,6 +12,7 @@ import { formatVideoExtraFieldValue, formatVideoFileSummaryLine, isVideoMetadata
 import { openTroveLocalFile } from './troveDirectoryHandles'
 import { looksLikeStandaloneHttpUrl, normalizeUrlForHref, trimUrlTrailingPunctuation } from './urlUtils'
 import { CopyFeedbackFlare, useCopyFeedback } from './CopyFeedback'
+import { TROVE_DEFAULT_THUMBNAIL } from './troveDefaultThumbnails'
 import './SearchResultsGrid.css'
 
 export interface SearchResultsGridProps {
@@ -835,7 +836,10 @@ function thumbnailColumnDef(
       const lpLines = formatLittlePrinceExtraLines(rowExtras ?? undefined, languageCodeMap)
       const lpExtraPlain = formatLittlePrinceExtraTooltip(rowExtras ?? undefined, languageCodeMap)
       const payload = rowToLightboxPayload(row)
-      const linkIcon = (
+      const troveDefaultThumb = row?.troveId ? TROVE_DEFAULT_THUMBNAIL[String(row.troveId)] : undefined
+      const linkIcon = troveDefaultThumb ? (
+        <img src={troveDefaultThumb} alt="" className="search-thumb search-thumb-default" loading="lazy" />
+      ) : (
         <span className="search-thumb-link-icon" aria-hidden="true">
           <PopOutIcon className="search-thumb-link-icon-img" />
         </span>
@@ -1027,12 +1031,14 @@ export function SearchResultsGrid({ data, sortBy = null, sortDir = 'asc', onSort
     () => Array.isArray(data) && data.some((row) => row && row.itemType === 'littlePrinceItem' && (row.thumbnailUrl || (row.itemUrl && String(row.itemUrl).trim()))),
     [data]
   )
-  // Hide the thumb column entirely in list mode when no row has an actual thumbnail image.
+  // Hide the thumb column entirely in list mode when no row has an actual thumbnail image
+  // or a per-trove default icon to fall back to.
   const hasAnyThumbnail = useMemo(
     () => Array.isArray(data) && data.some((row) => {
       if (!row) return false
       const url = row.thumbnailUrl
-      return Boolean(url && String(url).trim() && !isPlaceholderThumb(url))
+      if (url && String(url).trim() && !isPlaceholderThumb(url)) return true
+      return Boolean(row.troveId && TROVE_DEFAULT_THUMBNAIL[String(row.troveId)])
     }),
     [data]
   )
@@ -1685,6 +1691,7 @@ export function SearchResultsGrid({ data, sortBy = null, sortDir = 'asc', onSort
               const itemUrl = row?.itemUrl && String(row.itemUrl).trim() ? row.itemUrl.trim() : null
               const hasImage = thumbUrl && !thumbIsPlaceholder && row?.itemType === 'littlePrinceItem'
               const showLinkIcon = row?.itemType === 'littlePrinceItem' && (!thumbUrl || thumbIsPlaceholder)
+              const troveDefaultThumb = row?.troveId ? TROVE_DEFAULT_THUMBNAIL[String(row.troveId)] : undefined
               const title = row?.title ?? ''
               const trove = row?.trove ?? ''
               const files = Array.isArray(row?.files) ? row.files : []
@@ -1842,6 +1849,10 @@ export function SearchResultsGrid({ data, sortBy = null, sortDir = 'asc', onSort
                   <span className="search-results-gallery-card-image">
                     {hasImage ? (
                       <img src={typeof thumbUrl === 'string' ? normalizeUrlForHref(thumbUrl) : ''} alt="" loading="lazy" />
+                    ) : troveDefaultThumb ? (
+                      <span className="search-results-gallery-card-default-icon" aria-hidden="true">
+                        <img src={troveDefaultThumb} alt="" loading="lazy" className="search-results-gallery-card-default-icon-img" />
+                      </span>
                     ) : showLinkIcon ? (
                       galleryLinkIcon
                     ) : (
