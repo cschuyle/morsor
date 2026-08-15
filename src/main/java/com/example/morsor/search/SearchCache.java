@@ -78,6 +78,34 @@ public class SearchCache {
         return new DupUniqCacheResult(data, true);
     }
 
+    /**
+     * Get or compute a single non-list value (e.g. aggregate counts derived from a result set),
+     * sharing the same TTL/memory-cap machinery as {@link #getOrCompute}.
+     *
+     * @return result with the value and whether it was cached (false if cache memory limit would be exceeded)
+     */
+    public <T> SingleCacheResult<T> getOrComputeSingle(
+            String key, java.util.function.Supplier<T> supplier, java.util.function.ToLongFunction<T> sizeEstimator) {
+        long now = System.currentTimeMillis();
+        Entry entry = cache.get(key);
+        if (entry != null && now < entry.expiryAt) {
+            @SuppressWarnings("unchecked")
+            T data = (T) entry.data;
+            return new SingleCacheResult<>(data, true);
+        }
+        T data = supplier.get();
+        long estimatedBytes = sizeEstimator.applyAsLong(data);
+        synchronized (this) {
+            evictExpired(now);
+            if (totalBytes + estimatedBytes > this.maxBytes) {
+                return new SingleCacheResult<>(data, false);
+            }
+            cache.put(key, new Entry(data, now + ttlMs, estimatedBytes));
+            totalBytes += estimatedBytes;
+        }
+        return new SingleCacheResult<>(data, true);
+    }
+
     private void evictExpired(long now) {
         cache.entrySet().removeIf(e -> {
             Entry ent = e.getValue();
@@ -114,6 +142,9 @@ public class SearchCache {
     }
 
     public record CacheResult<T>(List<T> data, boolean cached) {}
+
+    /** Result for getOrComputeSingle; single value rather than a list. */
+    public record SingleCacheResult<T>(T data, boolean cached) {}
 
     /** Result for getOrComputeDupUniq; pair is the cached or freshly computed dup+uniques. */
     public record DupUniqCacheResult(DupUniqPair pair, boolean cached) {}

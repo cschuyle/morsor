@@ -288,18 +288,51 @@ public class SearchController {
                     .filter(r -> r.result().hasThumbnail())
                     .toList();
         }
-        List<String> availableFileTypes = FileTypeCounts.collectFileTypes(all);
+        // Aggregates (trove/file-type counts, available filter options) don't depend on sort or
+        // pagination, only on the filtered set, so cache them separately keyed on what shaped that set.
+        String aggKey = "agg:" + cacheKey + ":ft:" + normalizedJoin(fileTypesFilter)
+                + ":rft:" + normalizedJoin(requireParsed) + ":thumbs:" + thumbs;
+        List<SearchResultWithScore> aggInput = all;
+        SearchCache.SingleCacheResult<SearchAggregates> aggResult = searchCache.getOrComputeSingle(
+                aggKey,
+                () -> computeAggregates(aggInput),
+                SearchAggregates::estimatedBytes);
+        SearchAggregates aggregates = aggResult.data();
         long total = all.size();
+        int from = (int) Math.min((long) page * size, total);
+        int to = (int) Math.min(from + size, total);
+        List<SearchResultWithScore> pageResults = from < to ? all.subList(from, to) : List.of();
+        String warning = cacheResult.cached() && aggResult.cached()
+                ? null : "Result not cached (cache memory limit reached). Pagination may be slower.";
+        return new SearchResponse(total, pageResults, page, size, aggregates.troveCounts(),
+                aggregates.availableFileTypes(), aggregates.fileTypeCounts(), aggregates.availableExtraFieldKeys(),
+                warning, caveats);
+    }
+
+    /** Aggregates over a filtered result set: trove/file-type hit counts and available filter options. */
+    private record SearchAggregates(
+            Map<String, Long> troveCounts,
+            List<String> availableFileTypes,
+            Map<String, Long> fileTypeCounts,
+            List<String> availableExtraFieldKeys) {
+        long estimatedBytes() {
+            return (long) (troveCounts.size() + fileTypeCounts.size() + availableFileTypes.size()
+                    + availableExtraFieldKeys.size()) * 64L + 256L;
+        }
+    }
+
+    private static SearchAggregates computeAggregates(List<SearchResultWithScore> all) {
+        List<String> availableFileTypes = FileTypeCounts.collectFileTypes(all);
         Map<String, Long> troveCounts = all.stream()
                 .filter(r -> r.result().troveId() != null && !r.result().troveId().isBlank())
                 .collect(Collectors.groupingBy(r -> r.result().troveId(), Collectors.counting()));
         Map<String, Long> fileTypeCounts = FileTypeCounts.countPerFileType(all);
         List<String> availableExtraFieldKeys = collectAvailableExtraFieldKeys(all);
-        int from = (int) Math.min((long) page * size, total);
-        int to = (int) Math.min(from + size, total);
-        List<SearchResultWithScore> pageResults = from < to ? all.subList(from, to) : List.of();
-        String warning = cacheResult.cached() ? null : "Result not cached (cache memory limit reached). Pagination may be slower.";
-        return new SearchResponse(total, pageResults, page, size, troveCounts, availableFileTypes, fileTypeCounts, availableExtraFieldKeys, warning, caveats);
+        return new SearchAggregates(troveCounts, availableFileTypes, fileTypeCounts, availableExtraFieldKeys);
+    }
+
+    private static String normalizedJoin(List<String> values) {
+        return values.stream().map(String::toUpperCase).sorted().collect(Collectors.joining(","));
     }
 
     /** Distinct {@link SearchResult#extraFields()} keys across the full filtered result set (before pagination), for gallery sort. */
