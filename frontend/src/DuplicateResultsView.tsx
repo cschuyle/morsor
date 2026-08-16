@@ -20,10 +20,11 @@ function titleWithExtraHighlight(matchTitle: string, primaryWords: Set<string>):
   const segments = matchTitle.split(/(\b[\w'\u2019]+\b)/g)
   return segments.map((seg, i) => {
     const normalized = stripApostrophes(seg.toLowerCase())
-    if (seg.length > 0 && /^[\w'\u2019]+$/.test(seg) && !primaryWords.has(normalized)) {
-      return <span key={i} className="dup-match-word-not-in-primary">{seg}</span>
+    if (seg.length === 0 || !/^[\w'\u2019]+$/.test(seg)) {
+      return seg
     }
-    return seg
+    const className = primaryWords.has(normalized) ? 'dup-match-word-in-primary' : 'dup-match-word-not-in-primary'
+    return <span key={i} className={className}>{seg}</span>
   })
 }
 

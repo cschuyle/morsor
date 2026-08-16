@@ -2452,7 +2452,11 @@
 }
 
 .mobile-dup-uniques-results .duplicate-row-match .dup-match-word-not-in-primary {
-  background-color: #fef9c3;
+  background-color: #fecaca;
+}
+
+.mobile-dup-uniques-results .duplicate-row-match .dup-match-word-in-primary {
+  background-color: #bbf7d0;
 }
 
 .mobile-dup-uniques-results .uniques-word-in-near-miss {
