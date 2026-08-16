@@ -84,6 +84,12 @@
   white-space: nowrap;
 }
 
+.trove-local-roots-status--elsewhere {
+  font-style: italic;
+  color: #888;
+  max-width: 14rem;
+}
+
 .trove-local-roots-btn {
   font-size: 0.76rem;
   padding: 0.2rem 0.45rem;

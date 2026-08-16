@@ -1021,6 +1021,22 @@
   background: #ede8ff;
 }
 
+.trove-menu-portal-dropdown button:disabled {
+  color: #999;
+  cursor: not-allowed;
+}
+
+.trove-menu-portal-dropdown button:disabled:hover {
+  background: none;
+}
+
+.trove-menu-divider {
+  height: 1px;
+  margin: 0.25rem 0;
+  background: #eee;
+  border: none;
+}
+
 .trove-checkbox:hover {
   background: #ede8ff;
 }

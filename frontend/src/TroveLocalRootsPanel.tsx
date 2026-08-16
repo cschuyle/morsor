@@ -7,6 +7,7 @@ import {
   listConnectedTroveIds,
   removeDirectoryHandle,
 } from './troveDirectoryHandles'
+import { fetchTroveLocalRoots, setTroveLocalRoot, deleteTroveLocalRoot, type TroveLocalRoot } from './troveLocalRootsApi'
 import './TroveLocalRootsPanel.css'
 
 export interface TroveLocalRootsPanelProps {
@@ -21,14 +22,21 @@ export function TroveLocalRootsPanel({ troves, onConnectionChange, troveFilter =
   const [open, setOpen] = useState(false)
   const [connectedIds, setConnectedIds] = useState<Set<string>>(() => new Set())
   const [folderLabels, setFolderLabels] = useState<Record<string, string>>({})
+  // DB-backed metadata: troves with a folder configured in *some* browser (maybe this one,
+  // maybe not). Advisory only — see troveLocalRootsApi.ts.
+  const [dbRoots, setDbRoots] = useState<TroveLocalRoot[]>([])
   const [busyTroveId, setBusyTroveId] = useState<string | null>(null)
   const filterLower = troveFilter.trim().toLowerCase()
   const pickerSupported = directoryPickerSupported()
 
   const refreshConnections = useCallback(async () => {
-    const ids = await listConnectedTroveIds()
+    const [ids, roots] = await Promise.all([
+      listConnectedTroveIds(),
+      fetchTroveLocalRoots().catch(() => [] as TroveLocalRoot[]),
+    ])
     const idSet = new Set(ids)
     setConnectedIds(idSet)
+    setDbRoots(roots)
     const labels: Record<string, string> = {}
     await Promise.all(
       ids.map(async (id) => {
@@ -53,13 +61,30 @@ export function TroveLocalRootsPanel({ troves, onConnectionChange, troveFilter =
   }, [troves, filterLower])
 
   const connectedCount = connectedIds.size
+  const dbRootByTroveId = useMemo(() => {
+    const map = new Map<string, TroveLocalRoot>()
+    for (const r of dbRoots) map.set(r.troveId, r)
+    return map
+  }, [dbRoots])
 
   async function handleChoose(troveId: string) {
     setBusyTroveId(troveId)
     try {
-      await chooseDirectoryForTrove(troveId)
+      const handle = await chooseDirectoryForTrove(troveId)
+      if (handle) {
+        try {
+          await setTroveLocalRoot(troveId, handle.name)
+        } catch {
+          // Non-fatal: the folder is connected and usable in this browser even if the
+          // shared "configured" metadata didn't make it to the server.
+        }
+      }
       await refreshConnections()
       onConnectionChange?.()
+    } catch (e) {
+      if (!(e instanceof DOMException && e.name === 'AbortError')) {
+        window.alert(e instanceof Error ? e.message : String(e))
+      }
     } finally {
       setBusyTroveId(null)
     }
@@ -68,7 +93,17 @@ export function TroveLocalRootsPanel({ troves, onConnectionChange, troveFilter =
   async function handleDisconnect(troveId: string) {
     setBusyTroveId(troveId)
     try {
-      await removeDirectoryHandle(troveId)
+      try {
+        await removeDirectoryHandle(troveId)
+      } catch {
+        // No local handle in this browser — fine, we may only be forgetting the server-side
+        // "configured elsewhere" record.
+      }
+      try {
+        await deleteTroveLocalRoot(troveId)
+      } catch {
+        // Non-fatal: this browser's disconnect already succeeded either way.
+      }
       await refreshConnections()
       onConnectionChange?.()
     } finally {
@@ -108,6 +143,7 @@ export function TroveLocalRootsPanel({ troves, onConnectionChange, troveFilter =
           <ul className="trove-local-roots-list">
             {sortedTroves.map((t) => {
               const connected = connectedIds.has(t.id)
+              const dbRoot = dbRootByTroveId.get(t.id)
               const busy = busyTroveId === t.id
               return (
                 <li key={t.id} className="trove-local-roots-item">
@@ -134,6 +170,31 @@ export function TroveLocalRootsPanel({ troves, onConnectionChange, troveFilter =
                             onClick={() => void handleDisconnect(t.id)}
                           >
                             Disconnect
+                          </button>
+                        </>
+                      ) : dbRoot ? (
+                        <>
+                          <span
+                            className="trove-local-roots-status trove-local-roots-status--elsewhere"
+                            title={`Configured as "${dbRoot.folderLabel}" in another browser or device — not available here yet.`}
+                          >
+                            Configured elsewhere: {dbRoot.folderLabel}
+                          </span>
+                          <button
+                            type="button"
+                            className="trove-local-roots-btn"
+                            disabled={busy || !pickerSupported}
+                            onClick={() => void handleChoose(t.id)}
+                          >
+                            Connect here too…
+                          </button>
+                          <button
+                            type="button"
+                            className="trove-local-roots-btn trove-local-roots-btn--secondary"
+                            disabled={busy}
+                            onClick={() => void handleDisconnect(t.id)}
+                          >
+                            Forget
                           </button>
                         </>
                       ) : (

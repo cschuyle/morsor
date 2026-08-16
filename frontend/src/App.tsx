@@ -65,8 +65,14 @@ import {
   getTroveLoadErrors,
   clearTroveLoadErrors,
 } from './dynamicTrovesApi'
-import { listConnectedTroveIds } from './troveDirectoryHandles'
-import { TroveLocalRootsPanel } from './TroveLocalRootsPanel'
+import {
+  listConnectedTroveIds,
+  connectedFolderLabel,
+  chooseDirectoryForTrove,
+  removeDirectoryHandle,
+  directoryPickerSupported,
+} from './troveDirectoryHandles'
+import { fetchTroveLocalRoots, setTroveLocalRoot, deleteTroveLocalRoot, type TroveLocalRoot } from './troveLocalRootsApi'
 import { clearLanguageCodeMapCache, ensureLanguageCodeMap, type LanguageCodeMap } from './languageCodeLookup'
 import { SearchQueryHelpButton, SearchQueryHelpPopover } from './SearchQueryHelpPopover'
 import { CopyFeedbackFlare, useCopyFeedback } from './CopyFeedback'
@@ -128,13 +134,39 @@ function App() {
   // react to a trove's identity/existence — not its live metadata — avoid re-running on every poll.
   const troveIdentityKey = useMemo(() => troves.map((t) => `${t.id}:${t.name}`).join('|'), [troves])
   const [connectedLocalTroveIds, setConnectedLocalTroveIds] = useState<Set<string>>(() => new Set())
+  // Live folder names read from this browser's IndexedDB handles (not the DB metadata below) —
+  // the most accurate label for a trove this browser has actually connected.
+  const [localFolderLabels, setLocalFolderLabels] = useState<Record<string, string>>({})
   const refreshConnectedLocalTroves = useCallback(async () => {
-    setConnectedLocalTroveIds(new Set(await listConnectedTroveIds()))
+    const ids = await listConnectedTroveIds()
+    setConnectedLocalTroveIds(new Set(ids))
+    const labels: Record<string, string> = {}
+    await Promise.all(
+      ids.map(async (id) => {
+        labels[id] = (await connectedFolderLabel(id)) ?? id
+      }),
+    )
+    setLocalFolderLabels(labels)
   }, [])
 
   useEffect(() => {
     void refreshConnectedLocalTroves()
   }, [refreshConnectedLocalTroves])
+
+  // DB-backed metadata: which troves have a local folder configured (in *some* browser) and
+  // what it's labeled. Advisory only — see troveLocalRootsApi.ts.
+  const [troveLocalRoots, setTroveLocalRoots] = useState<TroveLocalRoot[]>([])
+  const refreshTroveLocalRoots = useCallback(async () => {
+    try {
+      setTroveLocalRoots(await fetchTroveLocalRoots())
+    } catch {
+      setTroveLocalRoots([])
+    }
+  }, [])
+
+  useEffect(() => {
+    void refreshTroveLocalRoots()
+  }, [refreshTroveLocalRoots])
 
   const [languageCodeMap, setLanguageCodeMap] = useState<LanguageCodeMap | null>(null)
   const [searchSelectedTroveIds, setSearchSelectedTroveIds] = useState<Set<string>>(() => new Set())
@@ -660,11 +692,15 @@ function App() {
 
   // Background heartbeat so an already-open tab notices dynamic-trove edits made elsewhere
   // (CLI, another tab) and drops its stale cached search results for that trove. Also picks up
-  // trove group edits made from the Trove Groups screen or another tab.
+  // trove group and local-directory edits made from another tab or another device.
   useEffect(() => {
-    const id = setInterval(() => { void refreshTroves(); void refreshTroveGroups() }, 15000)
+    const id = setInterval(() => {
+      void refreshTroves()
+      void refreshTroveGroups()
+      void refreshTroveLocalRoots()
+    }, 15000)
     return () => clearInterval(id)
-  }, [refreshTroves, refreshTroveGroups])
+  }, [refreshTroves, refreshTroveGroups, refreshTroveLocalRoots])
 
   const soleDynamicTroveId = useMemo(() => {
     if (searchMode !== 'search' || searchSelectedTroveIds.size !== 1) {
@@ -810,6 +846,46 @@ function App() {
       window.alert(e instanceof Error ? e.message : String(e))
     }
   }, [refreshTroves, showActionFlare])
+
+  const handleConnectLocalFolder = useCallback(async (troveId: string, troveName: string) => {
+    if (!directoryPickerSupported()) {
+      window.alert('This browser does not support choosing a local folder. Use Chrome, Edge, or a recent Safari.')
+      return
+    }
+    try {
+      const handle = await chooseDirectoryForTrove(troveId)
+      if (!handle) return
+      await refreshConnectedLocalTroves()
+      try {
+        await setTroveLocalRoot(troveId, handle.name)
+      } catch {
+        // Non-fatal: the folder is connected and usable in this browser even if the shared
+        // "configured" metadata didn't make it to the server.
+      }
+      await refreshTroveLocalRoots()
+      showActionFlare(`Connected local folder for ${flareQuote(troveName)}`)
+    } catch (e) {
+      if (e instanceof DOMException && e.name === 'AbortError') return
+      window.alert(e instanceof Error ? e.message : String(e))
+    }
+  }, [refreshConnectedLocalTroves, refreshTroveLocalRoots, showActionFlare])
+
+  const handleDisconnectLocalFolder = useCallback(async (troveId: string, troveName: string) => {
+    try {
+      await removeDirectoryHandle(troveId)
+    } catch {
+      // No local handle to remove in this browser — fine, we may only be forgetting the
+      // server-side "configured elsewhere" record.
+    }
+    await refreshConnectedLocalTroves()
+    try {
+      await deleteTroveLocalRoot(troveId)
+    } catch {
+      // Non-fatal: this browser's disconnect already succeeded either way.
+    }
+    await refreshTroveLocalRoots()
+    showActionFlare(`Disconnected local folder for ${flareQuote(troveName)}`)
+  }, [refreshConnectedLocalTroves, refreshTroveLocalRoots, showActionFlare])
 
   const handleClearTroveLoadErrors = useCallback(async () => {
     try {
@@ -2541,11 +2617,6 @@ function App() {
               </button>
             )}
           </div>
-          <TroveLocalRootsPanel
-            troves={troves}
-            onConnectionChange={refreshConnectedLocalTroves}
-            troveFilter={troveFilter}
-          />
           {renderTroveGroupsSection(troveFilter)}
           <ul className="trove-list">
             {selectedTroves.map(renderTroveRow)}
@@ -3952,6 +4023,51 @@ function App() {
               Delete trove
             </button>
           )}
+          <div className="trove-menu-divider" role="separator" />
+          {(() => {
+            const { id, name } = openTroveMenu
+            const dbRoot = troveLocalRoots.find((r) => r.troveId === id)
+            const browserConnected = connectedLocalTroveIds.has(id)
+            const liveLabel = browserConnected ? (localFolderLabels[id] ?? 'Connected') : dbRoot?.folderLabel
+            const supported = directoryPickerSupported()
+            const connectLabel = browserConnected
+              ? 'Change local folder…'
+              : dbRoot
+                ? `Connect local folder here… (elsewhere: ${dbRoot.folderLabel})`
+                : 'Connect local folder…'
+            return (
+              <>
+                <button
+                  type="button"
+                  role="menuitem"
+                  disabled={!supported}
+                  title={supported ? undefined : 'Local folder access is not supported in this browser.'}
+                  onClick={(e) => {
+                    e.preventDefault()
+                    e.stopPropagation()
+                    setOpenTroveMenu(null)
+                    void handleConnectLocalFolder(id, name)
+                  }}
+                >
+                  {connectLabel}
+                </button>
+                {(browserConnected || dbRoot) && (
+                  <button
+                    type="button"
+                    role="menuitem"
+                    onClick={(e) => {
+                      e.preventDefault()
+                      e.stopPropagation()
+                      setOpenTroveMenu(null)
+                      void handleDisconnectLocalFolder(id, name)
+                    }}
+                  >
+                    {`Disconnect local folder${liveLabel ? ` (${liveLabel})` : ''}`}
+                  </button>
+                )}
+              </>
+            )
+          })()}
         </div>,
         document.body,
       )}

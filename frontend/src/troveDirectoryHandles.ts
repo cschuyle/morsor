@@ -89,12 +89,18 @@ export async function chooseDirectoryForTrove(troveId: string): Promise<FileSyst
 }
 
 async function ensureReadPermission(handle: FileSystemDirectoryHandle): Promise<boolean> {
-  const current = await handle.queryPermission({ mode: 'read' })
-  if (current === 'granted') {
-    return true
+  try {
+    const current = await handle.queryPermission({ mode: 'read' })
+    if (current === 'granted') {
+      return true
+    }
+    const requested = await handle.requestPermission({ mode: 'read' })
+    return requested === 'granted'
+  } catch {
+    // The handle can throw here if the folder it points to was moved, renamed, or deleted
+    // since it was connected — treat that the same as "can't access it".
+    return false
   }
-  const requested = await handle.requestPermission({ mode: 'read' })
-  return requested === 'granted'
 }
 
 function splitRelativePath(relativePath: string): string[] | null {
@@ -114,21 +120,28 @@ export async function resolveFileInDirectory(
   if (!parts) {
     return null
   }
-  let dir = root
-  for (let i = 0; i < parts.length - 1; i++) {
-    dir = await dir.getDirectoryHandle(parts[i])
+  try {
+    let dir = root
+    for (let i = 0; i < parts.length - 1; i++) {
+      dir = await dir.getDirectoryHandle(parts[i])
+    }
+    const fileHandle = await dir.getFileHandle(parts[parts.length - 1]!)
+    return await fileHandle.getFile()
+  } catch {
+    // getDirectoryHandle/getFileHandle reject (rather than returning null) when a path
+    // segment doesn't exist — e.g. the file was renamed, moved, or deleted since the item
+    // was indexed. Collapse that into "not found" so callers get one clean error case.
+    return null
   }
-  const fileHandle = await dir.getFileHandle(parts[parts.length - 1]!)
-  return fileHandle.getFile()
 }
 
 export async function openTroveLocalFile(troveId: string, sourcePath: string): Promise<void> {
   const handle = await getDirectoryHandle(troveId)
   if (!handle) {
-    throw new Error('No folder connected for this trove. Use Local directories → Choose folder.')
+    throw new Error('No folder connected for this trove in this browser. Use its ⋮ menu → Connect folder.')
   }
   if (!(await ensureReadPermission(handle))) {
-    throw new Error('Folder access was denied.')
+    throw new Error('Could not access the connected folder — access was denied, or it may have been moved, renamed, or deleted.')
   }
   const file = await resolveFileInDirectory(handle, sourcePath)
   if (!file) {
