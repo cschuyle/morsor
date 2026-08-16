@@ -1295,11 +1295,11 @@ def _dir_content_hash(entries: list[str]) -> str:
 def _sister_trove_id(path: str, trove_id: str) -> str:
     """Return a deterministic ephemeral trove ID for a sister config entry.
 
-    Format: local-sister_<hostname>:<path>∈<trove-id-or-alias>
-    Example: local-sister_myMac.local:/Volumes/Movies∈synology-movies
+    Format: sister-link_<hostname>:<path>∈<trove-id-or-alias>
+    Example: sister-link_myMac.local:/Volumes/Movies∈synology-movies
     """
     hostname = socket.gethostname()
-    return f"local-sister_{hostname}:{path}∈{trove_id}"
+    return f"sister-link_{hostname}:{path}∈{trove_id}"
 
 
 def _get_server_sisters(
@@ -1440,7 +1440,7 @@ def _post_sister_trove(
         die(_server_unreachable(base, e))
 
 
-def run_local_sister_of(
+def run_sister_link_of(
     base: str,
     bearer: str | None,
     extra_headers: list[str],
@@ -1453,12 +1453,12 @@ def run_local_sister_of(
     """Like local trove create but marks the new ephemeral trove as a sister of a companion trove."""
     # positional[0] = sister_trove_id, positional[1:] = optional file / --name args
     if not positional or not positional[0].strip():
-        die("local sister-of requires a companion trove ID")
+        die("sister-link-of requires a companion trove ID")
     sister_trove_id = positional[0].strip()
     # Reuse run_local_trove with the sister_trove_id injected into the body.
     run_local_trove(
         base, bearer, extra_headers, show_headers, debug, output_mode,
-        ["local sister-of"] + positional[1:],
+        ["sister-link-of"] + positional[1:],
         preparsed_name_override,
         sister_trove_id=sister_trove_id,
     )
@@ -1515,14 +1515,14 @@ def _fetch_non_ephemeral_trove_ids(
 
 
 
-def run_local_sisters_create(
+def run_sister_link_create(
     base: str,
     bearer: str | None,
     extra_headers: list[str],
     debug: bool,
     output_mode: str,
 ) -> None:
-    """Reconcile local sister troves from MORSOR_PROPERTIES_FILE with the server index.
+    """Reconcile sister-link troves from MORSOR_PROPERTIES_FILE with the server index.
 
     For each configured sister: delete any existing ephemeral trove for it, then
     register a fresh one from the current directory contents.
@@ -1547,7 +1547,7 @@ def run_local_sisters_create(
     unknown = sorted(configured_ids - server_trove_ids)
     if unknown:
         die(
-            "local sisters load: the following configured trove-id(s) do not exist on the server:\n"
+            "sister-link load: the following configured trove-id(s) do not exist on the server:\n"
             + "".join(f"  {tid}\n" for tid in unknown)
             + "Check your MORSOR_PROPERTIES_FILE or run 'morsor-cli troves' to see available troves."
         )
@@ -1563,7 +1563,7 @@ def run_local_sisters_create(
                 continue
             if ephemeral_id not in configured_ephemeral_ids:
                 print(
-                    f"morsor-cli: local sisters load: removing orphan {ephemeral_id}"
+                    f"morsor-cli: sister-link load: removing orphan {ephemeral_id}"
                     f" (sister of {companion_id!r})",
                     file=sys.stderr,
                 )
@@ -1576,7 +1576,7 @@ def run_local_sisters_create(
         explicit_id = _sister_trove_id(path, raw_trove_id)
         companions_label = ",".join(companions)
 
-        print(f"morsor-cli: local sisters load: scanning {path!r} …", file=sys.stderr)
+        print(f"morsor-cli: sister-link load: scanning {path!r} …", file=sys.stderr)
         dir_entries = _scan_directory(path)
         content_hash = _dir_content_hash(dir_entries)
 
@@ -1592,7 +1592,7 @@ def run_local_sisters_create(
 
         if existing_entry and existing_entry.get("contentHash") == content_hash:
             print(
-                f"morsor-cli: local sisters load:   no change since last upload, skipping {explicit_id!r}",
+                f"morsor-cli: sister-link load:   no change since last upload, skipping {explicit_id!r}",
                 file=sys.stderr,
             )
             rows.append((companions_label, explicit_id, 0, path))
@@ -1600,13 +1600,13 @@ def run_local_sisters_create(
 
         if existing_entry:
             print(
-                f"morsor-cli: local sisters load: replacing {explicit_id} for {companions_label!r}",
+                f"morsor-cli: sister-link load: replacing {explicit_id} for {companions_label!r}",
                 file=sys.stderr,
             )
             _delete_ephemeral_trove(base, bearer, extra_headers, debug, explicit_id)
 
         items = [{"id": str(i + 1), "title": name, "files": []} for i, name in enumerate(dir_entries)]
-        print(f"morsor-cli: local sisters load:   {len(items)} items", file=sys.stderr)
+        print(f"morsor-cli: sister-link load:   {len(items)} items", file=sys.stderr)
 
         reg = _post_sister_trove(
             base, bearer, extra_headers, debug, path, items, companions, content_hash,
@@ -1619,7 +1619,7 @@ def run_local_sisters_create(
         count = reg.get("count", len(items))
         rows.append((companions_label, ephemeral_id, count, path))
         print(
-            f"morsor-cli: local sisters load:   registered {ephemeral_id} ({count} items)",
+            f"morsor-cli: sister-link load:   registered {ephemeral_id} ({count} items)",
             file=sys.stderr,
         )
 
@@ -1637,7 +1637,7 @@ def run_local_sisters_create(
                 print(f"{pad_right(companions_label, max_c)}\t{pad_right(ephemeral_id, max_eid)}\t{count}\t{path}")
 
 
-def run_local_sisters_list(
+def run_sister_link_list(
     base: str,
     bearer: str | None,
     extra_headers: list[str],
@@ -1696,7 +1696,7 @@ def run_local_sisters_list(
             print(f"{pad_right(companions_label, max_c)}\t{pad_right(path, max_path)}\t{pad_right(ephemeral_id, max_eid)}\t{status}")
 
 
-def run_local_sisters_clear(
+def run_sister_link_clear(
     base: str,
     bearer: str | None,
     extra_headers: list[str],
@@ -1705,15 +1705,15 @@ def run_local_sisters_clear(
     """Delete all ephemeral sister troves currently registered on the server."""
     server_state = _get_server_sisters(base, bearer, extra_headers, debug)
     if not server_state:
-        print("morsor-cli: local sisters clear: nothing to clear", file=sys.stderr)
+        print("morsor-cli: sister-link clear: nothing to clear", file=sys.stderr)
         return
     for trove_id, entries in server_state.items():
         for entry in entries:
             ephemeral_id = entry.get("ephemeralId")
             if ephemeral_id:
-                print(f"morsor-cli: local sisters clear: deleting {ephemeral_id} (sister of {trove_id!r})", file=sys.stderr)
+                print(f"morsor-cli: sister-link clear: deleting {ephemeral_id} (sister of {trove_id!r})", file=sys.stderr)
                 _delete_ephemeral_trove(base, bearer, extra_headers, debug, ephemeral_id)
-    print("morsor-cli: local sisters clear: done", file=sys.stderr)
+    print("morsor-cli: sister-link clear: done", file=sys.stderr)
 
 
 def run_troves_reload(
@@ -1862,20 +1862,20 @@ def run_local_command(
     local_trove_name_override: str | None = None,
 ) -> None:
     if not args:
-        die("local requires a subcommand: sisters, trove, list, rename")
+        die("local requires a subcommand: sister-link, trove, list, rename")
     subcommand = args[0].lower()
-    if subcommand in ("sisters", "sister"):
+    if subcommand in ("sister-link", "sister-links"):
         if len(args) < 2:
-            die("local sisters requires a subcommand: load, list, clear")
+            die("local sister-link requires a subcommand: load, list, clear")
         sub = args[1].lower().replace("_", "-")
         if sub in ("load", "reload", "refresh-all"):
-            run_local_sisters_create(base, bearer, extra_headers, debug, output_mode)
+            run_sister_link_create(base, bearer, extra_headers, debug, output_mode)
         elif sub == "list":
-            run_local_sisters_list(base, bearer, extra_headers, debug, output_mode)
+            run_sister_link_list(base, bearer, extra_headers, debug, output_mode)
         elif sub == "clear":
-            run_local_sisters_clear(base, bearer, extra_headers, debug)
+            run_sister_link_clear(base, bearer, extra_headers, debug)
         else:
-            die(f"unknown subcommand: local sister(s) {sub!r}  (expected: load, list, clear)")
+            die(f"unknown subcommand: local sister-link {sub!r}  (expected: load, list, clear)")
     elif subcommand in ("trove", "troves"):
         if len(args) < 2:
             die(f"local {subcommand} requires a subcommand: create, delete")
@@ -1894,10 +1894,10 @@ def run_local_command(
             die(f"unknown subcommand: local {subcommand} {sub!r}  (expected: create, delete)")
     elif subcommand == "list":
         run_local_trove_list(base, bearer, extra_headers, debug, output_mode)
-    elif subcommand == "sister-of":
+    elif subcommand == "sister-link-of":
         if len(args) < 2:
-            die("local sister-of requires a companion trove ID")
-        run_local_sister_of(
+            die("local sister-link-of requires a companion trove ID")
+        run_sister_link_of(
             base, bearer, extra_headers, show_headers, debug, output_mode,
             args[1:],
             local_trove_name_override,
@@ -1914,7 +1914,7 @@ def run_local_command(
             die("local rename requires a trove ID and a new name")
         run_local_rename(base, bearer, extra_headers, debug, args[1], args[2])
     else:
-        die(f"unknown local subcommand: {subcommand!r}  (expected: sisters, trove, troves, list, aliases, rename)")
+        die(f"unknown local subcommand: {subcommand!r}  (expected: sister-link, trove, troves, list, aliases, rename)")
 
 
 def _cli_auth_headers(
@@ -2437,8 +2437,8 @@ INLINE ITEMS: THE "-" TROVE
          uniques -p - -c jazz      items in your list with no match in jazz
          search -t -               full-text search restricted to your list
 
-LOCAL SISTER TROVES (DIRECTORY SCAN)
-       local sisters load
+SISTER-LINK TROVES (DIRECTORY SCAN)
+       local sister-link load
 
                    Reconciles the server index with the directories listed in
                    MORSOR_PROPERTIES_FILE (a YAML or JSON config file).  For
@@ -2451,22 +2451,22 @@ LOCAL SISTER TROVES (DIRECTORY SCAN)
                    up-to-date result.
 
                    After create, any search on a configured non-ephemeral trove
-                   automatically includes its local sister's results, and the
+                   automatically includes its sister-link results, and the
                    API response includes a "caveats" field noting the expansion.
 
-       local sisters list
+       local sister-link list
 
                    Prints all configured sisters with their upload status
                    (Not Uploaded / Uploaded on <timestamp>), ephemeral trove
                    ID, and directory path.  Queries the server for live state.
                    Troves not in the config are not shown.
 
-       local sisters clear
+       local sister-link clear
 
                    Deletes every ephemeral trove recorded in the state file
                    and resets the state.  Subsequent searches on the
-                   non-ephemeral troves will no longer include local sisters
-                   until the next create.
+                   non-ephemeral troves will no longer include sister-link
+                   results until the next create.
 
        Config is read from the file pointed to by MORSOR_PROPERTIES_FILE:
 
@@ -2561,7 +2561,7 @@ OPTIONS
 
 ENVIRONMENT
        MORSOR_CLI_BASE_URL     Default base URL (-b overrides).
-       MORSOR_PROPERTIES_FILE  Path to YAML/JSON config. Used for local sisters and
+       MORSOR_PROPERTIES_FILE  Path to YAML/JSON config. Used for sister-link and
                               for trove aliases (morsor.trove-aliases). Local aliases are
                               merged with server-side trove groups (GET /api/trove-groups);
                               on an id clash the local definition wins and a warning is
@@ -2575,9 +2575,9 @@ ACTIONS
        troves get <id>                  GET /api/troves/{id} (full trove document; text mode prints YAML)
        troves reload                    POST /api/troves/reload (reload trove data)
        status                           GET /api/status
-       local sisters load          Reconcile sister troves from config (see above).
-       local sisters list     List configured sisters and their upload status.
-       local sisters clear    Delete all ephemeral sister troves.
+       local sister-link load    Reconcile sister-link troves from config (see above).
+       local sister-link list    List configured sister-links and their upload status.
+       local sister-link clear   Delete all ephemeral sister-link troves.
        local trove create     Register line input as an ephemeral trove (see above).
                               Accepts optional --name NAME.
        local trove delete <id> Delete an ephemeral trove by id.
@@ -2634,9 +2634,9 @@ EXAMPLES
 
               ./scripts/morsor-cli search --trove=vinyl --query='King Gizzard'
 
-    Reconcile local sister troves from config (MORSOR_PROPERTIES_FILE must be set):
+    Reconcile sister-link troves from config (MORSOR_PROPERTIES_FILE must be set):
 
-        MORSOR_PROPERTIES_FILE=~/.morsor.yaml ./scripts/morsor-cli local sisters load
+        MORSOR_PROPERTIES_FILE=~/.morsor.yaml ./scripts/morsor-cli local sister-link load
 
        Register from a file (one title per line):
 
@@ -2745,10 +2745,10 @@ INLINE ITEMS  use "-" as a trove id  [--items FILE]
   uniques -p - -c jazz       # items in your list not found in jazz
 
 LOCAL (EPHEMERAL) TROVES
-  local sisters load                   # Reconcile all config-defined sisters with server
-  local sisters list                  # Show configured sisters and upload status
-  local sisters clear                 # Delete all sister ephemeral troves
-  local sister-of <trove-id> [FILE]   # Create an ad-hoc sister trove (no config needed)
+  local sister-link load                   # Reconcile all config-defined sister-links with server
+  local sister-link list                   # Show configured sister-links and upload status
+  local sister-link clear                  # Delete all sister-link ephemeral troves
+  local sister-link-of <trove-id> [FILE]   # Create an ad-hoc sister-link trove (no config needed)
   local trove create [FILE]           # Register a file (or stdin) as an ephemeral trove
   local trove delete <id>             # Delete an ephemeral trove by id
   local list                          # List all CLI-created ephemeral troves
@@ -2764,7 +2764,7 @@ DYNAMIC (DB-BACKED) TROVES
 ENV
   MORSOR_CLI_BASE_URL      Default base URL (overridden by -b/--base)
   MORSOR_CLI_TOKEN         Bearer token (used if ~/.morsor/session-token.json absent)
-  MORSOR_PROPERTIES_FILE   Config file; required for local sisters; also defines trove aliases
+  MORSOR_PROPERTIES_FILE   Config file; required for sister-link; also defines trove aliases
 
 Examples:
   morsor-cli aliens
@@ -2773,7 +2773,7 @@ Examples:
   morsor-cli -p vinyl -c jazz dups
   cat titles.txt | morsor-cli dups -p -                 # list vs all other troves
   cat titles.txt | morsor-cli dups -p - -c -            # duplicates within the list
-  morsor-cli local sisters load
+  morsor-cli local sister-link load
   morsor-cli local trove create /path/to/titles.txt
   cat /path/to/titles.txt | morsor-cli local trove create
   morsor-cli dynamic item add my-list "Hello World"

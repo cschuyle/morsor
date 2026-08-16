@@ -9,46 +9,46 @@ import java.time.Instant;
 import java.util.List;
 
 @Repository
-public class TroveFileLinkRepository {
+public class TroveDirLinkRepository {
 
     private final JdbcTemplate jdbc;
 
-    public TroveFileLinkRepository(JdbcTemplate jdbc) {
+    public TroveDirLinkRepository(JdbcTemplate jdbc) {
         this.jdbc = jdbc;
     }
 
-    private static final RowMapper<TroveFileLinkRow> ROOT_MAPPER = (rs, rowNum) ->
-            new TroveFileLinkRow(
+    private static final RowMapper<TroveDirLinkRow> ROOT_MAPPER = (rs, rowNum) ->
+            new TroveDirLinkRow(
                     rs.getString("trove_id"),
                     rs.getString("folder_label"),
                     rs.getTimestamp("connected_at").toInstant().toString());
 
-    public List<TroveFileLinkRow> findAll() {
+    public List<TroveDirLinkRow> findAll() {
         return jdbc.query(
-                "SELECT trove_id, folder_label, connected_at FROM trove_file_links ORDER BY trove_id",
+                "SELECT trove_id, folder_label, connected_at FROM trove_dir_links ORDER BY trove_id",
                 ROOT_MAPPER);
     }
 
     /** Insert or update the folder label for a trove (last connector wins). */
-    public TroveFileLinkRow upsert(String troveId, String folderLabel) {
+    public TroveDirLinkRow upsert(String troveId, String folderLabel) {
         Timestamp now = Timestamp.from(Instant.now());
         int updated = jdbc.update(
-                "UPDATE trove_file_links SET folder_label = ?, connected_at = ? WHERE trove_id = ?",
+                "UPDATE trove_dir_links SET folder_label = ?, connected_at = ? WHERE trove_id = ?",
                 folderLabel,
                 now,
                 troveId);
         if (updated == 0) {
             jdbc.update(
-                    "INSERT INTO trove_file_links (trove_id, folder_label, connected_at) VALUES (?, ?, ?)",
+                    "INSERT INTO trove_dir_links (trove_id, folder_label, connected_at) VALUES (?, ?, ?)",
                     troveId,
                     folderLabel,
                     now);
         }
-        return new TroveFileLinkRow(troveId, folderLabel, now.toInstant().toString());
+        return new TroveDirLinkRow(troveId, folderLabel, now.toInstant().toString());
     }
 
     /** @return rows deleted (0 or 1) */
     public int delete(String troveId) {
-        return jdbc.update("DELETE FROM trove_file_links WHERE trove_id = ?", troveId);
+        return jdbc.update("DELETE FROM trove_dir_links WHERE trove_id = ?", troveId);
     }
 }

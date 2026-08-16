@@ -46,8 +46,8 @@ export interface SearchResultsGridProps {
   onNextPage?: (() => void) | null
   /** Optional client-side fallback map for subtitle language code display. */
   languageCodeMap?: LanguageCodeMap | null
-  /** Trove ids with a connected local folder (File System Access API; see TroveFileLinksPanel). */
-  fileLinkedTroveIds?: ReadonlySet<string> | null
+  /** Trove ids with a connected local folder (File System Access API; see TroveDirLinksPanel). */
+  dirLinkedTroveIds?: ReadonlySet<string> | null
   /** When true, show a leading × control to delete a dynamic-trove item. */
   showDeleteItem?: boolean
   /** Called when the user clicks the delete-item control. */
@@ -914,7 +914,7 @@ export function rawSourceDisplay(rawSourceItem: unknown): string {
   return (rawSourceItem != null && rawSourceItem !== '') ? String(rawSourceItem) : RAW_SOURCE_NOT_AVAILABLE
 }
 
-export function SearchResultsGrid({ data, sortBy = null, sortDir = 'asc', onSortChange, showScoreColumn = false, afterFilterSlot = null, viewMode = 'list', hideTroveInGallery = false, hideTroveInList = false, showPdfSashInGallery = false, showGalleryDecorations = true, isMobile = false, visibleExtraFieldKeys = null, onFetchAllForCopy = null, currentPage, totalPages, onPrevPage = null, onNextPage = null, languageCodeMap = null, fileLinkedTroveIds = null, showDeleteItem = false, onDeleteItem = null }: SearchResultsGridProps) {
+export function SearchResultsGrid({ data, sortBy = null, sortDir = 'asc', onSortChange, showScoreColumn = false, afterFilterSlot = null, viewMode = 'list', hideTroveInGallery = false, hideTroveInList = false, showPdfSashInGallery = false, showGalleryDecorations = true, isMobile = false, visibleExtraFieldKeys = null, onFetchAllForCopy = null, currentPage, totalPages, onPrevPage = null, onNextPage = null, languageCodeMap = null, dirLinkedTroveIds = null, showDeleteItem = false, onDeleteItem = null }: SearchResultsGridProps) {
   const [globalFilter, setGlobalFilter] = useState('')
   const [expandedFileRowIds, setExpandedFileRowIds] = useState<Set<string>>(() => new Set())
   const toggleFileRowExpanded = useCallback((rowKey: string) => {
@@ -2156,7 +2156,7 @@ export function SearchResultsGrid({ data, sortBy = null, sortDir = 'asc', onSort
                       const sourcePath = videoFileSourcePath(file)
                       const troveId = rowData.troveId != null ? String(rowData.troveId) : ''
                       const canOpenLinkedFile =
-                        troveId && sourcePath && fileLinkedTroveIds?.has(troveId)
+                        troveId && sourcePath && dirLinkedTroveIds?.has(troveId)
                       const filename = videoFileBasename(isVideoMetadataFileEntry(file) ? file.source : null)
                       const suffix = videoFileSummarySuffix(file)
                       const handleOpenLinkedFile = canOpenLinkedFile

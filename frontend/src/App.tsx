@@ -72,7 +72,7 @@ import {
   removeDirectoryHandle,
   directoryPickerSupported,
 } from './troveDirectoryHandles'
-import { fetchTroveFileLinks, setTroveFileLink, deleteTroveFileLink, type TroveFileLink } from './troveFileLinksApi'
+import { fetchTroveDirLinks, setTroveDirLink, deleteTroveDirLink, type TroveDirLink } from './troveDirLinksApi'
 import { clearLanguageCodeMapCache, ensureLanguageCodeMap, type LanguageCodeMap } from './languageCodeLookup'
 import { SearchQueryHelpButton, SearchQueryHelpPopover } from './SearchQueryHelpPopover'
 import { CopyFeedbackFlare, useCopyFeedback } from './CopyFeedback'
@@ -133,40 +133,40 @@ function App() {
   // itself (refreshTroves always produces a new array reference). Lets effects that only need to
   // react to a trove's identity/existence — not its live metadata — avoid re-running on every poll.
   const troveIdentityKey = useMemo(() => troves.map((t) => `${t.id}:${t.name}`).join('|'), [troves])
-  const [fileLinkedTroveIds, setFileLinkedTroveIds] = useState<Set<string>>(() => new Set())
+  const [dirLinkedTroveIds, setDirLinkedTroveIds] = useState<Set<string>>(() => new Set())
   // Live folder names read from this browser's IndexedDB handles (not the DB metadata below) —
   // the most accurate label for a trove this browser has actually connected.
-  const [fileLinkedFolderLabels, setFileLinkedFolderLabels] = useState<Record<string, string>>({})
-  const refreshFileLinkedTroves = useCallback(async () => {
+  const [dirLinkedFolderLabels, setDirLinkedFolderLabels] = useState<Record<string, string>>({})
+  const refreshDirLinkedTroves = useCallback(async () => {
     const ids = await listConnectedTroveIds()
-    setFileLinkedTroveIds(new Set(ids))
+    setDirLinkedTroveIds(new Set(ids))
     const labels: Record<string, string> = {}
     await Promise.all(
       ids.map(async (id) => {
         labels[id] = (await connectedFolderLabel(id)) ?? id
       }),
     )
-    setFileLinkedFolderLabels(labels)
+    setDirLinkedFolderLabels(labels)
   }, [])
 
   useEffect(() => {
-    void refreshFileLinkedTroves()
-  }, [refreshFileLinkedTroves])
+    void refreshDirLinkedTroves()
+  }, [refreshDirLinkedTroves])
 
   // DB-backed metadata: which troves have a local folder configured (in *some* browser) and
-  // what it's labeled. Advisory only — see troveFileLinksApi.ts.
-  const [troveFileLinks, setTroveFileLinks] = useState<TroveFileLink[]>([])
-  const refreshTroveFileLinks = useCallback(async () => {
+  // what it's labeled. Advisory only — see troveDirLinksApi.ts.
+  const [troveDirLinks, setTroveDirLinks] = useState<TroveDirLink[]>([])
+  const refreshTroveDirLinks = useCallback(async () => {
     try {
-      setTroveFileLinks(await fetchTroveFileLinks())
+      setTroveDirLinks(await fetchTroveDirLinks())
     } catch {
-      setTroveFileLinks([])
+      setTroveDirLinks([])
     }
   }, [])
 
   useEffect(() => {
-    void refreshTroveFileLinks()
-  }, [refreshTroveFileLinks])
+    void refreshTroveDirLinks()
+  }, [refreshTroveDirLinks])
 
   const [languageCodeMap, setLanguageCodeMap] = useState<LanguageCodeMap | null>(null)
   const [searchSelectedTroveIds, setSearchSelectedTroveIds] = useState<Set<string>>(() => new Set())
@@ -184,7 +184,7 @@ function App() {
   // Independent toggles layered on top of showFilter/troveFilter, not part of the Show select
   // since a user may want e.g. "selected" + "dynamic only" at the same time.
   const [filterDynamicOnly, setFilterDynamicOnly] = useState(false)
-  const [filterFileLinkedOnly, setFilterFileLinkedOnly] = useState(false)
+  const [filterDirLinkedOnly, setFilterDirLinkedOnly] = useState(false)
   const [freezeTroveListOrder, setFreezeTroveListOrder] = useState(false)
   const [boostTroveId, setBoostTroveId] = useState<string | null>(null)
   const [sidebarOpen, setSidebarOpen] = useState(true)
@@ -713,10 +713,10 @@ function App() {
     const id = setInterval(() => {
       void refreshTroves()
       void refreshTroveGroups()
-      void refreshTroveFileLinks()
+      void refreshTroveDirLinks()
     }, 15000)
     return () => clearInterval(id)
-  }, [refreshTroves, refreshTroveGroups, refreshTroveFileLinks])
+  }, [refreshTroves, refreshTroveGroups, refreshTroveDirLinks])
 
   const soleDynamicTroveId = useMemo(() => {
     if (searchMode !== 'search' || searchSelectedTroveIds.size !== 1) {
@@ -863,7 +863,7 @@ function App() {
     }
   }, [refreshTroves, showActionFlare])
 
-  const handleConnectFileLink = useCallback(async (troveId: string, troveName: string) => {
+  const handleConnectDirLink = useCallback(async (troveId: string, troveName: string) => {
     if (!directoryPickerSupported()) {
       window.alert('This browser does not support choosing a local folder. Use Chrome, Edge, or a recent Safari.')
       return
@@ -871,37 +871,37 @@ function App() {
     try {
       const handle = await chooseDirectoryForTrove(troveId)
       if (!handle) return
-      await refreshFileLinkedTroves()
+      await refreshDirLinkedTroves()
       try {
-        await setTroveFileLink(troveId, handle.name)
+        await setTroveDirLink(troveId, handle.name)
       } catch {
         // Non-fatal: the folder is connected and usable in this browser even if the shared
         // "configured" metadata didn't make it to the server.
       }
-      await refreshTroveFileLinks()
+      await refreshTroveDirLinks()
       showActionFlare(`Connected local folder for ${flareQuote(troveName)}`)
     } catch (e) {
       if (e instanceof DOMException && e.name === 'AbortError') return
       window.alert(e instanceof Error ? e.message : String(e))
     }
-  }, [refreshFileLinkedTroves, refreshTroveFileLinks, showActionFlare])
+  }, [refreshDirLinkedTroves, refreshTroveDirLinks, showActionFlare])
 
-  const handleDisconnectFileLink = useCallback(async (troveId: string, troveName: string) => {
+  const handleDisconnectDirLink = useCallback(async (troveId: string, troveName: string) => {
     try {
       await removeDirectoryHandle(troveId)
     } catch {
       // No local handle to remove in this browser — fine, we may only be forgetting the
       // server-side "configured elsewhere" record.
     }
-    await refreshFileLinkedTroves()
+    await refreshDirLinkedTroves()
     try {
-      await deleteTroveFileLink(troveId)
+      await deleteTroveDirLink(troveId)
     } catch {
       // Non-fatal: this browser's disconnect already succeeded either way.
     }
-    await refreshTroveFileLinks()
+    await refreshTroveDirLinks()
     showActionFlare(`Disconnected local folder for ${flareQuote(troveName)}`)
-  }, [refreshFileLinkedTroves, refreshTroveFileLinks, showActionFlare])
+  }, [refreshDirLinkedTroves, refreshTroveDirLinks, showActionFlare])
 
   const handleClearTroveLoadErrors = useCallback(async () => {
     try {
@@ -1514,7 +1514,7 @@ function App() {
   }
 
   function renderPickerToggleButtons() {
-    if (dynamicTroveCount === 0 && fileLinkedTroveIds.size === 0) return null
+    if (dynamicTroveCount === 0 && dirLinkedTroveIds.size === 0) return null
     return (
       <div className="sidebar-toggle-filters">
         {dynamicTroveCount > 0 && (
@@ -1527,14 +1527,14 @@ function App() {
             dynamic
           </button>
         )}
-        {fileLinkedTroveIds.size > 0 && (
+        {dirLinkedTroveIds.size > 0 && (
           <button
             type="button"
-            className={`sidebar-toggle-filter-btn${filterFileLinkedOnly ? ' sidebar-toggle-filter-btn--active' : ''}`}
-            aria-pressed={filterFileLinkedOnly}
-            onClick={() => setFilterFileLinkedOnly((v) => !v)}
+            className={`sidebar-toggle-filter-btn${filterDirLinkedOnly ? ' sidebar-toggle-filter-btn--active' : ''}`}
+            aria-pressed={filterDirLinkedOnly}
+            onClick={() => setFilterDirLinkedOnly((v) => !v)}
           >
-            file-linked
+            dir-linked
           </button>
         )}
       </div>
@@ -2221,8 +2221,8 @@ function App() {
     if (filterDynamicOnly) {
       filtered = filtered.filter((t) => t.dynamic === true)
     }
-    if (filterFileLinkedOnly) {
-      filtered = filtered.filter((t) => fileLinkedTroveIds.has(t.id))
+    if (filterDirLinkedOnly) {
+      filtered = filtered.filter((t) => dirLinkedTroveIds.has(t.id))
     }
     const sortByName = (a, b) => (a.name || '').localeCompare(b.name || '', undefined, { sensitivity: 'base' })
     const sortByHitsDesc = (a, b) => {
@@ -2265,15 +2265,15 @@ function App() {
       if (filterDynamicOnly) {
         pool = pool.filter((t) => t.dynamic === true)
       }
-      if (filterFileLinkedOnly) {
-        pool = pool.filter((t) => fileLinkedTroveIds.has(t.id))
+      if (filterDirLinkedOnly) {
+        pool = pool.filter((t) => dirLinkedTroveIds.has(t.id))
       }
       bottomPoolExclusive = pool.filter(textMatches).filter((t) => !idsForSplit.has(t.id))
     }
     const selected = doSplit ? withCounts.filter((t) => idsForSplit.has(t.id)).sort(selectedSort) : []
     const notSelected = doSplit ? [...bottomPoolExclusive].sort(sortByName) : [...filtered].sort(sortByName)
     return { selected, notSelected, displaySelectedTroveIds: idsForSplit }
-  }, [troves, searchResult, troveFilter, showFilter, filterDynamicOnly, filterFileLinkedOnly, fileLinkedTroveIds, selectedTroveIds, searchMode, freezeTroveListOrder, boostTroveId])
+  }, [troves, searchResult, troveFilter, showFilter, filterDynamicOnly, filterDirLinkedOnly, dirLinkedTroveIds, selectedTroveIds, searchMode, freezeTroveListOrder, boostTroveId])
 
   const dynamicTroveCount = useMemo(
     () => troves.filter((t) => t.dynamic === true).length,
@@ -2287,10 +2287,10 @@ function App() {
   }, [dynamicTroveCount, filterDynamicOnly])
 
   useEffect(() => {
-    if (fileLinkedTroveIds.size === 0 && filterFileLinkedOnly) {
-      setFilterFileLinkedOnly(false)
+    if (dirLinkedTroveIds.size === 0 && filterDirLinkedOnly) {
+      setFilterDirLinkedOnly(false)
     }
-  }, [fileLinkedTroveIds, filterFileLinkedOnly])
+  }, [dirLinkedTroveIds, filterDirLinkedOnly])
 
   const ephemeralTroveCount = useMemo(
     () => troves.filter((t) => t.cliCreated === true).length,
@@ -3833,7 +3833,7 @@ function App() {
                       visibleExtraFieldKeys={visibleExtraFieldKeysForGrid}
                       onFetchAllForCopy={async () => fullSearchResultsRef.current}
                       languageCodeMap={languageCodeMap}
-                      fileLinkedTroveIds={fileLinkedTroveIds}
+                      dirLinkedTroveIds={dirLinkedTroveIds}
                       showDeleteItem={soleDynamicTroveId != null}
                       onDeleteItem={soleDynamicTroveId != null ? handleDeleteDynamicItem : null}
                     />
@@ -4046,7 +4046,7 @@ function App() {
                     visibleExtraFieldKeys={visibleExtraFieldKeysForGrid}
                     onFetchAllForCopy={async () => fullSearchResultsRef.current}
                     languageCodeMap={languageCodeMap}
-                    fileLinkedTroveIds={fileLinkedTroveIds}
+                    dirLinkedTroveIds={dirLinkedTroveIds}
                     currentPage={pageNum}
                     totalPages={totalPages}
                     onPrevPage={() => goToPage(pageNum - 1)}
@@ -4143,9 +4143,9 @@ function App() {
           <div className="trove-menu-divider" role="separator" />
           {(() => {
             const { id, name } = openTroveMenu
-            const dbRoot = troveFileLinks.find((r) => r.troveId === id)
-            const browserConnected = fileLinkedTroveIds.has(id)
-            const liveLabel = browserConnected ? (fileLinkedFolderLabels[id] ?? 'Connected') : dbRoot?.folderLabel
+            const dbRoot = troveDirLinks.find((r) => r.troveId === id)
+            const browserConnected = dirLinkedTroveIds.has(id)
+            const liveLabel = browserConnected ? (dirLinkedFolderLabels[id] ?? 'Connected') : dbRoot?.folderLabel
             const supported = directoryPickerSupported()
             const connectLabel = browserConnected
               ? 'Change local folder…'
@@ -4163,7 +4163,7 @@ function App() {
                     e.preventDefault()
                     e.stopPropagation()
                     setOpenTroveMenu(null)
-                    void handleConnectFileLink(id, name)
+                    void handleConnectDirLink(id, name)
                   }}
                 >
                   {connectLabel}
@@ -4176,7 +4176,7 @@ function App() {
                       e.preventDefault()
                       e.stopPropagation()
                       setOpenTroveMenu(null)
-                      void handleDisconnectFileLink(id, name)
+                      void handleDisconnectDirLink(id, name)
                     }}
                   >
                     {`Disconnect local folder${liveLabel ? ` (${liveLabel})` : ''}`}

@@ -1,10 +1,10 @@
-.trove-file-links-panel {
+.trove-dir-links-panel {
   margin: 0.65rem 0 0.5rem;
   border-top: 1px solid #e0d8f5;
   padding-top: 0.5rem;
 }
 
-.trove-file-links-toggle {
+.trove-dir-links-toggle {
   display: flex;
   align-items: center;
   gap: 0.35rem;
@@ -18,33 +18,33 @@
   text-align: left;
 }
 
-.trove-file-links-toggle:hover {
+.trove-dir-links-toggle:hover {
   color: #6633cc;
 }
 
-.trove-file-links-toggle-meta {
+.trove-dir-links-toggle-meta {
   margin-left: auto;
   font-size: 0.78rem;
   color: #777;
 }
 
-.trove-file-links-toggle-chevron {
+.trove-dir-links-toggle-chevron {
   font-size: 0.65rem;
   color: #6633cc;
 }
 
-.trove-file-links-body {
+.trove-dir-links-body {
   margin-top: 0.45rem;
 }
 
-.trove-file-links-hint {
+.trove-dir-links-hint {
   margin: 0 0 0.5rem;
   font-size: 0.78rem;
   line-height: 1.35;
   color: #666;
 }
 
-.trove-file-links-list {
+.trove-dir-links-list {
   list-style: none;
   margin: 0;
   padding: 0;
@@ -52,30 +52,30 @@
   overflow-y: auto;
 }
 
-.trove-file-links-item + .trove-file-links-item {
+.trove-dir-links-item + .trove-dir-links-item {
   margin-top: 0.35rem;
 }
 
-.trove-file-links-warning {
+.trove-dir-links-warning {
   margin: 0 0 0.5rem;
   font-size: 0.78rem;
   color: #a44;
 }
 
-.trove-file-links-row {
+.trove-dir-links-row {
   display: flex;
   flex-direction: column;
   gap: 0.25rem;
 }
 
-.trove-file-links-actions {
+.trove-dir-links-actions {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 0.35rem;
 }
 
-.trove-file-links-status {
+.trove-dir-links-status {
   font-size: 0.76rem;
   color: #555;
   max-width: 10rem;
@@ -84,13 +84,13 @@
   white-space: nowrap;
 }
 
-.trove-file-links-status--elsewhere {
+.trove-dir-links-status--elsewhere {
   font-style: italic;
   color: #888;
   max-width: 14rem;
 }
 
-.trove-file-links-btn {
+.trove-dir-links-btn {
   font-size: 0.76rem;
   padding: 0.2rem 0.45rem;
   border: 1px solid #6633cc;
@@ -100,25 +100,25 @@
   cursor: pointer;
 }
 
-.trove-file-links-btn:hover:not(:disabled) {
+.trove-dir-links-btn:hover:not(:disabled) {
   background: #5528b8;
 }
 
-.trove-file-links-btn:disabled {
+.trove-dir-links-btn:disabled {
   opacity: 0.55;
   cursor: default;
 }
 
-.trove-file-links-btn--secondary {
+.trove-dir-links-btn--secondary {
   background: #fff;
   color: #6633cc;
 }
 
-.trove-file-links-btn--secondary:hover:not(:disabled) {
+.trove-dir-links-btn--secondary:hover:not(:disabled) {
   background: #f3eeff;
 }
 
-.trove-file-links-name {
+.trove-dir-links-name {
   font-size: 0.8rem;
   color: #444;
   overflow: hidden;
@@ -126,11 +126,11 @@
   white-space: nowrap;
 }
 
-.mobile-trove-picker .trove-file-links-panel {
+.mobile-trove-picker .trove-dir-links-panel {
   margin: 0.5rem 0.75rem 0;
   padding-top: 0.45rem;
 }
 
-.mobile-trove-picker .trove-file-links-list {
+.mobile-trove-picker .trove-dir-links-list {
   max-height: 10rem;
 }
