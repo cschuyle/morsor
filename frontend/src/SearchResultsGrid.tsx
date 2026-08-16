@@ -1937,7 +1937,11 @@ export function SearchResultsGrid({ data, sortBy = null, sortDir = 'asc', onSort
           className={`grid-table${isMobile ? ' grid-table--mobile' : ''}`}
           style={{
             ...columnSizeVars,
-            width: isMobile ? '100%' : ('max(100%, ' + table.getTotalSize() + 'px)'),
+            // Never force the table wider than the sum of its own column widths: under
+            // table-layout:fixed, stretching past that sum makes browsers proportionally
+            // inflate every column (including narrow fixed-size ones like thumb) to fill
+            // the gap, rather than leaving the extra space unused.
+            width: isMobile ? '100%' : (table.getTotalSize() + 'px'),
           }}
         >
           <colgroup>
