@@ -665,4 +665,83 @@ class DynamicTroveControllerTest {
                 Void.class))
                 .isInstanceOf(HttpClientErrorException.NotFound.class);
     }
+
+    private String troveUpdateTimestamp(String troveId) {
+        ResponseEntity<List<TroveOption>> troves = restTemplate.exchange(
+                base() + "/api/troves",
+                HttpMethod.GET,
+                null,
+                new ParameterizedTypeReference<List<TroveOption>>() {});
+        assertThat(troves.getBody()).isNotNull();
+        return troves.getBody().stream()
+                .filter(t -> troveId.equals(t.id()))
+                .findFirst()
+                .orElseThrow()
+                .updateTimestamp();
+    }
+
+    /**
+     * Item add/delete (and bulk variants) must bump the trove's updateTimestamp, since the web UI
+     * polls /api/troves and diffs it to invalidate its own client-side cache when a change happens
+     * out-of-band (e.g. via the CLI) rather than through that browser tab's own action handlers.
+     */
+    @Test
+    void itemMutationsBumpUpdateTimestamp() {
+        String uniqueName = "Touch-" + UUID.randomUUID();
+        ResponseEntity<DynamicTroveRegistration> created = restTemplate.exchange(
+                base() + "/api/dynamic-troves",
+                HttpMethod.POST,
+                new HttpEntity<>("{\"name\":\"" + uniqueName + "\"}", jsonHeaders()),
+                DynamicTroveRegistration.class);
+        assertThat(created.getBody()).isNotNull();
+        String troveId = created.getBody().troveId();
+
+        String afterCreate = troveUpdateTimestamp(troveId);
+        assertThat(afterCreate).isNotNull();
+
+        restTemplate.exchange(
+                base() + "/api/dynamic-troves/" + troveId + "/items",
+                HttpMethod.POST,
+                new HttpEntity<>("{\"title\":\"Touch Item\"}", jsonHeaders()),
+                DynamicTroveItemRegistration.class);
+        String afterAdd = troveUpdateTimestamp(troveId);
+        assertThat(afterAdd).isNotEqualTo(afterCreate);
+
+        restTemplate.exchange(
+                base() + "/api/dynamic-troves/" + troveId + "/items/bulk",
+                HttpMethod.POST,
+                new HttpEntity<>("{\"titles\":[\"Bulk Touch\"]}", jsonHeaders()),
+                DynamicTroveItemBulkLoadResult.class);
+        String afterBulkAdd = troveUpdateTimestamp(troveId);
+        assertThat(afterBulkAdd).isNotEqualTo(afterAdd);
+
+        URI deleteUri = UriComponentsBuilder
+                .fromUriString(base() + "/api/dynamic-troves/" + troveId + "/items")
+                .queryParam("title", "Touch Item")
+                .build()
+                .encode()
+                .toUri();
+        restTemplate.exchange(deleteUri, HttpMethod.DELETE, null, Void.class);
+        String afterDelete = troveUpdateTimestamp(troveId);
+        assertThat(afterDelete).isNotEqualTo(afterBulkAdd);
+
+        restTemplate.exchange(
+                base() + "/api/dynamic-troves/" + troveId + "/items/bulk-delete",
+                HttpMethod.POST,
+                new HttpEntity<>("{\"titles\":[\"Bulk Touch\"]}", jsonHeaders()),
+                DynamicTroveItemBulkDeleteResult.class);
+        String afterBulkDelete = troveUpdateTimestamp(troveId);
+        assertThat(afterBulkDelete).isNotEqualTo(afterDelete);
+
+        String newName = "Touched-" + UUID.randomUUID();
+        restTemplate.exchange(
+                base() + "/api/dynamic-troves/" + troveId,
+                HttpMethod.PATCH,
+                new HttpEntity<>("{\"name\":\"" + newName + "\"}", jsonHeaders()),
+                Void.class);
+        String afterRename = troveUpdateTimestamp(troveId);
+        assertThat(afterRename).isNotEqualTo(afterBulkDelete);
+
+        restTemplate.exchange(base() + "/api/dynamic-troves/" + troveId, HttpMethod.DELETE, null, Void.class);
+    }
 }

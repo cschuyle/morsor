@@ -19,20 +19,23 @@ public class DynamicTroveRepository {
     }
 
     private static final RowMapper<DynamicTroveRow> TROVE_MAPPER = (rs, rowNum) ->
-            new DynamicTroveRow(rs.getString("id"), rs.getString("name"));
+            new DynamicTroveRow(
+                    rs.getString("id"),
+                    rs.getString("name"),
+                    rs.getTimestamp("updated_at").toInstant().toString());
 
     private static final RowMapper<DynamicTroveItemRow> ITEM_MAPPER = (rs, rowNum) ->
             new DynamicTroveItemRow(rs.getString("trove_id"), rs.getString("title"));
 
     public List<DynamicTroveRow> findAllTroves() {
         return jdbc.query(
-                "SELECT id, name FROM dynamic_troves ORDER BY LOWER(name)",
+                "SELECT id, name, updated_at FROM dynamic_troves ORDER BY LOWER(name)",
                 TROVE_MAPPER);
     }
 
     public Optional<DynamicTroveRow> findTroveById(String id) {
         List<DynamicTroveRow> rows = jdbc.query(
-                "SELECT id, name FROM dynamic_troves WHERE id = ?",
+                "SELECT id, name, updated_at FROM dynamic_troves WHERE id = ?",
                 TROVE_MAPPER,
                 id);
         return rows.isEmpty() ? Optional.empty() : Optional.of(rows.get(0));
@@ -52,11 +55,13 @@ public class DynamicTroveRepository {
     }
 
     public void insertTrove(String id, String name) {
+        Timestamp now = Timestamp.from(Instant.now());
         jdbc.update(
-                "INSERT INTO dynamic_troves (id, name, created_at) VALUES (?, ?, ?)",
+                "INSERT INTO dynamic_troves (id, name, created_at, updated_at) VALUES (?, ?, ?, ?)",
                 id,
                 name,
-                Timestamp.from(Instant.now()));
+                now,
+                now);
     }
 
     /** @return rows deleted (0 or 1) */
@@ -66,7 +71,19 @@ public class DynamicTroveRepository {
 
     /** @return rows updated (0 or 1) */
     public int updateTroveName(String id, String name) {
-        return jdbc.update("UPDATE dynamic_troves SET name = ? WHERE id = ?", name, id);
+        return jdbc.update(
+                "UPDATE dynamic_troves SET name = ?, updated_at = ? WHERE id = ?",
+                name,
+                Timestamp.from(Instant.now()),
+                id);
+    }
+
+    /** Bump a trove's updated_at (e.g. after its items change) without touching its name. */
+    public void touchTrove(String id) {
+        jdbc.update(
+                "UPDATE dynamic_troves SET updated_at = ? WHERE id = ?",
+                Timestamp.from(Instant.now()),
+                id);
     }
 
     public void insertItem(String troveId, String title) {

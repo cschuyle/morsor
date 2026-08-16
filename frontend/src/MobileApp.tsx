@@ -222,6 +222,7 @@ function MobileApp() {
     return Number.isFinite(s) && s > 0 ? s : MOBILE_PAGE_SIZE
   })
   const queryRef = useRef('')
+  const troveUpdateTimestampsRef = useRef<Map<string, string>>(new Map())
   const skipSearchRef = useRef(true)
   const skipFileTypeSearchRef = useRef(false)
   const skipViewModeSearchRef = useRef(false)
@@ -1242,7 +1243,29 @@ function MobileApp() {
         return
       }
       const data = res.ok ? await res.json() : []
-      setTroves(Array.isArray(data) ? data : [])
+      const list: Trove[] = Array.isArray(data) ? data : []
+      // A dynamic trove's updateTimestamp changing since we last saw it means its contents
+      // changed out-of-band (e.g. via the CLI, or another tab) — this tab's own action handlers
+      // already clear the cache for changes made from right here, but have no way to know about
+      // those. Diff against what we last saw and drop this trove's cached search results.
+      const changedIds: string[] = []
+      for (const t of list) {
+        if (!t.id) continue
+        const prev = troveUpdateTimestampsRef.current.get(t.id)
+        const next = typeof t.updateTimestamp === 'string' ? t.updateTimestamp : null
+        if (prev != null && next != null && prev !== next) {
+          changedIds.push(t.id)
+        }
+        if (next != null) {
+          troveUpdateTimestampsRef.current.set(t.id, next)
+        } else {
+          troveUpdateTimestampsRef.current.delete(t.id)
+        }
+      }
+      if (changedIds.length > 0) {
+        queryCache.clearForTroves(changedIds)
+      }
+      setTroves(list)
     } catch {
       setTroves([])
     }
@@ -1253,6 +1276,13 @@ function MobileApp() {
     ensureLanguageCodeMap(getApiAuthHeaders())
       .then(setLanguageCodeMap)
       .catch(() => setLanguageCodeMap(null))
+  }, [refreshTroves])
+
+  // Background heartbeat so an already-open tab notices dynamic-trove edits made elsewhere
+  // (CLI, another tab) and drops its stale cached search results for that trove.
+  useEffect(() => {
+    const id = setInterval(() => { void refreshTroves() }, 15000)
+    return () => clearInterval(id)
   }, [refreshTroves])
 
   const soleDynamicTroveId = useMemo(() => {

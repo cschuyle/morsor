@@ -131,6 +131,8 @@ public class SearchDataService {
     private final Map<String, List<SearchResult>> dynamicTroves = new ConcurrentHashMap<>();
     /** Display names for dynamic troves (including empty ones that have no results yet). */
     private final Map<String, String> dynamicTroveNames = new ConcurrentHashMap<>();
+    /** ISO-8601 instant a dynamic trove's name or items last changed; drives client cache invalidation. */
+    private final Map<String, String> dynamicTroveUpdatedAt = new ConcurrentHashMap<>();
     /** Errors from the most recent full reload (startup or manual "Reload troves"); not touched by partial reloads. */
     private volatile List<String> lastLoadErrors = List.of();
     /*
@@ -573,9 +575,20 @@ public class SearchDataService {
                 .collect(Collectors.toSet());
     }
 
+    /**
+     * Record that a dynamic trove's items or name just changed: persists a fresh updated_at and
+     * mirrors it in-memory so {@link #getTroveOptions()} reflects it without a DB round-trip.
+     * Caller must already hold {@code mergeLock}.
+     */
+    private void touchDynamicTroveLocked(String id) {
+        dynamicTroveRepository.touchTrove(id);
+        dynamicTroveUpdatedAt.put(id, java.time.Instant.now().toString());
+    }
+
     private void loadDynamicTrovesFromDbLocked() {
         dynamicTroves.clear();
         dynamicTroveNames.clear();
+        dynamicTroveUpdatedAt.clear();
         if (dynamicTroveRepository == null) {
             return;
         }
@@ -584,6 +597,7 @@ public class SearchDataService {
         Map<String, List<SearchResult>> byTrove = new HashMap<>();
         for (DynamicTroveRow trove : troves) {
             dynamicTroveNames.put(trove.id(), trove.name());
+            dynamicTroveUpdatedAt.put(trove.id(), trove.updatedAt());
             byTrove.put(trove.id(), new ArrayList<>());
         }
         for (DynamicTroveItemRow item : items) {
@@ -696,6 +710,7 @@ public class SearchDataService {
                 throw new IllegalStateException("A trove named \"" + slug + "\" already exists", e);
             }
             dynamicTroveNames.put(slug, raw);
+            dynamicTroveUpdatedAt.put(slug, java.time.Instant.now().toString());
             dynamicTroves.put(slug, List.of());
             rebuildMergedIndexLocked();
         }
@@ -730,6 +745,7 @@ public class SearchDataService {
                     .toList();
             dynamicTroveRepository.updateTroveName(id, label);
             dynamicTroveNames.put(id, label);
+            dynamicTroveUpdatedAt.put(id, java.time.Instant.now().toString());
             dynamicTroves.put(id, renamed);
             rebuildMergedIndexLocked();
         }
@@ -810,6 +826,7 @@ public class SearchDataService {
             }
             dynamicTroveRepository.insertItems(id, titles);
             dynamicTroveNames.put(id, displayName);
+            dynamicTroveUpdatedAt.put(id, java.time.Instant.now().toString());
             dynamicTroves.put(id, titles.stream()
                     .map(t -> dynamicItemToSearchResult(t, id, displayName))
                     .toList());
@@ -844,6 +861,7 @@ public class SearchDataService {
             }
             dynamicTroveRepository.deleteTrove(id);
             dynamicTroveNames.remove(id);
+            dynamicTroveUpdatedAt.remove(id);
             dynamicTroves.remove(id);
             rebuildMergedIndexLocked();
         }
@@ -900,6 +918,7 @@ public class SearchDataService {
             updated.addAll(existing);
             updated.add(result);
             dynamicTroves.put(id, List.copyOf(updated));
+            touchDynamicTroveLocked(id);
             rebuildMergedIndexLocked();
         }
         log.info("Added item title=\"{}\" to dynamic trove \"{}\"", titleTrimmed, id);
@@ -966,6 +985,7 @@ public class SearchDataService {
             if (!added.isEmpty()) {
                 dynamicTroveRepository.insertItems(id, added);
                 dynamicTroves.put(id, List.copyOf(updated));
+                touchDynamicTroveLocked(id);
                 rebuildMergedIndexLocked();
             }
         }
@@ -1017,6 +1037,7 @@ public class SearchDataService {
                     .filter(r -> !toRemove.equals(r.title()))
                     .toList();
             dynamicTroves.put(tid, updated);
+            touchDynamicTroveLocked(tid);
             rebuildMergedIndexLocked();
         }
         log.info("Removed item title=\"{}\" from dynamic trove \"{}\"", title.trim(), tid);
@@ -1081,6 +1102,7 @@ public class SearchDataService {
                         .filter(r -> !toRemoveStored.contains(r.title()))
                         .toList();
                 dynamicTroves.put(id, updated);
+                touchDynamicTroveLocked(id);
                 rebuildMergedIndexLocked();
             }
         }
@@ -2399,8 +2421,10 @@ public class SearchDataService {
                 .collect(Collectors.groupingBy(SearchResult::troveId))
                 .forEach((id, items) -> {
                     String name = items.isEmpty() ? id : (items.get(0).trove() != null ? items.get(0).trove() : id);
-                    String updateTimestamp = troveMetadata.getOrDefault(id, null);
                     boolean dynamic = dynamicTroveNames.containsKey(id);
+                    String updateTimestamp = dynamic
+                            ? dynamicTroveUpdatedAt.getOrDefault(id, null)
+                            : troveMetadata.getOrDefault(id, null);
                     byId.put(id, new TroveOption(
                             id,
                             name,
@@ -2417,7 +2441,7 @@ public class SearchDataService {
                         e.getValue(),
                         0,
                         false,
-                        null,
+                        dynamicTroveUpdatedAt.getOrDefault(e.getKey(), null),
                         true));
             }
         }
