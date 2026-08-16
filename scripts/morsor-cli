@@ -1877,8 +1877,11 @@ def _http_json(
     req = urllib.request.Request(url, data=data, method=method, headers=headers)
     if debug:
         print(f"[debug] {method} {url}", file=sys.stderr)
+    status: int | None = None
+    raw = ""
     try:
         with urllib.request.urlopen(req, timeout=timeout) as resp:
+            status = resp.status
             raw = resp.read().decode("utf-8", errors="replace")
             if ok_empty and (not raw or not raw.strip()):
                 return None
@@ -1886,6 +1889,7 @@ def _http_json(
                 return None
             return json.loads(raw)
     except HTTPError as e:
+        status = e.code
         raw = e.read().decode("utf-8", errors="replace") if e.fp else ""
         if e.code == 409:
             msg = raw.strip() or "resource already exists (e.g. duplicate normalized title)"
@@ -1904,7 +1908,24 @@ def _http_json(
     except URLError as e:
         die(_server_unreachable(base, e))
     except json.JSONDecodeError:
-        die(f"{method} {path}: could not parse JSON response")
+        if debug:
+            print(f"[debug] response body ({len(raw)} bytes):", file=sys.stderr)
+            print(raw, file=sys.stderr)
+        looks_html = raw.lstrip()[:15].lower().startswith(("<!doctype", "<html"))
+        hint = (
+            " — response looks like an HTML page, not JSON; the server (or a proxy in "
+            "front of it) may not be routing this endpoint correctly. Re-run with -v to see the full body."
+            if looks_html and not debug
+            else " Re-run with -v to see the full body."
+            if not debug
+            else ""
+        )
+        preview = raw.strip().replace("\n", " ")[:200]
+        die(
+            f"{method} {path}: could not parse JSON response "
+            f"(HTTP {status if status is not None else 'unknown'}){hint} "
+            f"body preview: {preview!r}"
+        )
 
 
 def _resolve_dynamic_trove_id(
