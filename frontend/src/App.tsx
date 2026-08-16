@@ -790,12 +790,12 @@ function App() {
     try {
       const reg = await createDynamicTrove(name)
       await refreshTroves()
-      setSearchSelectedTroveIds(new Set([reg.troveId]))
+      setSelectedTroveIds(new Set([reg.troveId]))
       showActionFlare(`Created trove ${flareQuote(reg.name || reg.troveId)}`)
     } catch (e) {
       window.alert(e instanceof Error ? e.message : String(e))
     }
-  }, [refreshTroves, searchQuery, showActionFlare, troveFilter])
+  }, [refreshTroves, searchQuery, setSelectedTroveIds, showActionFlare, troveFilter])
 
   const handleDeleteDynamicTrove = useCallback(async (
     troveId: string,
