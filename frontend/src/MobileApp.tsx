@@ -128,6 +128,10 @@ function hasUsableThumbnail(row: SearchResultRow | undefined | null): boolean {
 
 function MobileApp() {
   const [troves, setTroves] = useState<Trove[]>([])
+  // Stable across background refreshes that don't add/remove/rename a trove, unlike `troves`
+  // itself (refreshTroves always produces a new array reference). Lets effects that only need to
+  // react to a trove's identity/existence — not its live metadata — avoid re-running on every poll.
+  const troveIdentityKey = useMemo(() => troves.map((t) => `${t.id}:${t.name}`).join('|'), [troves])
   const [connectedLocalTroveIds, setConnectedLocalTroveIds] = useState<Set<string>>(() => new Set())
   const refreshConnectedLocalTroves = useCallback(async () => {
     setConnectedLocalTroveIds(new Set(await listConnectedTroveIds()))
@@ -450,7 +454,12 @@ function MobileApp() {
       mergeSearchFromSession(sSearch)
       mergeDupFromSession(sDup)
     }
-  }, [searchParams, troves])
+    // Deliberately keyed on troveIdentityKey, not troves: the background poll (see refreshTroves)
+    // gives troves a new array reference every ~15s even when nothing relevant changed, which was
+    // re-running this hydration effect and stomping in-flight local selection changes with a URL
+    // that hadn't caught up yet. troveIdentityKey only changes when a trove is actually
+    // added/removed/renamed, which is what urlTroveId's id/name resolution actually depends on.
+  }, [searchParams, troveIdentityKey])
 
   function buildAppUrlParams(
     overrides: {
