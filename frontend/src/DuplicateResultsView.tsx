@@ -15,17 +15,52 @@ function getPrimaryWords(primaryTitle: string): Set<string> {
   return new Set(words.map(stripApostrophes))
 }
 
+// Merges consecutive same-colored word highlights (and the non-alnum text between them, e.g. a
+// space or hyphen) into a single span, so runs of matching/non-matching words read as one block
+// instead of one highlighted chip per word.
 function titleWithExtraHighlight(matchTitle: string, primaryWords: Set<string>): React.ReactNode {
   if (!matchTitle) return '—'
-  const segments = matchTitle.split(/(\b[\w'\u2019]+\b)/g)
-  return segments.map((seg, i) => {
-    const normalized = stripApostrophes(seg.toLowerCase())
-    if (seg.length === 0 || !/^[\w'\u2019]+$/.test(seg)) {
-      return seg
+  const tokens = matchTitle.split(/(\b[\w'\u2019]+\b)/g)
+  const nodes: React.ReactNode[] = []
+  let runClassName: string | null = null
+  let runText = ''
+  let pendingSep = ''
+
+  const flushRun = () => {
+    if (runClassName && runText) {
+      nodes.push(<span key={nodes.length} className={runClassName}>{runText}</span>)
+    } else if (runText) {
+      nodes.push(runText)
     }
+    runClassName = null
+    runText = ''
+  }
+
+  for (const tok of tokens) {
+    const isWord = tok.length > 0 && /^[\w'\u2019]+$/.test(tok)
+    if (!isWord) {
+      pendingSep += tok
+      continue
+    }
+    const normalized = stripApostrophes(tok.toLowerCase())
     const className = primaryWords.has(normalized) ? 'dup-match-word-in-primary' : 'dup-match-word-not-in-primary'
-    return <span key={i} className={className}>{seg}</span>
-  })
+    if (runClassName === className) {
+      runText += pendingSep + tok
+    } else {
+      flushRun()
+      if (pendingSep) {
+        nodes.push(pendingSep)
+      }
+      runClassName = className
+      runText = tok
+    }
+    pendingSep = ''
+  }
+  flushRun()
+  if (pendingSep) {
+    nodes.push(pendingSep)
+  }
+  return nodes
 }
 
 interface DuplicateResultsViewProps {
