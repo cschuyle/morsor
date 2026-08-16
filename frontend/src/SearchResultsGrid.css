@@ -731,6 +731,52 @@
   font-weight: 600;
 }
 
+.search-thumb-lightbox-source-info {
+  margin: -0.25rem 0 0.65rem;
+  max-width: min(60ch, calc(100% - 4rem));
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  align-items: center;
+}
+
+.search-thumb-lightbox-source-info-row {
+  display: flex;
+  gap: 0.4rem;
+  font-size: 0.8rem;
+  line-height: 1.4;
+  color: rgba(255, 255, 255, 0.7);
+  max-width: 100%;
+}
+
+.search-thumb-lightbox-source-info-label {
+  flex-shrink: 0;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  font-size: 0.7rem;
+  color: rgba(255, 255, 255, 0.45);
+  align-self: center;
+}
+
+.search-thumb-lightbox-source-info-value {
+  font-family: ui-monospace, 'Cascadia Code', 'Source Code Pro', Menlo, Consolas, monospace;
+  word-break: break-all;
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.search-thumb-lightbox-source-info-link {
+  text-decoration: underline;
+}
+
+.search-thumb-lightbox-source-info-link:hover {
+  color: #fff;
+}
+
+.search-thumb-lightbox-source-info-empty {
+  color: rgba(255, 255, 255, 0.5);
+  font-style: italic;
+}
+
 .search-thumb-lightbox-footer {
   flex-shrink: 0;
   display: flex;

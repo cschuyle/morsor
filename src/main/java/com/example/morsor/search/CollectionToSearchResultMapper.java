@@ -86,7 +86,7 @@ public final class CollectionToSearchResultMapper {
 
         JsonNode titles = collectionNode.get("titles");
         if (titles != null && titles.isArray()) {
-            addTitlesCollectionResults(troveId, troveName, titles, out);
+            addTitlesCollectionResults(troveId, troveName, titles, collectionNode, out);
             return;
         }
 
@@ -112,14 +112,36 @@ public final class CollectionToSearchResultMapper {
         }
     }
 
-    /** Map a collection with "titles": [ "Title 1", "Title 2", ... ] to one SearchResult per title. */
-    private static void addTitlesCollectionResults(String troveId, String troveName, JsonNode titlesArray, List<SearchResult> out) {
+    /**
+     * Map a collection with "titles": [ "Title 1", "Title 2", ... ] to one SearchResult per title.
+     * Optional {@code sourceFile} (string) and {@code titleSourceLines} (int array, aligned by index
+     * with {@code titles}) on the collection node — emitted by moocho's lines2json — are surfaced in
+     * extraFields for troubleshooting which line of which file produced a given item. Every item also
+     * gets {@code sourceIndex} (1-based position in this array), the universal fallback for collections
+     * (of any format) that don't carry file/line provenance.
+     */
+    private static void addTitlesCollectionResults(String troveId, String troveName, JsonNode titlesArray, JsonNode collectionNode, List<SearchResult> out) {
+        String sourceFile = text(collectionNode, "sourceFile");
+        JsonNode sourceLines = collectionNode.get("titleSourceLines");
         for (int i = 0; i < titlesArray.size(); i++) {
             JsonNode titleNode = titlesArray.get(i);
             String title = titleNode != null && titleNode.isTextual() ? titleNode.asText() : (titleNode != null ? titleNode.toString() : "");
             String rawSourceItem = toRawSourceItem(titleNode);
             String id = troveId != null && !troveId.isEmpty() ? troveId + "-" + i : "trove-" + i;
-            out.add(new SearchResult(id, null, title, title, troveName, troveId, false, null, null, rawSourceItem, List.of(), null, null));
+
+            Map<String, Object> extraFields = new LinkedHashMap<>();
+            extraFields.put("sourceIndex", i + 1);
+            if (sourceFile != null && !sourceFile.isEmpty()) {
+                extraFields.put("sourceFile", sourceFile);
+            }
+            if (sourceLines != null && sourceLines.isArray() && i < sourceLines.size()) {
+                JsonNode lineNode = sourceLines.get(i);
+                if (lineNode != null && lineNode.isIntegralNumber()) {
+                    extraFields.put("sourceLine", lineNode.asInt());
+                }
+            }
+
+            out.add(new SearchResult(id, null, title, title, troveName, troveId, false, null, null, rawSourceItem, List.of(), null, extraFields));
         }
     }
 
@@ -201,6 +223,11 @@ public final class CollectionToSearchResultMapper {
             extraFields = mergeLpidIntoExtraFields(item, extraFields);
             extraFields = mergeTintenfassIdIntoExtraFields(item, extraFields);
         }
+        // Universal troubleshooting fallback: 1-based position in this trove's "items" array, for
+        // collections that don't carry a real source file/line (see addTitlesCollectionResults for
+        // those that do).
+        extraFields = extraFields != null ? new LinkedHashMap<>(extraFields) : new LinkedHashMap<>();
+        extraFields.put("sourceIndex", index + 1);
 
         return new SearchResult(id, itemType, title, snippet, troveName, troveId, hasThumbnail, thumbnailUrl, largeImageUrl, rawSourceItem, files, itemUrl, extraFields);
     }

@@ -727,6 +727,8 @@ function rowToLightboxPayload(row: SearchResultRow | undefined | null): Lightbox
   const itemType = row.itemType != null && String(row.itemType).trim() ? String(row.itemType).trim() : null
 
   return {
+    id: row.id ?? null,
+    troveId: row.troveId ?? null,
     imageUrl,
     pdfs,
     imageUrls,
@@ -1486,6 +1488,38 @@ export function SearchResultsGrid({ data, sortBy = null, sortDir = 'asc', onSort
                   </div>
                 )
               })()}
+              <div className="search-thumb-lightbox-source-info">
+                  {lightbox.id && (
+                    <div className="search-thumb-lightbox-source-info-row">
+                      <span className="search-thumb-lightbox-source-info-label">ID</span>
+                      <span className="search-thumb-lightbox-source-info-value">{lightbox.id}</span>
+                    </div>
+                  )}
+                  {lightbox.troveId && (
+                    <div className="search-thumb-lightbox-source-info-row">
+                      <span className="search-thumb-lightbox-source-info-label">Trove ID</span>
+                      <span className="search-thumb-lightbox-source-info-value">{lightbox.troveId}</span>
+                    </div>
+                  )}
+                  {lightbox.itemUrl && (
+                    <div className="search-thumb-lightbox-source-info-row">
+                      <span className="search-thumb-lightbox-source-info-label">URL</span>
+                      <a
+                        className="search-thumb-lightbox-source-info-value search-thumb-lightbox-source-info-link"
+                        href={normalizeUrlForHref(lightbox.itemUrl)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
+                        {lightbox.itemUrl}
+                      </a>
+                    </div>
+                  )}
+                  {!lightbox.id && !lightbox.troveId && !lightbox.itemUrl && !hasLpExtra && (
+                    <div className="search-thumb-lightbox-source-info-row search-thumb-lightbox-source-info-empty">
+                      No further source information available for this item.
+                    </div>
+                  )}
+              </div>
               {desktopLpExtraBesideImage ? (
                 <div className="search-thumb-lightbox-media-panel">
                   <div className="search-thumb-lightbox-media-panel-image">

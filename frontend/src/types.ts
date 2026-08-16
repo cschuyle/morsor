@@ -79,6 +79,8 @@ export interface UniquesResultData {
 
 /** Lightbox payload for SearchResultsGrid thumbnail click */
 export interface LightboxPayload {
+  id?: string | null
+  troveId?: string | null
   imageUrl?: string | null
   title?: string
   itemType?: string | null

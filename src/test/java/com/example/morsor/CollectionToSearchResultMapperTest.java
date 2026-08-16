@@ -58,6 +58,35 @@ class CollectionToSearchResultMapperTest {
         assertThat(results.get(1).id()).isEqualTo("synology-bu-courses-1");
         assertThat(results.get(2).title()).isEqualTo("Introduction to Big Data");
         assertThat(results.get(2).id()).isEqualTo("synology-bu-courses-2");
+        assertThat(results.get(0).extraFields()).containsEntry("sourceIndex", 1);
+        assertThat(results.get(1).extraFields()).containsEntry("sourceIndex", 2);
+        assertThat(results.get(2).extraFields()).containsEntry("sourceIndex", 3);
+    }
+
+    @Test
+    void mapsTitlesFormatSourceFileAndLineIntoExtraFields() throws Exception {
+        String json = """
+            {
+              "titles": [
+                "First Title",
+                "Second Title"
+              ],
+              "sourceFile": "hard-to-get.txt",
+              "titleSourceLines": [3, 9],
+              "id": "hard-to-get",
+              "name": "Hard-to-get",
+              "shortName": "Hard-to-get"
+            }
+            """;
+        JsonNode root = objectMapper.readTree(json);
+        List<SearchResult> results = CollectionToSearchResultMapper.mapRootToSearchResults(root);
+        assertThat(results).hasSize(2);
+        assertThat(results.get(0).extraFields()).containsEntry("sourceFile", "hard-to-get.txt");
+        assertThat(results.get(0).extraFields()).containsEntry("sourceLine", 3);
+        assertThat(results.get(0).extraFields()).containsEntry("sourceIndex", 1);
+        assertThat(results.get(1).extraFields()).containsEntry("sourceFile", "hard-to-get.txt");
+        assertThat(results.get(1).extraFields()).containsEntry("sourceLine", 9);
+        assertThat(results.get(1).extraFields()).containsEntry("sourceIndex", 2);
     }
 
     @Test
@@ -197,7 +226,7 @@ class CollectionToSearchResultMapperTest {
         assertThat(results.get(1).itemUrl()).isNull();
         assertThat(results.get(2).itemType()).isEqualTo("movie");
         assertThat(results.get(2).itemUrl()).isNull();
-        assertThat(results.get(0).extraFields()).isNull();
+        assertThat(results.get(0).extraFields()).containsEntry("sourceIndex", 1);
         assertThat(results.get(1).extraFields()).isNotNull();
         assertThat(results.get(1).extraFields()).containsEntry("author", "Antoine de Saint-Exupéry");
         assertThat(results.get(1).extraFields()).containsEntry("lpid", "PP-4277");
