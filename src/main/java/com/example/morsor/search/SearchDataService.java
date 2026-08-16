@@ -131,6 +131,8 @@ public class SearchDataService {
     private final Map<String, List<SearchResult>> dynamicTroves = new ConcurrentHashMap<>();
     /** Display names for dynamic troves (including empty ones that have no results yet). */
     private final Map<String, String> dynamicTroveNames = new ConcurrentHashMap<>();
+    /** Errors from the most recent full reload (startup or manual "Reload troves"); not touched by partial reloads. */
+    private volatile List<String> lastLoadErrors = List.of();
     /*
      * Sister-trove model (many-to-many):
      *
@@ -232,12 +234,13 @@ public class SearchDataService {
         Set<String> loadedTroveIds = java.util.Collections.synchronizedSet(new TreeSet<>());
         List<String> loadErrors = java.util.Collections.synchronizedList(new ArrayList<>());
         List<SearchResult> freshResults = new ArrayList<>();
+        Set<String> dynamicTroveIds = currentDynamicTroveIdsFromDb();
         boolean useS3 = environment.acceptsProfiles(Profiles.of("s3troves"));
         if (useS3) {
             requireS3EnvVars();
-            loadFromS3(freshResults, effectiveIds, Set.of(), progress, loadedTroveIds, loadErrors);
+            loadFromS3(freshResults, effectiveIds, Set.of(), progress, loadedTroveIds, loadErrors, dynamicTroveIds);
         } else {
-            loadFromClasspath(freshResults, effectiveIds, Set.of(), progress, loadedTroveIds, loadErrors);
+            loadFromClasspath(freshResults, effectiveIds, Set.of(), progress, loadedTroveIds, loadErrors, dynamicTroveIds);
         }
         if (cancelled != null && cancelled.get()) {
             log.info("Partial reload cancelled; existing data unchanged");
@@ -285,13 +288,14 @@ public class SearchDataService {
             log.info("Excluding trove IDs: {}", excludeIds);
         }
         List<SearchResult> combined = new ArrayList<>();
+        Set<String> dynamicTroveIds = currentDynamicTroveIdsFromDb();
         boolean useS3 = environment.acceptsProfiles(Profiles.of("s3troves"));
         log.info("Trove load: useS3={}, bucketName={}", useS3, bucketName != null ? bucketName : "(null)");
         if (useS3) {
             requireS3EnvVars();
-            loadFromS3(combined, onlyIds, excludeIds, progress, loadedTroveIds, loadErrors);
+            loadFromS3(combined, onlyIds, excludeIds, progress, loadedTroveIds, loadErrors, dynamicTroveIds);
         } else {
-            loadFromClasspath(combined, onlyIds, excludeIds, progress, loadedTroveIds, loadErrors);
+            loadFromClasspath(combined, onlyIds, excludeIds, progress, loadedTroveIds, loadErrors, dynamicTroveIds);
         }
         loadMissingReferenceTroves(combined, loadedTroveIds, loadErrors);
         if (cancelled != null && cancelled.get()) {
@@ -317,6 +321,9 @@ public class SearchDataService {
         if (!loadErrors.isEmpty()) {
             log.warn("Trove load completed with {} errors: {}", loadErrors.size(), loadErrors);
         }
+        // Full reload is the authoritative "startup" snapshot; replace wholesale (unlike partial
+        // reloads, which don't touch this — see reloadDataPartial()).
+        lastLoadErrors = List.copyOf(loadErrors);
         synchronized (mergeLock) {
             persistedResults = List.copyOf(applyLanguageEnrichment(combined));
             loadDynamicTrovesFromDbLocked();
@@ -542,6 +549,30 @@ public class SearchDataService {
     /** Max titles accepted in one bulk load request. */
     public static final int MAX_DYNAMIC_BULK_ITEMS = 50_000;
 
+    /** Errors from the most recent full reload (startup or manual "Reload troves"). */
+    public List<String> getLastLoadErrors() {
+        return lastLoadErrors;
+    }
+
+    /** Dismiss the currently-known load errors; a subsequent full reload will repopulate as needed. */
+    public void clearLastLoadErrors() {
+        lastLoadErrors = List.of();
+    }
+
+    /**
+     * Dynamic trove ids read fresh from the DB, not the in-memory {@code dynamicTroveNames} map —
+     * on a full reload, {@code loadFromS3}/{@code loadFromClasspath} run before
+     * {@link #loadDynamicTrovesFromDbLocked()} refreshes that map, so it can't be trusted yet.
+     */
+    private Set<String> currentDynamicTroveIdsFromDb() {
+        if (dynamicTroveRepository == null) {
+            return Set.of();
+        }
+        return dynamicTroveRepository.findAllTroves().stream()
+                .map(DynamicTroveRow::id)
+                .collect(Collectors.toSet());
+    }
+
     private void loadDynamicTrovesFromDbLocked() {
         dynamicTroves.clear();
         dynamicTroveNames.clear();
@@ -672,6 +703,40 @@ public class SearchDataService {
         return new DynamicTroveRegistration(slug, raw, 0);
     }
 
+    /**
+     * Rename a dynamic trove's display name (id unchanged). Returns {@code false} if unknown.
+     * Mirrors {@link #renameEphemeralTrove(String, String)}.
+     */
+    public boolean renameDynamicTrove(String troveId, String newName) {
+        if (troveId == null || troveId.isBlank()) {
+            return false;
+        }
+        String label = newName == null ? "" : newName.trim();
+        if (label.isEmpty()) {
+            throw new IllegalArgumentException("newName is required");
+        }
+        if (label.length() > MAX_DYNAMIC_TROVE_NAME_LEN) {
+            throw new IllegalArgumentException("newName exceeds max length " + MAX_DYNAMIC_TROVE_NAME_LEN);
+        }
+        synchronized (mergeLock) {
+            String id = troveId.trim();
+            if (!dynamicTroveNames.containsKey(id)) {
+                return false;
+            }
+            List<SearchResult> renamed = dynamicTroves.getOrDefault(id, List.of()).stream()
+                    .map(r -> new SearchResult(r.id(), r.itemType(), r.title(), r.snippet(),
+                            label, r.troveId(), r.hasThumbnail(), r.thumbnailUrl(),
+                            r.largeImageUrl(), r.rawSourceItem(), r.files(), r.itemUrl(), r.extraFields()))
+                    .toList();
+            dynamicTroveRepository.updateTroveName(id, label);
+            dynamicTroveNames.put(id, label);
+            dynamicTroves.put(id, renamed);
+            rebuildMergedIndexLocked();
+        }
+        log.info("Renamed dynamic trove \"{}\" → \"{}\"", troveId, label);
+        return true;
+    }
+
     /** True if any trove id or display name collides with this normalized dynamic-trove slug. */
     private boolean isDynamicTroveSlugTakenLocked(String slug) {
         if (dynamicTroveNames.containsKey(slug)) {
@@ -703,6 +768,68 @@ public class SearchDataService {
             }
         }
         return false;
+    }
+
+    /**
+     * Convert an existing (non-dynamic) trove into a dynamic trove containing a snapshot of its
+     * current contents, reusing the same id. Unlike {@link #createDynamicTrove}, this
+     * intentionally bypasses {@link #isDynamicTroveSlugTakenLocked} — reusing the source's id is
+     * the whole point. Works for both S3-backed and ephemeral (local-directory) source troves.
+     */
+    public DynamicTroveRegistration convertTroveToDynamic(String troveId) {
+        if (dynamicTroveRepository == null) {
+            throw new IllegalStateException("Dynamic troves are not available (no repository)");
+        }
+        if (troveId == null || troveId.isBlank()) {
+            throw new IllegalArgumentException("troveId is required");
+        }
+        String id = troveId.trim();
+        List<String> titles;
+        String displayName;
+        boolean wasEphemeral;
+        boolean wasS3Backed;
+        synchronized (mergeLock) {
+            if (dynamicTroveNames.containsKey(id)) {
+                throw new IllegalStateException("Trove \"" + id + "\" is already dynamic");
+            }
+            List<SearchResult> source = allResults.stream()
+                    .filter(r -> id.equals(r.troveId()))
+                    .toList();
+            if (source.isEmpty()) {
+                throw new IllegalArgumentException("Unknown trove: " + id);
+            }
+            displayName = source.get(0).trove();
+            titles = source.stream().map(SearchResult::title).toList();
+            wasEphemeral = ephemeralTroves.containsKey(id);
+            wasS3Backed = persistedResults.stream().anyMatch(r -> id.equals(r.troveId()));
+
+            try {
+                dynamicTroveRepository.insertTrove(id, displayName);
+            } catch (DataIntegrityViolationException e) {
+                throw new IllegalStateException("Trove \"" + id + "\" already exists as dynamic", e);
+            }
+            dynamicTroveRepository.insertItems(id, titles);
+            dynamicTroveNames.put(id, displayName);
+            dynamicTroves.put(id, titles.stream()
+                    .map(t -> dynamicItemToSearchResult(t, id, displayName))
+                    .toList());
+            rebuildMergedIndexLocked();
+        }
+        log.info("Converted trove \"{}\" to dynamic ({} items, ephemeral={}, s3={})",
+                id, titles.size(), wasEphemeral, wasS3Backed);
+
+        if (wasEphemeral) {
+            // Reuses existing cleanup (sister-trove associations, cliCreatedEphemeralTroveIds,
+            // troveSourceDocuments) and does its own rebuildMergedIndexLocked(); ephemeral troves
+            // aren't reloaded from any external source, so no further action is needed.
+            removeEphemeralTrove(id);
+        }
+        if (wasS3Backed) {
+            // Strips the old S3-backed rows from persistedResults and re-triggers the skip-check
+            // in loadFromS3/loadFromClasspath, so the stale copy doesn't resurface.
+            reloadDataPartial(Set.of(id), null, null);
+        }
+        return new DynamicTroveRegistration(id, displayName, titles.size());
     }
 
     /** Remove a dynamic trove and its items. Returns false if unknown. */
@@ -1213,7 +1340,8 @@ public class SearchDataService {
             Set<String> excludeIds,
             BiConsumer<Integer, Integer> progress,
             Set<String> loadedTroveIds,
-            List<String> loadErrors) {
+            List<String> loadErrors,
+            Set<String> dynamicTroveIds) {
         log.info("Loading from S3");
         // Region from AWS_REGION env var (e.g. us-west-2); fallback for local runs without it set
         String region = System.getenv().getOrDefault("AWS_REGION", "us-west-2");
@@ -1255,6 +1383,10 @@ public class SearchDataService {
                 }
                 if (troveId == null || troveId.isEmpty()) {
                     log.warn("Skipping trove entry with no id (tried id, troveId, trove_id); entry: {}", entry);
+                    continue;
+                }
+                if (dynamicTroveIds.contains(troveId)) {
+                    loadErrors.add("Didn't load S3 trove '" + troveId + "' superseded by dynamic trove");
                     continue;
                 }
                 if (shouldSkipTrove(troveId, onlyIds, excludeIds)) {
@@ -1319,7 +1451,8 @@ public class SearchDataService {
             Set<String> excludeIds,
             BiConsumer<Integer, Integer> progress,
             Set<String> loadedTroveIds,
-            List<String> loadErrors) {
+            List<String> loadErrors,
+            Set<String> dynamicTroveIds) {
         log.info("Loading trove data from: {}", dataLocation);
         try {
             Resource[] resources = resourceResolver.getResources(dataLocation);
@@ -1335,6 +1468,13 @@ public class SearchDataService {
                     String troveId = troveIdFromCollectionNode(root);
                     if (troveId == null || troveId.isEmpty()) {
                         troveId = resource.getFilename() != null ? resource.getFilename() : "unknown";
+                    }
+                    if (dynamicTroveIds.contains(troveId)) {
+                        loadErrors.add("Didn't load S3 trove '" + troveId + "' superseded by dynamic trove");
+                        if (progress != null) {
+                            progress.accept(i + 1, total);
+                        }
+                        continue;
                     }
                     if (shouldSkipTrove(troveId, onlyIds, excludeIds)) {
                         if (!onlyIds.isEmpty() && !onlyIds.contains(troveId)) {

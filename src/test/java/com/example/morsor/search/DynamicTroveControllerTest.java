@@ -29,7 +29,10 @@ class DynamicTroveControllerTest {
     @LocalServerPort
     int port;
 
-    private final RestTemplate restTemplate = new RestTemplate();
+    // Default SimpleClientHttpRequestFactory (java.net.HttpURLConnection) rejects PATCH; the
+    // JDK HttpClient-backed factory supports it natively.
+    private final RestTemplate restTemplate =
+            new RestTemplate(new org.springframework.http.client.JdkClientHttpRequestFactory());
 
     private String base() {
         return "http://localhost:" + port;
@@ -363,5 +366,243 @@ class DynamicTroveControllerTest {
                 HttpMethod.DELETE,
                 null,
                 Void.class);
+    }
+
+    @Test
+    void convertEphemeralTroveToDynamicKeepsIdAndContents() {
+        String registerBody = """
+                {
+                  "displayName": "/tmp/convert-ephem-test",
+                  "items": [
+                    { "id": "a", "title": "Ephem Alpha" },
+                    { "id": "b", "title": "Ephem Beta" }
+                  ]
+                }
+                """;
+        ResponseEntity<EphemeralTroveRegistration> registered = restTemplate.exchange(
+                base() + "/api/ephemeral-troves",
+                HttpMethod.POST,
+                new HttpEntity<>(registerBody, jsonHeaders()),
+                EphemeralTroveRegistration.class);
+        assertThat(registered.getBody()).isNotNull();
+        String troveId = registered.getBody().troveId();
+
+        ResponseEntity<DynamicTroveRegistration> converted = restTemplate.exchange(
+                base() + "/api/dynamic-troves/convert",
+                HttpMethod.POST,
+                new HttpEntity<>("{\"sourceTroveId\":\"" + troveId + "\"}", jsonHeaders()),
+                DynamicTroveRegistration.class);
+        assertThat(converted.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+        assertThat(converted.getBody()).isNotNull();
+        assertThat(converted.getBody().troveId()).isEqualTo(troveId);
+        assertThat(converted.getBody().name()).isEqualTo("/tmp/convert-ephem-test");
+        assertThat(converted.getBody().count()).isEqualTo(2);
+
+        ResponseEntity<List<TroveOption>> troves = restTemplate.exchange(
+                base() + "/api/troves",
+                HttpMethod.GET,
+                null,
+                new ParameterizedTypeReference<List<TroveOption>>() {});
+        assertThat(troves.getBody()).isNotNull();
+        TroveOption option = troves.getBody().stream()
+                .filter(t -> troveId.equals(t.id()))
+                .findFirst()
+                .orElseThrow();
+        assertThat(option.dynamic()).isTrue();
+        assertThat(option.count()).isEqualTo(2);
+
+        ResponseEntity<SearchResponse> search = restTemplate.exchange(
+                base() + "/api/search?query=*&trove=" + troveId,
+                HttpMethod.GET,
+                null,
+                SearchResponse.class);
+        assertThat(search.getBody()).isNotNull();
+        assertThat(search.getBody().results()).extracting(r -> r.result().title())
+                .containsExactlyInAnyOrder("Ephem Alpha", "Ephem Beta");
+
+        restTemplate.exchange(base() + "/api/dynamic-troves/" + troveId, HttpMethod.DELETE, null, Void.class);
+    }
+
+    @Test
+    void convertS3BackedTroveToDynamicRecordsLoadErrorOnReload() {
+        String troveId = "dvds";
+        ResponseEntity<SearchResponse> before = restTemplate.exchange(
+                base() + "/api/search?query=*&trove=" + troveId,
+                HttpMethod.GET,
+                null,
+                SearchResponse.class);
+        assertThat(before.getBody()).isNotNull();
+        List<String> originalTitles = before.getBody().results().stream()
+                .map(r -> r.result().title())
+                .toList();
+        assertThat(originalTitles).isNotEmpty();
+
+        try {
+            ResponseEntity<DynamicTroveRegistration> converted = restTemplate.exchange(
+                    base() + "/api/dynamic-troves/convert",
+                    HttpMethod.POST,
+                    new HttpEntity<>("{\"sourceTroveId\":\"" + troveId + "\"}", jsonHeaders()),
+                    DynamicTroveRegistration.class);
+            assertThat(converted.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+            assertThat(converted.getBody()).isNotNull();
+            assertThat(converted.getBody().troveId()).isEqualTo(troveId);
+            assertThat(converted.getBody().count()).isEqualTo(originalTitles.size());
+
+            ResponseEntity<List<TroveOption>> trovesAfterConvert = restTemplate.exchange(
+                    base() + "/api/troves",
+                    HttpMethod.GET,
+                    null,
+                    new ParameterizedTypeReference<List<TroveOption>>() {});
+            assertThat(trovesAfterConvert.getBody()).isNotNull();
+            TroveOption option = trovesAfterConvert.getBody().stream()
+                    .filter(t -> troveId.equals(t.id()))
+                    .findFirst()
+                    .orElseThrow();
+            assertThat(option.dynamic()).isTrue();
+
+            // Full reload should skip the now-superseded S3/classpath copy and record why.
+            restTemplate.postForEntity(base() + "/api/troves/reload", null, Void.class);
+
+            ResponseEntity<List<String>> loadErrors = restTemplate.exchange(
+                    base() + "/api/troves/load-errors",
+                    HttpMethod.GET,
+                    null,
+                    new ParameterizedTypeReference<List<String>>() {});
+            assertThat(loadErrors.getBody()).isNotNull();
+            assertThat(loadErrors.getBody())
+                    .contains("Didn't load S3 trove '" + troveId + "' superseded by dynamic trove");
+
+            ResponseEntity<List<TroveOption>> trovesAfterReload = restTemplate.exchange(
+                    base() + "/api/troves",
+                    HttpMethod.GET,
+                    null,
+                    new ParameterizedTypeReference<List<TroveOption>>() {});
+            assertThat(trovesAfterReload.getBody()).isNotNull();
+            TroveOption optionAfterReload = trovesAfterReload.getBody().stream()
+                    .filter(t -> troveId.equals(t.id()))
+                    .findFirst()
+                    .orElseThrow();
+            assertThat(optionAfterReload.dynamic()).isTrue();
+            assertThat(optionAfterReload.count()).isEqualTo(originalTitles.size());
+
+            restTemplate.postForEntity(base() + "/api/troves/load-errors/clear", null, Void.class);
+            ResponseEntity<List<String>> clearedErrors = restTemplate.exchange(
+                    base() + "/api/troves/load-errors",
+                    HttpMethod.GET,
+                    null,
+                    new ParameterizedTypeReference<List<String>>() {});
+            assertThat(clearedErrors.getBody()).isEmpty();
+        } finally {
+            // Restore the fixture: delete the dynamic trove, then reload so the classpath
+            // copy of "dvds" loads again (no dynamic trove is left to shadow it).
+            restTemplate.exchange(base() + "/api/dynamic-troves/" + troveId, HttpMethod.DELETE, null, Void.class);
+            restTemplate.postForEntity(base() + "/api/troves/reload", null, Void.class);
+        }
+
+        ResponseEntity<List<TroveOption>> trovesAfterRestore = restTemplate.exchange(
+                base() + "/api/troves",
+                HttpMethod.GET,
+                null,
+                new ParameterizedTypeReference<List<TroveOption>>() {});
+        assertThat(trovesAfterRestore.getBody()).isNotNull();
+        TroveOption restored = trovesAfterRestore.getBody().stream()
+                .filter(t -> troveId.equals(t.id()))
+                .findFirst()
+                .orElseThrow();
+        assertThat(restored.dynamic()).isFalse();
+        assertThat(restored.count()).isEqualTo(originalTitles.size());
+    }
+
+    @Test
+    void convertAlreadyDynamicTroveReturns409() {
+        String uniqueName = "ConvertAlreadyDyn-" + UUID.randomUUID();
+        ResponseEntity<DynamicTroveRegistration> created = restTemplate.exchange(
+                base() + "/api/dynamic-troves",
+                HttpMethod.POST,
+                new HttpEntity<>("{\"name\":\"" + uniqueName + "\"}", jsonHeaders()),
+                DynamicTroveRegistration.class);
+        assertThat(created.getBody()).isNotNull();
+        String troveId = created.getBody().troveId();
+
+        assertThatThrownBy(() -> restTemplate.exchange(
+                base() + "/api/dynamic-troves/convert",
+                HttpMethod.POST,
+                new HttpEntity<>("{\"sourceTroveId\":\"" + troveId + "\"}", jsonHeaders()),
+                DynamicTroveRegistration.class))
+                .isInstanceOf(HttpClientErrorException.Conflict.class);
+
+        restTemplate.exchange(base() + "/api/dynamic-troves/" + troveId, HttpMethod.DELETE, null, Void.class);
+    }
+
+    @Test
+    void convertUnknownTroveReturns400() {
+        assertThatThrownBy(() -> restTemplate.exchange(
+                base() + "/api/dynamic-troves/convert",
+                HttpMethod.POST,
+                new HttpEntity<>("{\"sourceTroveId\":\"no-such-trove-at-all\"}", jsonHeaders()),
+                DynamicTroveRegistration.class))
+                .isInstanceOf(HttpClientErrorException.BadRequest.class);
+    }
+
+    @Test
+    void renameDynamicTroveUpdatesDisplayNameKeepsId() {
+        String uniqueName = "RenameMe-" + UUID.randomUUID();
+        ResponseEntity<DynamicTroveRegistration> created = restTemplate.exchange(
+                base() + "/api/dynamic-troves",
+                HttpMethod.POST,
+                new HttpEntity<>("{\"name\":\"" + uniqueName + "\"}", jsonHeaders()),
+                DynamicTroveRegistration.class);
+        assertThat(created.getBody()).isNotNull();
+        String troveId = created.getBody().troveId();
+
+        restTemplate.exchange(
+                base() + "/api/dynamic-troves/" + troveId + "/items",
+                HttpMethod.POST,
+                new HttpEntity<>("{\"title\":\"Renamed Item\"}", jsonHeaders()),
+                DynamicTroveItemRegistration.class);
+
+        String newName = "Renamed-" + UUID.randomUUID();
+        ResponseEntity<Void> renamed = restTemplate.exchange(
+                base() + "/api/dynamic-troves/" + troveId,
+                HttpMethod.PATCH,
+                new HttpEntity<>("{\"name\":\"" + newName + "\"}", jsonHeaders()),
+                Void.class);
+        assertThat(renamed.getStatusCode().is2xxSuccessful()).isTrue();
+
+        ResponseEntity<List<TroveOption>> troves = restTemplate.exchange(
+                base() + "/api/troves",
+                HttpMethod.GET,
+                null,
+                new ParameterizedTypeReference<List<TroveOption>>() {});
+        assertThat(troves.getBody()).isNotNull();
+        TroveOption option = troves.getBody().stream()
+                .filter(t -> troveId.equals(t.id()))
+                .findFirst()
+                .orElseThrow();
+        assertThat(option.name()).isEqualTo(newName);
+        assertThat(option.id()).isEqualTo(troveId);
+
+        ResponseEntity<SearchResponse> search = restTemplate.exchange(
+                base() + "/api/search?query=*&trove=" + troveId,
+                HttpMethod.GET,
+                null,
+                SearchResponse.class);
+        assertThat(search.getBody()).isNotNull();
+        assertThat(search.getBody().results()).hasSize(1);
+        assertThat(search.getBody().results().get(0).result().trove()).isEqualTo(newName);
+        assertThat(search.getBody().results().get(0).result().troveId()).isEqualTo(troveId);
+
+        restTemplate.exchange(base() + "/api/dynamic-troves/" + troveId, HttpMethod.DELETE, null, Void.class);
+    }
+
+    @Test
+    void renameUnknownDynamicTroveReturns404() {
+        String url = base() + "/api/dynamic-troves/no-such-dynamic-trove";
+        assertThatThrownBy(() -> restTemplate.exchange(
+                url,
+                HttpMethod.PATCH,
+                new HttpEntity<>("{\"name\":\"Anything\"}", jsonHeaders()),
+                Void.class))
+                .isInstanceOf(HttpClientErrorException.NotFound.class);
     }
 }

@@ -626,27 +626,29 @@
   background: #ede8ff;
 }
 
-.trove-delete-btn {
+.trove-load-errors-btn {
   flex-shrink: 0;
-  width: 1.75rem;
-  min-width: 1.75rem;
-  align-self: stretch;
+  width: 2rem;
+  min-width: 2rem;
   padding: 0;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-size: 1.05rem;
-  line-height: 1;
   border: none;
+  border-right: 1px solid #e5e5e5;
   background: transparent;
-  color: #666;
   cursor: pointer;
   border-radius: 0;
 }
 
-.trove-delete-btn:hover {
+.trove-load-errors-btn:hover {
   background: #ede8ff;
-  color: #333;
+}
+
+.trove-load-errors-btn img {
+  width: 1.2rem;
+  height: 1.2rem;
+  display: block;
 }
 
 .sidebar-trove-filter-input {
@@ -958,6 +960,65 @@
 .trove-only-link--boost-active .trove-booster {
   color: #c00;
   font-weight: bold;
+}
+
+.trove-menu-wrap {
+  position: relative;
+  flex-shrink: 0;
+  display: flex;
+  align-self: stretch;
+  align-items: stretch;
+}
+
+.trove-menu-btn {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.75rem;
+  min-width: 1.75rem;
+  padding: 0;
+  margin: 0;
+  border: none;
+  background: none;
+  color: #666;
+  font-size: 1.1rem;
+  line-height: 1;
+  cursor: pointer;
+  border-radius: 0;
+  align-self: stretch;
+}
+
+.trove-menu-btn:hover {
+  background: #ede8ff;
+  color: #333;
+}
+
+.trove-menu-portal-dropdown {
+  display: flex;
+  flex-direction: column;
+  min-width: 10rem;
+  padding: 0.25rem 0;
+  background: #fff;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.trove-menu-portal-dropdown button {
+  display: block;
+  width: 100%;
+  padding: 0.45rem 0.8rem;
+  border: none;
+  background: none;
+  text-align: left;
+  font-size: 0.85rem;
+  color: #252525;
+  cursor: pointer;
+}
+
+.trove-menu-portal-dropdown button:hover {
+  background: #ede8ff;
 }
 
 .trove-checkbox:hover {
@@ -3431,4 +3492,65 @@
 
 .troves-stale-dismiss-btn:hover {
   color: #333;
+}
+
+.trove-load-errors-lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background: rgba(0, 0, 0, 0.9);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 1rem;
+  box-sizing: border-box;
+}
+
+.trove-load-errors-lightbox-content {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  max-width: min(700px, calc(100% - 2rem));
+  overflow: auto;
+}
+
+.trove-load-errors-lightbox-content p {
+  color: #fff;
+}
+
+.trove-load-errors-list {
+  width: 100%;
+  margin: 0 0 1rem;
+  padding: 1rem;
+  box-sizing: border-box;
+  list-style: disc;
+  list-style-position: inside;
+  background: #1e1e1e;
+  color: #d4d4d4;
+  font-family: ui-monospace, 'Cascadia Code', 'Source Code Pro', Menlo, Consolas, monospace;
+  font-size: 0.85rem;
+  line-height: 1.6;
+  border-radius: 6px;
+  overflow: auto;
+}
+
+.trove-load-errors-list li {
+  word-break: break-word;
+}
+
+.trove-load-errors-clear-btn {
+  padding: 0.4rem 1.25rem;
+  border-radius: 999px;
+  border: none;
+  background: #6633cc;
+  color: #fff;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
+.trove-load-errors-clear-btn:hover {
+  background: #5522b3;
 }

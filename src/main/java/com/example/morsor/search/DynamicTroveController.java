@@ -5,6 +5,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -46,6 +47,51 @@ public class DynamicTroveController {
             log.warn("POST /api/dynamic-troves: conflict: {}", e.getMessage());
             return ResponseEntity.status(HttpStatus.CONFLICT).build();
         }
+    }
+
+    public record DynamicTroveConvertRequest(String sourceTroveId) {}
+
+    /** Convert an existing (non-dynamic) trove into a dynamic trove with the same id. */
+    @PostMapping("/convert")
+    public ResponseEntity<DynamicTroveRegistration> convert(@RequestBody DynamicTroveConvertRequest body) {
+        if (body == null || body.sourceTroveId() == null || body.sourceTroveId().isBlank()) {
+            return ResponseEntity.badRequest().build();
+        }
+        log.info("POST /api/dynamic-troves/convert: sourceTroveId={}", body.sourceTroveId());
+        try {
+            DynamicTroveRegistration reg = searchDataService.convertTroveToDynamic(body.sourceTroveId());
+            searchCache.clear();
+            return ResponseEntity.status(HttpStatus.CREATED).body(reg);
+        } catch (IllegalArgumentException e) {
+            log.warn("POST /api/dynamic-troves/convert: bad request: {}", e.getMessage());
+            return ResponseEntity.badRequest().build();
+        } catch (IllegalStateException e) {
+            log.warn("POST /api/dynamic-troves/convert: conflict: {}", e.getMessage());
+            return ResponseEntity.status(HttpStatus.CONFLICT).build();
+        }
+    }
+
+    /** Rename a dynamic trove's display name (id unchanged). Body: {"name": "..."}. */
+    @PatchMapping("/{troveId}")
+    public ResponseEntity<Void> rename(
+            @PathVariable String troveId,
+            @RequestBody java.util.Map<String, String> body) {
+        String newName = body == null ? null : body.get("name");
+        if (newName == null || newName.isBlank()) {
+            return ResponseEntity.badRequest().build();
+        }
+        log.info("PATCH /api/dynamic-troves/{}: name.preview={}", troveId, previewForLog(newName));
+        try {
+            boolean found = searchDataService.renameDynamicTrove(troveId, newName);
+            if (!found) {
+                return ResponseEntity.notFound().build();
+            }
+        } catch (IllegalArgumentException e) {
+            log.warn("PATCH /api/dynamic-troves/{}: bad request: {}", troveId, e.getMessage());
+            return ResponseEntity.badRequest().build();
+        }
+        searchCache.clear();
+        return ResponseEntity.noContent().build();
     }
 
     @DeleteMapping("/{troveId}")

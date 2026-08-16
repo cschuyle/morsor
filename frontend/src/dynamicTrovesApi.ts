@@ -121,3 +121,72 @@ export async function deleteDynamicTroveItem(troveId: string, title: string): Pr
     throw new Error(await readApiErrorMessage(res))
   }
 }
+
+export async function convertTroveToDynamic(sourceTroveId: string): Promise<DynamicTroveRegistration> {
+  await ensureCsrf()
+  const res = await fetch('/api/dynamic-troves/convert', {
+    method: 'POST',
+    credentials: 'include',
+    headers: writeHeaders(),
+    body: JSON.stringify({ sourceTroveId }),
+  })
+  if (res.status === 401) {
+    window.location.href = '/login'
+    throw new Error('Unauthorized')
+  }
+  if (res.status === 409) {
+    throw new Error('That trove is already dynamic')
+  }
+  if (!res.ok) {
+    throw new Error(await readApiErrorMessage(res))
+  }
+  return res.json() as Promise<DynamicTroveRegistration>
+}
+
+export async function renameDynamicTrove(troveId: string, name: string): Promise<void> {
+  await ensureCsrf()
+  const res = await fetch(`/api/dynamic-troves/${encodeURIComponent(troveId)}`, {
+    method: 'PATCH',
+    credentials: 'include',
+    headers: writeHeaders(),
+    body: JSON.stringify({ name }),
+  })
+  if (res.status === 401) {
+    window.location.href = '/login'
+    throw new Error('Unauthorized')
+  }
+  if (res.status === 404) {
+    throw new Error('Trove not found')
+  }
+  if (!res.ok) {
+    throw new Error(await readApiErrorMessage(res))
+  }
+}
+
+export async function getTroveLoadErrors(): Promise<string[]> {
+  const res = await fetch('/api/troves/load-errors', { credentials: 'include' })
+  if (res.status === 401) {
+    window.location.href = '/login'
+    throw new Error('Unauthorized')
+  }
+  if (!res.ok) {
+    throw new Error(await readApiErrorMessage(res))
+  }
+  return res.json() as Promise<string[]>
+}
+
+export async function clearTroveLoadErrors(): Promise<void> {
+  await ensureCsrf()
+  const res = await fetch('/api/troves/load-errors/clear', {
+    method: 'POST',
+    credentials: 'include',
+    headers: writeHeaders(),
+  })
+  if (res.status === 401) {
+    window.location.href = '/login'
+    throw new Error('Unauthorized')
+  }
+  if (!res.ok) {
+    throw new Error(await readApiErrorMessage(res))
+  }
+}

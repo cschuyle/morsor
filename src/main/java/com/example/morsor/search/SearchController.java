@@ -69,6 +69,17 @@ public class SearchController {
 
     public record SyncStateResponse(boolean stale, String detectedAt, String staleTroveIds) {}
 
+    /** Trove-load errors from the most recent full reload (startup or manual "Reload troves"). */
+    @GetMapping("/troves/load-errors")
+    public List<String> troveLoadErrors() {
+        return searchDataService.getLastLoadErrors();
+    }
+
+    @PostMapping("/troves/load-errors/clear")
+    public void clearTroveLoadErrors() {
+        searchDataService.clearLastLoadErrors();
+    }
+
     @PostMapping("/troves/reload")
     public void reloadTroves(@RequestParam(required = false) String ids) {
         Set<String> partialIds = parseIds(ids);

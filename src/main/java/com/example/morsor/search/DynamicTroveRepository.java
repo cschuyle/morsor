@@ -64,6 +64,11 @@ public class DynamicTroveRepository {
         return jdbc.update("DELETE FROM dynamic_troves WHERE id = ?", id);
     }
 
+    /** @return rows updated (0 or 1) */
+    public int updateTroveName(String id, String name) {
+        return jdbc.update("UPDATE dynamic_troves SET name = ? WHERE id = ?", name, id);
+    }
+
     public void insertItem(String troveId, String title) {
         jdbc.update(
                 "INSERT INTO dynamic_trove_items (trove_id, title, created_at) VALUES (?, ?, ?)",

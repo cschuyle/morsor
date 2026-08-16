@@ -1,4 +1,5 @@
 import { useMemo, useState, useEffect, useRef, useLayoutEffect, useCallback } from 'react'
+import { createPortal } from 'react-dom'
 import { Link, useSearchParams, useLocation } from 'react-router-dom'
 import type { SearchResultData, Trove, DuplicatesResultData, UniquesResultData } from './types'
 import type { FileTypeQuickModeValue } from './fileTypeQuickMode'
@@ -58,6 +59,10 @@ import {
   createDynamicTrove,
   deleteDynamicTrove,
   deleteDynamicTroveItem,
+  convertTroveToDynamic,
+  renameDynamicTrove,
+  getTroveLoadErrors,
+  clearTroveLoadErrors,
 } from './dynamicTrovesApi'
 import { listConnectedTroveIds } from './troveDirectoryHandles'
 import { TroveLocalRootsPanel } from './TroveLocalRootsPanel'
@@ -196,6 +201,9 @@ function App() {
   const [reloadTrovesProgress, setReloadTrovesProgress] = useState({ current: 0, total: 0 })
   const [trovesStale, setTrovesStale] = useState(false)
   const [staleTroveIds, setStaleTroveIds] = useState<string>('')
+  const [openTroveMenu, setOpenTroveMenu] = useState<{ id: string; name: string; count: number; dynamic: boolean; rect: DOMRect } | null>(null)
+  const [troveLoadErrors, setTroveLoadErrors] = useState<string[]>([])
+  const [loadErrorsPopupOpen, setLoadErrorsPopupOpen] = useState(false)
   const queryRef = useRef('')
   const skipCheckboxSearchRef = useRef(true)
   const skipFileTypeSearchRef = useRef(false)
@@ -512,6 +520,43 @@ function App() {
   }, [fileTypeDropdownOpen])
 
   useEffect(() => {
+    if (!openTroveMenu) return
+    function handleClickOutside(e) {
+      if (
+        !(e.target instanceof Element) ||
+        (!e.target.closest('.trove-menu-wrap') && !e.target.closest('.trove-menu-portal-dropdown'))
+      ) {
+        setOpenTroveMenu(null)
+      }
+    }
+    document.addEventListener('click', handleClickOutside)
+    return () => document.removeEventListener('click', handleClickOutside)
+  }, [openTroveMenu])
+
+  useEffect(() => {
+    if (!openTroveMenu) return
+    // Close rather than drift out of sync if the (scrollable) trove list or page scrolls.
+    function handleScroll() {
+      setOpenTroveMenu(null)
+    }
+    document.addEventListener('scroll', handleScroll, true)
+    return () => document.removeEventListener('scroll', handleScroll, true)
+  }, [openTroveMenu])
+
+  useEffect(() => {
+    if (!openTroveMenu) return
+    function handleEscape(e) {
+      if (e.key === 'Escape') setOpenTroveMenu(null)
+    }
+    window.addEventListener('keydown', handleEscape)
+    return () => window.removeEventListener('keydown', handleEscape)
+  }, [openTroveMenu])
+
+  useEffect(() => {
+    getTroveLoadErrors().then(setTroveLoadErrors).catch(() => { /* ignore — backend may be unreachable */ })
+  }, [])
+
+  useEffect(() => {
     if (!fileTypeDropdownOpen) return
     function handleEscape(e) {
       if (e.key === 'Escape') setFileTypeDropdownOpen(false)
@@ -688,6 +733,47 @@ function App() {
       window.alert(e instanceof Error ? e.message : String(e))
     }
   }, [refreshTroves, showActionFlare])
+
+  const handleConvertTroveToDynamic = useCallback(async (troveId: string, troveName: string) => {
+    if (!window.confirm('Are you sure? This will make the existing trove unloadable.')) {
+      return
+    }
+    try {
+      await convertTroveToDynamic(troveId)
+      await refreshTroves()
+      showActionFlare(`Converted ${flareQuote(troveName || troveId)} to a dynamic trove`)
+    } catch (e) {
+      window.alert(e instanceof Error ? e.message : String(e))
+    }
+  }, [refreshTroves, showActionFlare])
+
+  const handleRenameDynamicTrove = useCallback(async (troveId: string, currentName: string) => {
+    const raw = window.prompt('Rename trove', currentName)
+    if (raw == null) {
+      return
+    }
+    const name = raw.trim()
+    if (!name || name === currentName) {
+      return
+    }
+    try {
+      await renameDynamicTrove(troveId, name)
+      await refreshTroves()
+      showActionFlare(`Renamed trove to ${flareQuote(name)}`)
+    } catch (e) {
+      window.alert(e instanceof Error ? e.message : String(e))
+    }
+  }, [refreshTroves, showActionFlare])
+
+  const handleClearTroveLoadErrors = useCallback(async () => {
+    try {
+      await clearTroveLoadErrors()
+      setTroveLoadErrors([])
+      setLoadErrorsPopupOpen(false)
+    } catch (e) {
+      window.alert(e instanceof Error ? e.message : String(e))
+    }
+  }, [])
 
   async function handleAddDynamicItem() {
     const troveId =
@@ -1265,6 +1351,71 @@ function App() {
       setUniqQuery('*')
     }
     if (searchMode === 'search') fetchSearch(0, null, new Set([troveId]))
+  }
+
+  /** Shared row markup for the search-mode trove picker (used by both the selected and not-selected lists). */
+  function renderTroveRow(t: Trove & { resultCount: number }) {
+    return (
+      <li
+        key={t.id}
+        className={`trove-item ${selectedTroveIds.has(t.id) ? 'trove-item--selected' : ''} ${searchResult != null && t.resultCount > 0 ? 'trove-item--has-results' : ''}`}
+      >
+        <label className="trove-checkbox">
+          <input
+            type="checkbox"
+            checked={selectedTroveIds.has(t.id)}
+            onChange={() => toggleTrove(t.id)}
+          />
+          <span className={`trove-name${t.id.startsWith('sister-1-of-') ? ' trove-name--sister' : ''}`}>
+            {t.name} {searchResult != null ? <span className="trove-count-suffix">({formatCount(t.resultCount)}/{formatCount(t.count)})</span> : `(${formatCount(t.count)})`}
+          </span>
+        </label>
+        {(selectedTroveIds.size !== 1 || !selectedTroveIds.has(t.id)) && (
+          <span className="trove-only-actions">
+            <button
+              type="button"
+              className="trove-only-link"
+              disabled={selectedTroveIds.size === 1 && !selectedTroveIds.has(t.id)}
+              onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleTargetClick(t.id) }}
+              aria-label={`Search only ${t.name}`}
+              title="Only this trove"
+            >
+              <img src="/target.png" alt="" className="trove-only-icon" />
+            </button>
+            {searchMode === 'search' && (
+              <button
+                type="button"
+                className={`trove-only-link trove-only-link--boost${boostTroveId === t.id ? ' trove-only-link--boost-active' : ''}`}
+                onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleBoostClick(t.id) }}
+                aria-label={boostTroveId === t.id ? `Boost on for ${t.name} (results rank higher)` : `Boost ${t.name} in search results`}
+                title={boostTroveId === t.id ? 'Boost on — results from this trove rank higher' : 'Boost this trove in search results'}
+              >
+                <span className="trove-booster" aria-hidden="true">↑</span>
+              </button>
+            )}
+          </span>
+        )}
+        <span className="trove-menu-wrap">
+          <button
+            type="button"
+            className="trove-menu-btn"
+            aria-label={`Actions for ${t.name}`}
+            aria-haspopup="menu"
+            aria-expanded={openTroveMenu?.id === t.id}
+            onClick={(e) => {
+              e.preventDefault()
+              e.stopPropagation()
+              const rect = e.currentTarget.getBoundingClientRect()
+              setOpenTroveMenu((prev) =>
+                prev?.id === t.id ? null : { id: t.id, name: t.name, count: t.count ?? 0, dynamic: t.dynamic === true, rect },
+              )
+            }}
+          >
+            ⋮
+          </button>
+        </span>
+      </li>
+    )
   }
 
   /** Compare tab: set compare selection to this trove only (duplicates: allows self-compare). Uniques cannot use primary as compare — clear compare when target is primary. */
@@ -2243,6 +2394,17 @@ function App() {
                 +
               </button>
             )}
+            {troveLoadErrors.length > 0 && (
+              <button
+                type="button"
+                className="trove-load-errors-btn"
+                title="Trove load errors"
+                aria-label="Trove load errors"
+                onClick={() => setLoadErrorsPopupOpen(true)}
+              >
+                <img src="/alert-icon-1575.png" alt="" />
+              </button>
+            )}
             <input
               type="text"
               value={troveFilter}
@@ -2269,125 +2431,13 @@ function App() {
             troveFilter={troveFilter}
           />
           <ul className="trove-list">
-            {selectedTroves.map((t) => (
-              <li
-                key={t.id}
-                className={`trove-item ${selectedTroveIds.has(t.id) ? 'trove-item--selected' : ''} ${searchResult != null && t.resultCount > 0 ? 'trove-item--has-results' : ''}`}
-              >
-                {t.dynamic === true && (
-                  <button
-                    type="button"
-                    className="trove-delete-btn"
-                    title={`Delete dynamic trove ${t.name}`}
-                    aria-label={`Delete dynamic trove ${t.name}`}
-                    onClick={(e) => {
-                      e.preventDefault()
-                      e.stopPropagation()
-                      void handleDeleteDynamicTrove(t.id, t.name, t.count ?? 0)
-                    }}
-                  >
-                    ×
-                  </button>
-                )}
-                <label className="trove-checkbox">
-                  <input
-                    type="checkbox"
-                    checked={selectedTroveIds.has(t.id)}
-                    onChange={() => toggleTrove(t.id)}
-                  />
-                  <span className={`trove-name${t.id.startsWith('sister-1-of-') ? ' trove-name--sister' : ''}`}>
-                    {t.name} {searchResult != null ? <span className="trove-count-suffix">({formatCount(t.resultCount)}/{formatCount(t.count)})</span> : `(${formatCount(t.count)})`}
-                  </span>
-                </label>
-                {(selectedTroveIds.size !== 1 || !selectedTroveIds.has(t.id)) && (
-                  <span className="trove-only-actions">
-                    <button
-                      type="button"
-                      className="trove-only-link"
-                      disabled={selectedTroveIds.size === 1 && !selectedTroveIds.has(t.id)}
-                      onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleTargetClick(t.id) }}
-                      aria-label={`Search only ${t.name}`}
-                      title="Only this trove"
-                    >
-                      <img src="/target.png" alt="" className="trove-only-icon" />
-                    </button>
-                    {searchMode === 'search' && (
-                      <button
-                        type="button"
-                        className={`trove-only-link trove-only-link--boost${boostTroveId === t.id ? ' trove-only-link--boost-active' : ''}`}
-                        onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleBoostClick(t.id) }}
-                        aria-label={boostTroveId === t.id ? `Boost on for ${t.name} (results rank higher)` : `Boost ${t.name} in search results`}
-                        title={boostTroveId === t.id ? 'Boost on — results from this trove rank higher' : 'Boost this trove in search results'}
-                      >
-                        <span className="trove-booster" aria-hidden="true">↑</span>
-                      </button>
-                    )}
-                  </span>
-                )}
-              </li>
-            ))}
+            {selectedTroves.map(renderTroveRow)}
             {selectedTroves.length > 0 && notSelectedTroves.length > 0 && (
               <li className="trove-list-separator" aria-hidden="true">
                 <hr className="sidebar-separator" />
               </li>
             )}
-            {notSelectedTroves.map((t) => (
-              <li
-                key={t.id}
-                className={`trove-item ${selectedTroveIds.has(t.id) ? 'trove-item--selected' : ''} ${searchResult != null && t.resultCount > 0 ? 'trove-item--has-results' : ''}`}
-              >
-                {t.dynamic === true && (
-                  <button
-                    type="button"
-                    className="trove-delete-btn"
-                    title={`Delete dynamic trove ${t.name}`}
-                    aria-label={`Delete dynamic trove ${t.name}`}
-                    onClick={(e) => {
-                      e.preventDefault()
-                      e.stopPropagation()
-                      void handleDeleteDynamicTrove(t.id, t.name, t.count ?? 0)
-                    }}
-                  >
-                    ×
-                  </button>
-                )}
-                <label className="trove-checkbox">
-                  <input
-                    type="checkbox"
-                    checked={selectedTroveIds.has(t.id)}
-                    onChange={() => toggleTrove(t.id)}
-                  />
-                  <span className={`trove-name${t.id.startsWith('sister-1-of-') ? ' trove-name--sister' : ''}`}>
-                    {t.name} {searchResult != null ? <span className="trove-count-suffix">({formatCount(t.resultCount)}/{formatCount(t.count)})</span> : `(${formatCount(t.count)})`}
-                  </span>
-                </label>
-                {(selectedTroveIds.size !== 1 || !selectedTroveIds.has(t.id)) && (
-                  <span className="trove-only-actions">
-                    <button
-                      type="button"
-                      className="trove-only-link"
-                      disabled={selectedTroveIds.size === 1 && !selectedTroveIds.has(t.id)}
-                      onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleTargetClick(t.id) }}
-                      aria-label={`Search only ${t.name}`}
-                      title="Only this trove"
-                    >
-                      <img src="/target.png" alt="" className="trove-only-icon" />
-                    </button>
-                    {searchMode === 'search' && (
-                      <button
-                        type="button"
-                        className={`trove-only-link trove-only-link--boost${boostTroveId === t.id ? ' trove-only-link--boost-active' : ''}`}
-                        onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleBoostClick(t.id) }}
-                        aria-label={boostTroveId === t.id ? `Boost on for ${t.name} (results rank higher)` : `Boost ${t.name} in search results`}
-                        title={boostTroveId === t.id ? 'Boost on — results from this trove rank higher' : 'Boost this trove in search results'}
-                      >
-                        <span className="trove-booster" aria-hidden="true">↑</span>
-                      </button>
-                    )}
-                  </span>
-                )}
-              </li>
-            ))}
+            {notSelectedTroves.map(renderTroveRow)}
           </ul>
                 </>
               )}
@@ -3726,6 +3776,89 @@ function App() {
             <div className="search-thumb-lightbox-raw-wrap">
               <span className="search-thumb-lightbox-raw-btn search-thumb-lightbox-raw-btn--label" aria-hidden="true">RAW</span>
             </div>
+          </div>
+        </div>
+      )}
+      {openTroveMenu && typeof document !== 'undefined' && createPortal(
+        <div
+          className="trove-menu-portal-dropdown"
+          role="menu"
+          style={{
+            position: 'fixed',
+            top: openTroveMenu.rect.bottom + 4,
+            left: Math.max(4, openTroveMenu.rect.right - 160),
+            zIndex: 10050,
+          }}
+        >
+          {!openTroveMenu.dynamic && (
+            <button
+              type="button"
+              role="menuitem"
+              onClick={(e) => {
+                e.preventDefault()
+                e.stopPropagation()
+                const { id, name } = openTroveMenu
+                setOpenTroveMenu(null)
+                void handleConvertTroveToDynamic(id, name)
+              }}
+            >
+              Convert to dynamic
+            </button>
+          )}
+          {openTroveMenu.dynamic && (
+            <button
+              type="button"
+              role="menuitem"
+              onClick={(e) => {
+                e.preventDefault()
+                e.stopPropagation()
+                const { id, name } = openTroveMenu
+                setOpenTroveMenu(null)
+                void handleRenameDynamicTrove(id, name)
+              }}
+            >
+              Rename trove
+            </button>
+          )}
+          {openTroveMenu.dynamic && (
+            <button
+              type="button"
+              role="menuitem"
+              onClick={(e) => {
+                e.preventDefault()
+                e.stopPropagation()
+                const { id, name, count } = openTroveMenu
+                setOpenTroveMenu(null)
+                void handleDeleteDynamicTrove(id, name, count)
+              }}
+            >
+              Delete trove
+            </button>
+          )}
+        </div>,
+        document.body,
+      )}
+      {loadErrorsPopupOpen && (
+        <div
+          className="trove-load-errors-lightbox"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Trove load errors"
+          onClick={() => setLoadErrorsPopupOpen(false)}
+        >
+          <button type="button" className="search-thumb-lightbox-close" onClick={() => setLoadErrorsPopupOpen(false)} aria-label="Close">×</button>
+          <div className="trove-load-errors-lightbox-content" onClick={(e) => e.stopPropagation()}>
+            <div className="search-thumb-lightbox-title">Trove load errors</div>
+            {troveLoadErrors.length > 0 ? (
+              <ul className="trove-load-errors-list">
+                {troveLoadErrors.map((err, i) => <li key={i}>{err}</li>)}
+              </ul>
+            ) : (
+              <p>No load errors.</p>
+            )}
+            <button type="button" className="trove-load-errors-clear-btn" onClick={() => { void handleClearTroveLoadErrors() }}>
+              Clear
+            </button>
           </div>
         </div>
       )}
