@@ -1199,7 +1199,10 @@ export function SearchResultsGrid({ data, sortBy = null, sortDir = 'asc', onSort
       vars[`--col-${header.column.id}-size`] = `${header.column.getSize()}px`
     }
     return vars
-  }, [table.getState().columnSizingInfo, table.getState().columnSizing])
+    // `columns` must stay a dependency: its defs (e.g. the thumb column's size/maxSize,
+    // which change with `hasThumbnails`) can change between searches without touching
+    // columnSizing state, and these vars are what actually size the rendered <col>/<th>.
+  }, [table.getState().columnSizingInfo, table.getState().columnSizing, columns])
 
   const filteredRowsForGallery = useMemo(() => {
     const rows = data ?? []
