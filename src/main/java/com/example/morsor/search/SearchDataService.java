@@ -2001,7 +2001,14 @@ public class SearchDataService {
         List<ScoredSearchResult> filtered = filterMatchesByYearHeuristic(primary, rawMatches);
         if (!filtered.isEmpty()) {
             int cap = Math.max(1, duplicateMatchCap);
-            List<ScoredSearchResult> matches = filtered.stream().limit(cap).toList();
+            List<ScoredSearchResult> capped = filtered.stream().limit(cap).toList();
+            // Within the capped candidate set, float near-matches (canonicalized title equal to the
+            // primary's, ignoring an optional trailing year) to the top; stable sort preserves each
+            // group's original score-descending order otherwise.
+            List<ScoredSearchResult> matches = capped.stream()
+                    .sorted(java.util.Comparator.comparing(
+                            (ScoredSearchResult m) -> isNearMatchModuloYear(primary, m.result()) ? 0 : 1))
+                    .toList();
             return new DupUniqPerPrimaryOutcome(new DuplicateMatchRow(primary, matches), null);
         }
         double nearestMiss = rawMatches.isEmpty() ? 0.0
@@ -2127,6 +2134,22 @@ public class SearchDataService {
             }
         }
         return false;
+    }
+
+    /** True if candidate's canonicalized title-core equals the primary's, ignoring an optional trailing year. */
+    private static boolean isNearMatchModuloYear(SearchResult primary, SearchResult candidate) {
+        if (primary == null || primary.title() == null || primary.title().isBlank()) {
+            return false;
+        }
+        if (candidate == null || candidate.title() == null || candidate.title().isBlank()) {
+            return false;
+        }
+        String primaryCore = normalizeForRerankComparison(parseTitleWithYear(primary.title()).core());
+        if (primaryCore.isEmpty()) {
+            return false;
+        }
+        String candidateCore = normalizeForRerankComparison(parseTitleWithYear(candidate.title()).core());
+        return primaryCore.equals(candidateCore);
     }
 
     private static boolean hasExactPrimaryMatchModuloYearSuffix(DuplicateMatchRow row) {
