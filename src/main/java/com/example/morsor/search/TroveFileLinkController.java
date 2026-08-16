@@ -17,33 +17,33 @@ import java.util.List;
 /**
  * Metadata for per-trove "local directories" (File System Access API folders): which troves
  * have a folder connected, and what it's labeled. Shared/advisory only — a browser must still
- * connect its own folder locally (IndexedDB) to actually read files; see TroveLocalRootRow.
+ * connect its own folder locally (IndexedDB) to actually read files; see TroveFileLinkRow.
  */
 @RestController
-@RequestMapping("/api/trove-local-roots")
-public class TroveLocalRootController {
+@RequestMapping("/api/trove-file-links")
+public class TroveFileLinkController {
 
-    private static final Logger log = LoggerFactory.getLogger(TroveLocalRootController.class);
+    private static final Logger log = LoggerFactory.getLogger(TroveFileLinkController.class);
     private static final int MAX_LABEL_LEN = 512;
 
-    private final TroveLocalRootRepository repository;
+    private final TroveFileLinkRepository repository;
 
-    public TroveLocalRootController(TroveLocalRootRepository repository) {
+    public TroveFileLinkController(TroveFileLinkRepository repository) {
         this.repository = repository;
     }
 
     @GetMapping
-    public List<TroveLocalRootRow> list() {
+    public List<TroveFileLinkRow> list() {
         return repository.findAll();
     }
 
-    public record TroveLocalRootSetRequest(String folderLabel) {}
+    public record TroveFileLinkSetRequest(String folderLabel) {}
 
     /** Connect (or change) the folder label for a trove. Body: {"folderLabel": "..."}. */
     @PutMapping("/{troveId}")
-    public ResponseEntity<TroveLocalRootRow> set(
+    public ResponseEntity<TroveFileLinkRow> set(
             @PathVariable String troveId,
-            @RequestBody TroveLocalRootSetRequest body) {
+            @RequestBody TroveFileLinkSetRequest body) {
         if (troveId == null || troveId.isBlank()) {
             return ResponseEntity.badRequest().build();
         }
@@ -51,13 +51,13 @@ public class TroveLocalRootController {
         if (raw.isEmpty() || raw.length() > MAX_LABEL_LEN) {
             return ResponseEntity.badRequest().build();
         }
-        log.info("PUT /api/trove-local-roots/{}: folderLabel.preview={}", troveId, previewForLog(raw));
+        log.info("PUT /api/trove-file-links/{}: folderLabel.preview={}", troveId, previewForLog(raw));
         return ResponseEntity.ok(repository.upsert(troveId, raw));
     }
 
     @DeleteMapping("/{troveId}")
     public ResponseEntity<Void> remove(@PathVariable String troveId) {
-        log.info("DELETE /api/trove-local-roots/{}", troveId);
+        log.info("DELETE /api/trove-file-links/{}", troveId);
         // Idempotent: disconnecting a trove this browser never registered (or already removed
         // elsewhere) is a no-op, not an error — the caller's local IndexedDB state always wins.
         repository.delete(troveId);

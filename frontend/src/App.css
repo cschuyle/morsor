@@ -567,15 +567,15 @@
 }
 
 .sidebar-show-wrap {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
   margin-bottom: 0.75rem;
 }
 
-.sidebar-show-label {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  font-size: 0.9rem;
-  color: #444;
+.sidebar-show-wrap .sidebar-toggle-filters {
+  margin-bottom: 0;
 }
 
 .sidebar-show-select {
@@ -591,6 +591,37 @@
 .sidebar-show-select:focus {
   outline: none;
   border-color: #6633cc;
+}
+
+.sidebar-toggle-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-bottom: 0.75rem;
+}
+
+.sidebar-toggle-filter-btn {
+  padding: 0.3rem 0.6rem;
+  border: 1px solid #e5e5e5;
+  border-radius: 999px;
+  background: #fff;
+  font-size: 0.8rem;
+  color: #444;
+  cursor: pointer;
+}
+
+.sidebar-toggle-filter-btn:hover {
+  background: #f5f3fa;
+}
+
+.sidebar-toggle-filter-btn--active {
+  background: #6633cc;
+  border-color: #6633cc;
+  color: #fff;
+}
+
+.sidebar-toggle-filter-btn--active:hover {
+  background: #5a2cb3;
 }
 
 .sidebar-trove-filter-wrap {
@@ -724,6 +755,72 @@
   font-size: 1rem;
   font-weight: 600;
   color: #222;
+}
+
+.trove-picker-header-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.trove-picker-header-row .trove-picker-heading {
+  margin: 0;
+}
+
+.trove-picker-new-wrap {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.trove-picker-new-btn {
+  padding: 0.3rem 0.65rem;
+  border: 1px solid #6633cc;
+  border-radius: 6px;
+  background: #fff;
+  color: #6633cc;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.trove-picker-new-btn:hover {
+  background: #f5f3fa;
+}
+
+.trove-picker-new-dropdown {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  min-width: 9rem;
+  padding: 0.25rem 0;
+  background: #fff;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.trove-picker-new-dropdown button,
+.trove-picker-new-dropdown-link {
+  display: block;
+  width: 100%;
+  padding: 0.45rem 0.8rem;
+  border: none;
+  background: none;
+  text-align: left;
+  font-size: 0.85rem;
+  color: #252525;
+  cursor: pointer;
+  text-decoration: none;
+  box-sizing: border-box;
+}
+
+.trove-picker-new-dropdown button:hover,
+.trove-picker-new-dropdown-link:hover {
+  background: #ede8ff;
 }
 
 .trove-picker-summary {

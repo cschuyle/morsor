@@ -22,7 +22,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @ActiveProfiles("test")
-class TroveLocalRootControllerTest {
+class TroveFileLinkControllerTest {
 
     @LocalServerPort
     int port;
@@ -40,58 +40,58 @@ class TroveLocalRootControllerTest {
     }
 
     @Test
-    void setListAndDeleteLocalRoot() {
+    void setListAndDeleteFileLink() {
         String troveId = "vinyl-" + UUID.randomUUID();
 
-        ResponseEntity<TroveLocalRootRow> set = restTemplate.exchange(
-                base() + "/api/trove-local-roots/" + troveId,
+        ResponseEntity<TroveFileLinkRow> set = restTemplate.exchange(
+                base() + "/api/trove-file-links/" + troveId,
                 HttpMethod.PUT,
                 new HttpEntity<>("{\"folderLabel\":\"My Vinyl\"}", jsonHeaders()),
-                TroveLocalRootRow.class);
+                TroveFileLinkRow.class);
         assertThat(set.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(set.getBody()).isNotNull();
         assertThat(set.getBody().troveId()).isEqualTo(troveId);
         assertThat(set.getBody().folderLabel()).isEqualTo("My Vinyl");
 
-        ResponseEntity<List<TroveLocalRootRow>> list = restTemplate.exchange(
-                base() + "/api/trove-local-roots",
+        ResponseEntity<List<TroveFileLinkRow>> list = restTemplate.exchange(
+                base() + "/api/trove-file-links",
                 HttpMethod.GET,
                 null,
-                new ParameterizedTypeReference<List<TroveLocalRootRow>>() {});
+                new ParameterizedTypeReference<List<TroveFileLinkRow>>() {});
         assertThat(list.getBody()).isNotNull();
-        assertThat(list.getBody().stream().map(TroveLocalRootRow::troveId)).contains(troveId);
+        assertThat(list.getBody().stream().map(TroveFileLinkRow::troveId)).contains(troveId);
 
         // Re-connecting (e.g. a different folder, or the same one) overwrites — last wins.
-        ResponseEntity<TroveLocalRootRow> reSet = restTemplate.exchange(
-                base() + "/api/trove-local-roots/" + troveId,
+        ResponseEntity<TroveFileLinkRow> reSet = restTemplate.exchange(
+                base() + "/api/trove-file-links/" + troveId,
                 HttpMethod.PUT,
                 new HttpEntity<>("{\"folderLabel\":\"Vinyl (external drive)\"}", jsonHeaders()),
-                TroveLocalRootRow.class);
+                TroveFileLinkRow.class);
         assertThat(reSet.getBody()).isNotNull();
         assertThat(reSet.getBody().folderLabel()).isEqualTo("Vinyl (external drive)");
 
         ResponseEntity<Void> deleted = restTemplate.exchange(
-                base() + "/api/trove-local-roots/" + troveId,
+                base() + "/api/trove-file-links/" + troveId,
                 HttpMethod.DELETE,
                 null,
                 Void.class);
         assertThat(deleted.getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
 
-        ResponseEntity<List<TroveLocalRootRow>> listAfterDelete = restTemplate.exchange(
-                base() + "/api/trove-local-roots",
+        ResponseEntity<List<TroveFileLinkRow>> listAfterDelete = restTemplate.exchange(
+                base() + "/api/trove-file-links",
                 HttpMethod.GET,
                 null,
-                new ParameterizedTypeReference<List<TroveLocalRootRow>>() {});
+                new ParameterizedTypeReference<List<TroveFileLinkRow>>() {});
         assertThat(listAfterDelete.getBody()).isNotNull();
-        assertThat(listAfterDelete.getBody().stream().map(TroveLocalRootRow::troveId)).doesNotContain(troveId);
+        assertThat(listAfterDelete.getBody().stream().map(TroveFileLinkRow::troveId)).doesNotContain(troveId);
     }
 
     @Test
-    void deletingUnknownLocalRootIsIdempotentNoContent() {
+    void deletingUnknownFileLinkIsIdempotentNoContent() {
         // Disconnecting a trove that was never (or no longer) registered must not error — the
         // caller's local IndexedDB state is always the source of truth for whether it's connected.
         ResponseEntity<Void> deleted = restTemplate.exchange(
-                base() + "/api/trove-local-roots/no-such-trove-root",
+                base() + "/api/trove-file-links/no-such-trove-root",
                 HttpMethod.DELETE,
                 null,
                 Void.class);
@@ -101,10 +101,10 @@ class TroveLocalRootControllerTest {
     @Test
     void setWithBlankFolderLabelReturns400() {
         assertThatThrownBy(() -> restTemplate.exchange(
-                base() + "/api/trove-local-roots/vinyl",
+                base() + "/api/trove-file-links/vinyl",
                 HttpMethod.PUT,
                 new HttpEntity<>("{\"folderLabel\":\"   \"}", jsonHeaders()),
-                TroveLocalRootRow.class))
+                TroveFileLinkRow.class))
                 .isInstanceOf(HttpClientErrorException.BadRequest.class);
     }
 }

@@ -56,7 +56,7 @@ import {
   deleteDynamicTroveItem,
 } from './dynamicTrovesApi'
 import { listConnectedTroveIds } from './troveDirectoryHandles'
-import { TroveLocalRootsPanel } from './TroveLocalRootsPanel'
+import { TroveFileLinksPanel } from './TroveFileLinksPanel'
 import { clearLanguageCodeMapCache, ensureLanguageCodeMap, type LanguageCodeMap } from './languageCodeLookup'
 import { SearchQueryHelpButton, SearchQueryHelpPopover } from './SearchQueryHelpPopover'
 import { CopyFeedbackFlare, useCopyFeedback } from './CopyFeedback'
@@ -134,14 +134,14 @@ function MobileApp() {
   // itself (refreshTroves always produces a new array reference). Lets effects that only need to
   // react to a trove's identity/existence — not its live metadata — avoid re-running on every poll.
   const troveIdentityKey = useMemo(() => troves.map((t) => `${t.id}:${t.name}`).join('|'), [troves])
-  const [connectedLocalTroveIds, setConnectedLocalTroveIds] = useState<Set<string>>(() => new Set())
-  const refreshConnectedLocalTroves = useCallback(async () => {
-    setConnectedLocalTroveIds(new Set(await listConnectedTroveIds()))
+  const [fileLinkedTroveIds, setFileLinkedTroveIds] = useState<Set<string>>(() => new Set())
+  const refreshFileLinkedTroves = useCallback(async () => {
+    setFileLinkedTroveIds(new Set(await listConnectedTroveIds()))
   }, [])
 
   useEffect(() => {
-    void refreshConnectedLocalTroves()
-  }, [refreshConnectedLocalTroves])
+    void refreshFileLinkedTroves()
+  }, [refreshFileLinkedTroves])
 
   const [languageCodeMap, setLanguageCodeMap] = useState<LanguageCodeMap | null>(null)
   const [searchParams, setSearchParams] = useSearchParams()
@@ -3311,9 +3311,9 @@ onClick={() => {
                 </span>
               )}
             </div>
-            <TroveLocalRootsPanel
+            <TroveFileLinksPanel
               troves={troves}
-              onConnectionChange={refreshConnectedLocalTroves}
+              onConnectionChange={refreshFileLinkedTroves}
               troveFilter={trovePickerFilter}
             />
             {renderTroveGroupsSection(trovePickerFilter)}
@@ -3562,7 +3562,7 @@ onClick={() => {
                   visibleExtraFieldKeys={visibleExtraFieldKeysForGrid}
                   onFetchAllForCopy={async () => fullSearchResultsRef.current}
                   languageCodeMap={languageCodeMap}
-                  troveIdsWithLocalDirectory={connectedLocalTroveIds}
+                  fileLinkedTroveIds={fileLinkedTroveIds}
                   currentPage={page}
                   totalPages={totalPages}
                   onPrevPage={() => goToPage(page - 1)}

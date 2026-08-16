@@ -7,10 +7,10 @@ import {
   listConnectedTroveIds,
   removeDirectoryHandle,
 } from './troveDirectoryHandles'
-import { fetchTroveLocalRoots, setTroveLocalRoot, deleteTroveLocalRoot, type TroveLocalRoot } from './troveLocalRootsApi'
-import './TroveLocalRootsPanel.css'
+import { fetchTroveFileLinks, setTroveFileLink, deleteTroveFileLink, type TroveFileLink } from './troveFileLinksApi'
+import './TroveFileLinksPanel.css'
 
-export interface TroveLocalRootsPanelProps {
+export interface TroveFileLinksPanelProps {
   troves: Trove[]
   /** Called after a folder is connected or disconnected. */
   onConnectionChange?: () => void
@@ -18,13 +18,13 @@ export interface TroveLocalRootsPanelProps {
   troveFilter?: string
 }
 
-export function TroveLocalRootsPanel({ troves, onConnectionChange, troveFilter = '' }: TroveLocalRootsPanelProps) {
+export function TroveFileLinksPanel({ troves, onConnectionChange, troveFilter = '' }: TroveFileLinksPanelProps) {
   const [open, setOpen] = useState(false)
   const [connectedIds, setConnectedIds] = useState<Set<string>>(() => new Set())
   const [folderLabels, setFolderLabels] = useState<Record<string, string>>({})
   // DB-backed metadata: troves with a folder configured in *some* browser (maybe this one,
-  // maybe not). Advisory only — see troveLocalRootsApi.ts.
-  const [dbRoots, setDbRoots] = useState<TroveLocalRoot[]>([])
+  // maybe not). Advisory only — see troveFileLinksApi.ts.
+  const [dbRoots, setDbRoots] = useState<TroveFileLink[]>([])
   const [busyTroveId, setBusyTroveId] = useState<string | null>(null)
   const filterLower = troveFilter.trim().toLowerCase()
   const pickerSupported = directoryPickerSupported()
@@ -32,7 +32,7 @@ export function TroveLocalRootsPanel({ troves, onConnectionChange, troveFilter =
   const refreshConnections = useCallback(async () => {
     const [ids, roots] = await Promise.all([
       listConnectedTroveIds(),
-      fetchTroveLocalRoots().catch(() => [] as TroveLocalRoot[]),
+      fetchTroveFileLinks().catch(() => [] as TroveFileLink[]),
     ])
     const idSet = new Set(ids)
     setConnectedIds(idSet)
@@ -62,7 +62,7 @@ export function TroveLocalRootsPanel({ troves, onConnectionChange, troveFilter =
 
   const connectedCount = connectedIds.size
   const dbRootByTroveId = useMemo(() => {
-    const map = new Map<string, TroveLocalRoot>()
+    const map = new Map<string, TroveFileLink>()
     for (const r of dbRoots) map.set(r.troveId, r)
     return map
   }, [dbRoots])
@@ -73,7 +73,7 @@ export function TroveLocalRootsPanel({ troves, onConnectionChange, troveFilter =
       const handle = await chooseDirectoryForTrove(troveId)
       if (handle) {
         try {
-          await setTroveLocalRoot(troveId, handle.name)
+          await setTroveFileLink(troveId, handle.name)
         } catch {
           // Non-fatal: the folder is connected and usable in this browser even if the
           // shared "configured" metadata didn't make it to the server.
@@ -100,7 +100,7 @@ export function TroveLocalRootsPanel({ troves, onConnectionChange, troveFilter =
         // "configured elsewhere" record.
       }
       try {
-        await deleteTroveLocalRoot(troveId)
+        await deleteTroveFileLink(troveId)
       } catch {
         // Non-fatal: this browser's disconnect already succeeded either way.
       }
@@ -116,48 +116,48 @@ export function TroveLocalRootsPanel({ troves, onConnectionChange, troveFilter =
   }
 
   return (
-    <div className="trove-local-roots-panel">
+    <div className="trove-file-links-panel">
       <button
         type="button"
-        className="trove-local-roots-toggle"
+        className="trove-file-links-toggle"
         aria-expanded={open}
         onClick={() => setOpen((v) => !v)}
       >
         <span>Local directories</span>
-        <span className="trove-local-roots-toggle-meta">
+        <span className="trove-file-links-toggle-meta">
           {connectedCount > 0 ? `${connectedCount} connected` : 'optional'}
         </span>
-        <span className="trove-local-roots-toggle-chevron" aria-hidden="true">{open ? '▼' : '▶'}</span>
+        <span className="trove-file-links-toggle-chevron" aria-hidden="true">{open ? '▼' : '▶'}</span>
       </button>
       {open && (
-        <div className="trove-local-roots-body">
-          <p className="trove-local-roots-hint">
+        <div className="trove-file-links-body">
+          <p className="trove-file-links-hint">
             Choose the folder on this machine that matches each trove. Filenames in expanded rows open via a browser
             file handle (not file:// links, which browsers block from web pages).
           </p>
           {!pickerSupported && (
-            <p className="trove-local-roots-warning">
+            <p className="trove-file-links-warning">
               Folder picking is not available in this browser. Use Chrome, Edge, or a recent Safari.
             </p>
           )}
-          <ul className="trove-local-roots-list">
+          <ul className="trove-file-links-list">
             {sortedTroves.map((t) => {
               const connected = connectedIds.has(t.id)
               const dbRoot = dbRootByTroveId.get(t.id)
               const busy = busyTroveId === t.id
               return (
-                <li key={t.id} className="trove-local-roots-item">
-                  <div className="trove-local-roots-row">
-                    <span className="trove-local-roots-name" title={t.id}>{t.name}</span>
-                    <span className="trove-local-roots-actions">
+                <li key={t.id} className="trove-file-links-item">
+                  <div className="trove-file-links-row">
+                    <span className="trove-file-links-name" title={t.id}>{t.name}</span>
+                    <span className="trove-file-links-actions">
                       {connected ? (
                         <>
-                          <span className="trove-local-roots-status" title={folderLabels[t.id]}>
+                          <span className="trove-file-links-status" title={folderLabels[t.id]}>
                             {folderLabels[t.id] ?? 'Connected'}
                           </span>
                           <button
                             type="button"
-                            className="trove-local-roots-btn trove-local-roots-btn--secondary"
+                            className="trove-file-links-btn trove-file-links-btn--secondary"
                             disabled={busy || !pickerSupported}
                             onClick={() => void handleChoose(t.id)}
                           >
@@ -165,7 +165,7 @@ export function TroveLocalRootsPanel({ troves, onConnectionChange, troveFilter =
                           </button>
                           <button
                             type="button"
-                            className="trove-local-roots-btn trove-local-roots-btn--secondary"
+                            className="trove-file-links-btn trove-file-links-btn--secondary"
                             disabled={busy}
                             onClick={() => void handleDisconnect(t.id)}
                           >
@@ -175,14 +175,14 @@ export function TroveLocalRootsPanel({ troves, onConnectionChange, troveFilter =
                       ) : dbRoot ? (
                         <>
                           <span
-                            className="trove-local-roots-status trove-local-roots-status--elsewhere"
+                            className="trove-file-links-status trove-file-links-status--elsewhere"
                             title={`Configured as "${dbRoot.folderLabel}" in another browser or device — not available here yet.`}
                           >
                             Configured elsewhere: {dbRoot.folderLabel}
                           </span>
                           <button
                             type="button"
-                            className="trove-local-roots-btn"
+                            className="trove-file-links-btn"
                             disabled={busy || !pickerSupported}
                             onClick={() => void handleChoose(t.id)}
                           >
@@ -190,7 +190,7 @@ export function TroveLocalRootsPanel({ troves, onConnectionChange, troveFilter =
                           </button>
                           <button
                             type="button"
-                            className="trove-local-roots-btn trove-local-roots-btn--secondary"
+                            className="trove-file-links-btn trove-file-links-btn--secondary"
                             disabled={busy}
                             onClick={() => void handleDisconnect(t.id)}
                           >
@@ -200,7 +200,7 @@ export function TroveLocalRootsPanel({ troves, onConnectionChange, troveFilter =
                       ) : (
                         <button
                           type="button"
-                          className="trove-local-roots-btn"
+                          className="trove-file-links-btn"
                           disabled={busy || !pickerSupported}
                           onClick={() => void handleChoose(t.id)}
                         >

@@ -9,7 +9,7 @@ import {
 import type { SearchResultRow, LightboxPayload } from './types'
 import { resolveLanguagesFromExtra, type LanguageCodeMap } from './languageCodeLookup'
 import { formatVideoExtraFieldValue, formatVideoFileSummaryLine, isVideoMetadataFileEntry, expandableFilesFromRow, urlFileBasename, videoFileBasename, videoFileSourcePath, videoFileSummarySuffix } from './videoMetadataFormat'
-import { openTroveLocalFile } from './troveDirectoryHandles'
+import { openLinkedTroveFile } from './troveDirectoryHandles'
 import { looksLikeStandaloneHttpUrl, normalizeUrlForHref, trimUrlTrailingPunctuation } from './urlUtils'
 import { CopyFeedbackFlare, useCopyFeedback } from './CopyFeedback'
 import { TROVE_DEFAULT_THUMBNAIL } from './troveDefaultThumbnails'
@@ -46,8 +46,8 @@ export interface SearchResultsGridProps {
   onNextPage?: (() => void) | null
   /** Optional client-side fallback map for subtitle language code display. */
   languageCodeMap?: LanguageCodeMap | null
-  /** Trove ids with a connected local folder (File System Access API; see TroveLocalRootsPanel). */
-  troveIdsWithLocalDirectory?: ReadonlySet<string> | null
+  /** Trove ids with a connected local folder (File System Access API; see TroveFileLinksPanel). */
+  fileLinkedTroveIds?: ReadonlySet<string> | null
   /** When true, show a leading × control to delete a dynamic-trove item. */
   showDeleteItem?: boolean
   /** Called when the user clicks the delete-item control. */
@@ -914,7 +914,7 @@ export function rawSourceDisplay(rawSourceItem: unknown): string {
   return (rawSourceItem != null && rawSourceItem !== '') ? String(rawSourceItem) : RAW_SOURCE_NOT_AVAILABLE
 }
 
-export function SearchResultsGrid({ data, sortBy = null, sortDir = 'asc', onSortChange, showScoreColumn = false, afterFilterSlot = null, viewMode = 'list', hideTroveInGallery = false, hideTroveInList = false, showPdfSashInGallery = false, showGalleryDecorations = true, isMobile = false, visibleExtraFieldKeys = null, onFetchAllForCopy = null, currentPage, totalPages, onPrevPage = null, onNextPage = null, languageCodeMap = null, troveIdsWithLocalDirectory = null, showDeleteItem = false, onDeleteItem = null }: SearchResultsGridProps) {
+export function SearchResultsGrid({ data, sortBy = null, sortDir = 'asc', onSortChange, showScoreColumn = false, afterFilterSlot = null, viewMode = 'list', hideTroveInGallery = false, hideTroveInList = false, showPdfSashInGallery = false, showGalleryDecorations = true, isMobile = false, visibleExtraFieldKeys = null, onFetchAllForCopy = null, currentPage, totalPages, onPrevPage = null, onNextPage = null, languageCodeMap = null, fileLinkedTroveIds = null, showDeleteItem = false, onDeleteItem = null }: SearchResultsGridProps) {
   const [globalFilter, setGlobalFilter] = useState('')
   const [expandedFileRowIds, setExpandedFileRowIds] = useState<Set<string>>(() => new Set())
   const toggleFileRowExpanded = useCallback((rowKey: string) => {
@@ -2155,16 +2155,16 @@ export function SearchResultsGrid({ data, sortBy = null, sortDir = 'asc', onSort
                       const file = entry.file
                       const sourcePath = videoFileSourcePath(file)
                       const troveId = rowData.troveId != null ? String(rowData.troveId) : ''
-                      const canOpenLocal =
-                        troveId && sourcePath && troveIdsWithLocalDirectory?.has(troveId)
+                      const canOpenLinkedFile =
+                        troveId && sourcePath && fileLinkedTroveIds?.has(troveId)
                       const filename = videoFileBasename(isVideoMetadataFileEntry(file) ? file.source : null)
                       const suffix = videoFileSummarySuffix(file)
-                      const handleOpenLocal = canOpenLocal
+                      const handleOpenLinkedFile = canOpenLinkedFile
                         ? async (e: MouseEvent<HTMLButtonElement>) => {
                           e.stopPropagation()
                           e.preventDefault()
                           try {
-                            await openTroveLocalFile(troveId, sourcePath)
+                            await openLinkedTroveFile(troveId, sourcePath)
                           } catch (err) {
                             const msg = err instanceof Error ? err.message : 'Could not open local file.'
                             showCopyFeedback(msg)
@@ -2175,12 +2175,12 @@ export function SearchResultsGrid({ data, sortBy = null, sortDir = 'asc', onSort
                       <tr key={`${row.id}-file-${fileIndex}`} className="grid-file-child-row">
                         <td colSpan={columns.length}>
                           <div className="grid-file-child-line">
-                            {canOpenLocal ? (
+                            {canOpenLinkedFile ? (
                               <>
                                 <button
                                   type="button"
                                   className="grid-file-child-link"
-                                  onClick={handleOpenLocal}
+                                  onClick={handleOpenLinkedFile}
                                 >
                                   {filename}
                                 </button>

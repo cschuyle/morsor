@@ -72,7 +72,7 @@ import {
   removeDirectoryHandle,
   directoryPickerSupported,
 } from './troveDirectoryHandles'
-import { fetchTroveLocalRoots, setTroveLocalRoot, deleteTroveLocalRoot, type TroveLocalRoot } from './troveLocalRootsApi'
+import { fetchTroveFileLinks, setTroveFileLink, deleteTroveFileLink, type TroveFileLink } from './troveFileLinksApi'
 import { clearLanguageCodeMapCache, ensureLanguageCodeMap, type LanguageCodeMap } from './languageCodeLookup'
 import { SearchQueryHelpButton, SearchQueryHelpPopover } from './SearchQueryHelpPopover'
 import { CopyFeedbackFlare, useCopyFeedback } from './CopyFeedback'
@@ -133,40 +133,40 @@ function App() {
   // itself (refreshTroves always produces a new array reference). Lets effects that only need to
   // react to a trove's identity/existence — not its live metadata — avoid re-running on every poll.
   const troveIdentityKey = useMemo(() => troves.map((t) => `${t.id}:${t.name}`).join('|'), [troves])
-  const [connectedLocalTroveIds, setConnectedLocalTroveIds] = useState<Set<string>>(() => new Set())
+  const [fileLinkedTroveIds, setFileLinkedTroveIds] = useState<Set<string>>(() => new Set())
   // Live folder names read from this browser's IndexedDB handles (not the DB metadata below) —
   // the most accurate label for a trove this browser has actually connected.
-  const [localFolderLabels, setLocalFolderLabels] = useState<Record<string, string>>({})
-  const refreshConnectedLocalTroves = useCallback(async () => {
+  const [fileLinkedFolderLabels, setFileLinkedFolderLabels] = useState<Record<string, string>>({})
+  const refreshFileLinkedTroves = useCallback(async () => {
     const ids = await listConnectedTroveIds()
-    setConnectedLocalTroveIds(new Set(ids))
+    setFileLinkedTroveIds(new Set(ids))
     const labels: Record<string, string> = {}
     await Promise.all(
       ids.map(async (id) => {
         labels[id] = (await connectedFolderLabel(id)) ?? id
       }),
     )
-    setLocalFolderLabels(labels)
+    setFileLinkedFolderLabels(labels)
   }, [])
 
   useEffect(() => {
-    void refreshConnectedLocalTroves()
-  }, [refreshConnectedLocalTroves])
+    void refreshFileLinkedTroves()
+  }, [refreshFileLinkedTroves])
 
   // DB-backed metadata: which troves have a local folder configured (in *some* browser) and
-  // what it's labeled. Advisory only — see troveLocalRootsApi.ts.
-  const [troveLocalRoots, setTroveLocalRoots] = useState<TroveLocalRoot[]>([])
-  const refreshTroveLocalRoots = useCallback(async () => {
+  // what it's labeled. Advisory only — see troveFileLinksApi.ts.
+  const [troveFileLinks, setTroveFileLinks] = useState<TroveFileLink[]>([])
+  const refreshTroveFileLinks = useCallback(async () => {
     try {
-      setTroveLocalRoots(await fetchTroveLocalRoots())
+      setTroveFileLinks(await fetchTroveFileLinks())
     } catch {
-      setTroveLocalRoots([])
+      setTroveFileLinks([])
     }
   }, [])
 
   useEffect(() => {
-    void refreshTroveLocalRoots()
-  }, [refreshTroveLocalRoots])
+    void refreshTroveFileLinks()
+  }, [refreshTroveFileLinks])
 
   const [languageCodeMap, setLanguageCodeMap] = useState<LanguageCodeMap | null>(null)
   const [searchSelectedTroveIds, setSearchSelectedTroveIds] = useState<Set<string>>(() => new Set())
@@ -181,6 +181,10 @@ function App() {
   const [pageSize, setPageSize] = useState(500)
   const [troveFilter, setTroveFilter] = useState('')
   const [showFilter, setShowFilter] = useState('all')
+  // Independent toggles layered on top of showFilter/troveFilter, not part of the Show select
+  // since a user may want e.g. "selected" + "dynamic only" at the same time.
+  const [filterDynamicOnly, setFilterDynamicOnly] = useState(false)
+  const [filterFileLinkedOnly, setFilterFileLinkedOnly] = useState(false)
   const [freezeTroveListOrder, setFreezeTroveListOrder] = useState(false)
   const [boostTroveId, setBoostTroveId] = useState<string | null>(null)
   const [sidebarOpen, setSidebarOpen] = useState(true)
@@ -240,6 +244,7 @@ function App() {
   const [trovesStale, setTrovesStale] = useState(false)
   const [staleTroveIds, setStaleTroveIds] = useState<string>('')
   const [openTroveMenu, setOpenTroveMenu] = useState<{ id: string; name: string; count: number; dynamic: boolean; rect: DOMRect } | null>(null)
+  const [newTroveMenuOpen, setNewTroveMenuOpen] = useState(false)
   const [troveLoadErrors, setTroveLoadErrors] = useState<string[]>([])
   const [loadErrorsPopupOpen, setLoadErrorsPopupOpen] = useState(false)
   const troveUpdateTimestampsRef = useRef<Map<string, string>>(new Map())
@@ -573,6 +578,17 @@ function App() {
   }, [openTroveMenu])
 
   useEffect(() => {
+    if (!newTroveMenuOpen) return
+    function handleClickOutside(e) {
+      if (!(e.target instanceof Element) || !e.target.closest('.trove-picker-new-wrap')) {
+        setNewTroveMenuOpen(false)
+      }
+    }
+    document.addEventListener('click', handleClickOutside)
+    return () => document.removeEventListener('click', handleClickOutside)
+  }, [newTroveMenuOpen])
+
+  useEffect(() => {
     if (!openTroveMenu) return
     // Close rather than drift out of sync if the (scrollable) trove list or page scrolls.
     function handleScroll() {
@@ -697,10 +713,10 @@ function App() {
     const id = setInterval(() => {
       void refreshTroves()
       void refreshTroveGroups()
-      void refreshTroveLocalRoots()
+      void refreshTroveFileLinks()
     }, 15000)
     return () => clearInterval(id)
-  }, [refreshTroves, refreshTroveGroups, refreshTroveLocalRoots])
+  }, [refreshTroves, refreshTroveGroups, refreshTroveFileLinks])
 
   const soleDynamicTroveId = useMemo(() => {
     if (searchMode !== 'search' || searchSelectedTroveIds.size !== 1) {
@@ -847,7 +863,7 @@ function App() {
     }
   }, [refreshTroves, showActionFlare])
 
-  const handleConnectLocalFolder = useCallback(async (troveId: string, troveName: string) => {
+  const handleConnectFileLink = useCallback(async (troveId: string, troveName: string) => {
     if (!directoryPickerSupported()) {
       window.alert('This browser does not support choosing a local folder. Use Chrome, Edge, or a recent Safari.')
       return
@@ -855,37 +871,37 @@ function App() {
     try {
       const handle = await chooseDirectoryForTrove(troveId)
       if (!handle) return
-      await refreshConnectedLocalTroves()
+      await refreshFileLinkedTroves()
       try {
-        await setTroveLocalRoot(troveId, handle.name)
+        await setTroveFileLink(troveId, handle.name)
       } catch {
         // Non-fatal: the folder is connected and usable in this browser even if the shared
         // "configured" metadata didn't make it to the server.
       }
-      await refreshTroveLocalRoots()
+      await refreshTroveFileLinks()
       showActionFlare(`Connected local folder for ${flareQuote(troveName)}`)
     } catch (e) {
       if (e instanceof DOMException && e.name === 'AbortError') return
       window.alert(e instanceof Error ? e.message : String(e))
     }
-  }, [refreshConnectedLocalTroves, refreshTroveLocalRoots, showActionFlare])
+  }, [refreshFileLinkedTroves, refreshTroveFileLinks, showActionFlare])
 
-  const handleDisconnectLocalFolder = useCallback(async (troveId: string, troveName: string) => {
+  const handleDisconnectFileLink = useCallback(async (troveId: string, troveName: string) => {
     try {
       await removeDirectoryHandle(troveId)
     } catch {
       // No local handle to remove in this browser — fine, we may only be forgetting the
       // server-side "configured elsewhere" record.
     }
-    await refreshConnectedLocalTroves()
+    await refreshFileLinkedTroves()
     try {
-      await deleteTroveLocalRoot(troveId)
+      await deleteTroveFileLink(troveId)
     } catch {
       // Non-fatal: this browser's disconnect already succeeded either way.
     }
-    await refreshTroveLocalRoots()
+    await refreshTroveFileLinks()
     showActionFlare(`Disconnected local folder for ${flareQuote(troveName)}`)
-  }, [refreshConnectedLocalTroves, refreshTroveLocalRoots, showActionFlare])
+  }, [refreshFileLinkedTroves, refreshTroveFileLinks, showActionFlare])
 
   const handleClearTroveLoadErrors = useCallback(async () => {
     try {
@@ -1453,6 +1469,76 @@ function App() {
       }
       return next
     })
+  }
+
+  /** Right-justified "New…" button next to the trove-picker heading: Dynamic Trove / Trove Group. */
+  function renderNewTroveMenu() {
+    return (
+      <div className="trove-picker-new-wrap">
+        <button
+          type="button"
+          className="trove-picker-new-btn"
+          aria-haspopup="menu"
+          aria-expanded={newTroveMenuOpen}
+          onClick={(e) => {
+            e.stopPropagation()
+            setNewTroveMenuOpen((v) => !v)
+          }}
+        >
+          New…
+        </button>
+        {newTroveMenuOpen && (
+          <div className="trove-picker-new-dropdown" role="menu">
+            <button
+              type="button"
+              role="menuitem"
+              onClick={() => {
+                setNewTroveMenuOpen(false)
+                void handleCreateDynamicTrove()
+              }}
+            >
+              Dynamic Trove
+            </button>
+            <Link
+              to="/trove-groups"
+              role="menuitem"
+              className="trove-picker-new-dropdown-link"
+              onClick={() => setNewTroveMenuOpen(false)}
+            >
+              Trove Group
+            </Link>
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  function renderPickerToggleButtons() {
+    if (dynamicTroveCount === 0 && fileLinkedTroveIds.size === 0) return null
+    return (
+      <div className="sidebar-toggle-filters">
+        {dynamicTroveCount > 0 && (
+          <button
+            type="button"
+            className={`sidebar-toggle-filter-btn${filterDynamicOnly ? ' sidebar-toggle-filter-btn--active' : ''}`}
+            aria-pressed={filterDynamicOnly}
+            onClick={() => setFilterDynamicOnly((v) => !v)}
+          >
+            dynamic
+          </button>
+        )}
+        {fileLinkedTroveIds.size > 0 && (
+          <button
+            type="button"
+            className={`sidebar-toggle-filter-btn${filterFileLinkedOnly ? ' sidebar-toggle-filter-btn--active' : ''}`}
+            aria-pressed={filterFileLinkedOnly}
+            onClick={() => setFilterFileLinkedOnly((v) => !v)}
+          >
+            file-linked
+          </button>
+        )}
+      </div>
+    )
   }
 
   function renderTroveGroupsSection(filterText: string) {
@@ -2132,6 +2218,12 @@ function App() {
     } else if (showFilter === 'ephemeral') {
       filtered = filtered.filter((t) => t.cliCreated === true)
     }
+    if (filterDynamicOnly) {
+      filtered = filtered.filter((t) => t.dynamic === true)
+    }
+    if (filterFileLinkedOnly) {
+      filtered = filtered.filter((t) => fileLinkedTroveIds.has(t.id))
+    }
     const sortByName = (a, b) => (a.name || '').localeCompare(b.name || '', undefined, { sensitivity: 'base' })
     const sortByHitsDesc = (a, b) => {
       if (searchMode === 'search' && boostTroveId && a.id === boostTroveId && b.id !== boostTroveId) return -1
@@ -2170,12 +2262,35 @@ function App() {
       } else if (showFilter === 'ephemeral') {
         pool = pool.filter((t) => t.cliCreated === true)
       }
+      if (filterDynamicOnly) {
+        pool = pool.filter((t) => t.dynamic === true)
+      }
+      if (filterFileLinkedOnly) {
+        pool = pool.filter((t) => fileLinkedTroveIds.has(t.id))
+      }
       bottomPoolExclusive = pool.filter(textMatches).filter((t) => !idsForSplit.has(t.id))
     }
     const selected = doSplit ? withCounts.filter((t) => idsForSplit.has(t.id)).sort(selectedSort) : []
     const notSelected = doSplit ? [...bottomPoolExclusive].sort(sortByName) : [...filtered].sort(sortByName)
     return { selected, notSelected, displaySelectedTroveIds: idsForSplit }
-  }, [troves, searchResult, troveFilter, showFilter, selectedTroveIds, searchMode, freezeTroveListOrder, boostTroveId])
+  }, [troves, searchResult, troveFilter, showFilter, filterDynamicOnly, filterFileLinkedOnly, fileLinkedTroveIds, selectedTroveIds, searchMode, freezeTroveListOrder, boostTroveId])
+
+  const dynamicTroveCount = useMemo(
+    () => troves.filter((t) => t.dynamic === true).length,
+    [troves],
+  )
+
+  useEffect(() => {
+    if (dynamicTroveCount === 0 && filterDynamicOnly) {
+      setFilterDynamicOnly(false)
+    }
+  }, [dynamicTroveCount, filterDynamicOnly])
+
+  useEffect(() => {
+    if (fileLinkedTroveIds.size === 0 && filterFileLinkedOnly) {
+      setFilterFileLinkedOnly(false)
+    }
+  }, [fileLinkedTroveIds, filterFileLinkedOnly])
 
   const ephemeralTroveCount = useMemo(
     () => troves.filter((t) => t.cliCreated === true).length,
@@ -2238,7 +2353,10 @@ function App() {
                 })()
                 return (
                   <>
-                  <h2 className="trove-picker-heading">Troves (total {formatCount(troves.length)})</h2>
+                  <div className="trove-picker-header-row">
+                    <h2 className="trove-picker-heading">Troves (total {formatCount(troves.length)})</h2>
+                    {renderNewTroveMenu()}
+                  </div>
                   <div className="trove-picker-tabs" role="tablist" aria-label="Trove selection">
                     {(() => {
                       const primaryTabInvalid = searchMode === 'duplicates' ? !dupPrimaryTroveId : !uniqPrimaryTroveId
@@ -2420,20 +2538,18 @@ function App() {
                         </div>
                       </div>
                       <div className="sidebar-show-wrap">
-                        <label className="sidebar-show-label">
-                          Show
-                          <select
-                            value={showFilter}
-                            onChange={(e) => setShowFilter(e.target.value)}
-                            className="sidebar-show-select"
-                            aria-label="Show troves: all, selected, or not selected"
-                          >
-                            <option value="all">All</option>
-                            <option value="selected">Selected</option>
-                            <option value="notSelected">Not Selected</option>
-                            {ephemeralTroveCount > 0 && <option value="ephemeral">Only Ephemeral</option>}
-                          </select>
-                        </label>
+                        <select
+                          value={showFilter}
+                          onChange={(e) => setShowFilter(e.target.value)}
+                          className="sidebar-show-select"
+                          aria-label="Show troves: all, selected, or not selected"
+                        >
+                          <option value="all">Show All</option>
+                          <option value="selected">Selected</option>
+                          <option value="notSelected">Not Selected</option>
+                          {ephemeralTroveCount > 0 && <option value="ephemeral">Only Ephemeral</option>}
+                        </select>
+                        {renderPickerToggleButtons()}
                       </div>
                       <div className="sidebar-trove-filter-wrap">
                         <input
@@ -2538,7 +2654,10 @@ function App() {
                 )
               })()) : (
                 <>
-                  <h2 className="trove-picker-heading">Troves (total {formatCount(troves.length)})</h2>
+                  <div className="trove-picker-header-row">
+                    <h2 className="trove-picker-heading">Troves (total {formatCount(troves.length)})</h2>
+                    {renderNewTroveMenu()}
+                  </div>
                   <div className="search-trove-summary-row">
                     <p className="trove-picker-summary search-trove-summary-text" aria-live="polite">
                       {selectedTroveIds.size === 0
@@ -2559,20 +2678,18 @@ function App() {
                     </button>
                   </div>
                   <div className="sidebar-show-wrap">
-            <label className="sidebar-show-label">
-              Show
-              <select
-                value={showFilter}
-                onChange={(e) => setShowFilter(e.target.value)}
-                className="sidebar-show-select"
-                aria-label="Show troves: all, selected, or not selected"
-              >
-                <option value="all">All</option>
-                <option value="selected">Selected</option>
-                <option value="notSelected">Not Selected</option>
-                {ephemeralTroveCount > 0 && <option value="ephemeral">Only Ephemeral</option>}
-              </select>
-            </label>
+            <select
+              value={showFilter}
+              onChange={(e) => setShowFilter(e.target.value)}
+              className="sidebar-show-select"
+              aria-label="Show troves: all, selected, or not selected"
+            >
+              <option value="all">Show All</option>
+              <option value="selected">Selected</option>
+              <option value="notSelected">Not Selected</option>
+              {ephemeralTroveCount > 0 && <option value="ephemeral">Only Ephemeral</option>}
+            </select>
+            {renderPickerToggleButtons()}
           </div>
           <div className="sidebar-trove-filter-wrap">
             {searchMode === 'search' && (
@@ -3716,7 +3833,7 @@ function App() {
                       visibleExtraFieldKeys={visibleExtraFieldKeysForGrid}
                       onFetchAllForCopy={async () => fullSearchResultsRef.current}
                       languageCodeMap={languageCodeMap}
-                      troveIdsWithLocalDirectory={connectedLocalTroveIds}
+                      fileLinkedTroveIds={fileLinkedTroveIds}
                       showDeleteItem={soleDynamicTroveId != null}
                       onDeleteItem={soleDynamicTroveId != null ? handleDeleteDynamicItem : null}
                     />
@@ -3929,7 +4046,7 @@ function App() {
                     visibleExtraFieldKeys={visibleExtraFieldKeysForGrid}
                     onFetchAllForCopy={async () => fullSearchResultsRef.current}
                     languageCodeMap={languageCodeMap}
-                    troveIdsWithLocalDirectory={connectedLocalTroveIds}
+                    fileLinkedTroveIds={fileLinkedTroveIds}
                     currentPage={pageNum}
                     totalPages={totalPages}
                     onPrevPage={() => goToPage(pageNum - 1)}
@@ -4026,9 +4143,9 @@ function App() {
           <div className="trove-menu-divider" role="separator" />
           {(() => {
             const { id, name } = openTroveMenu
-            const dbRoot = troveLocalRoots.find((r) => r.troveId === id)
-            const browserConnected = connectedLocalTroveIds.has(id)
-            const liveLabel = browserConnected ? (localFolderLabels[id] ?? 'Connected') : dbRoot?.folderLabel
+            const dbRoot = troveFileLinks.find((r) => r.troveId === id)
+            const browserConnected = fileLinkedTroveIds.has(id)
+            const liveLabel = browserConnected ? (fileLinkedFolderLabels[id] ?? 'Connected') : dbRoot?.folderLabel
             const supported = directoryPickerSupported()
             const connectLabel = browserConnected
               ? 'Change local folder…'
@@ -4046,7 +4163,7 @@ function App() {
                     e.preventDefault()
                     e.stopPropagation()
                     setOpenTroveMenu(null)
-                    void handleConnectLocalFolder(id, name)
+                    void handleConnectFileLink(id, name)
                   }}
                 >
                   {connectLabel}
@@ -4059,7 +4176,7 @@ function App() {
                       e.preventDefault()
                       e.stopPropagation()
                       setOpenTroveMenu(null)
-                      void handleDisconnectLocalFolder(id, name)
+                      void handleDisconnectFileLink(id, name)
                     }}
                   >
                     {`Disconnect local folder${liveLabel ? ` (${liveLabel})` : ''}`}
@@ -4100,7 +4217,6 @@ function App() {
         <div className="app-footer-row">
           <Link to="/about" className="app-footer-link">About</Link>
           <Link to="/history" className="app-footer-link">History</Link>
-          <Link to="/trove-groups" className="app-footer-link">Trove Groups</Link>
           <Link to={`/mobile${location.search}`} className="app-footer-link" onClick={() => sessionStorage.removeItem('morsorPreferDesktop')}>Mobile</Link>
         </div>
         <div className="app-footer-row">

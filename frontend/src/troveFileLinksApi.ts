@@ -6,7 +6,7 @@ import { getCsrfToken, primeCsrfCookie } from './getCsrfToken'
  * and what it's labeled. Advisory only: the actual FileSystemDirectoryHandle that can read
  * files lives in this browser's IndexedDB (see troveDirectoryHandles.ts) and never leaves it.
  */
-export type TroveLocalRoot = {
+export type TroveFileLink = {
   troveId: string
   folderLabel: string
 }
@@ -29,8 +29,8 @@ async function ensureCsrf(): Promise<void> {
   }
 }
 
-export async function fetchTroveLocalRoots(): Promise<TroveLocalRoot[]> {
-  const res = await fetch('/api/trove-local-roots', {
+export async function fetchTroveFileLinks(): Promise<TroveFileLink[]> {
+  const res = await fetch('/api/trove-file-links', {
     credentials: 'include',
     headers: { ...getApiAuthHeaders() },
   })
@@ -42,13 +42,13 @@ export async function fetchTroveLocalRoots(): Promise<TroveLocalRoot[]> {
     throw new Error(await readApiErrorMessage(res))
   }
   const data: unknown = await res.json()
-  return Array.isArray(data) ? (data as TroveLocalRoot[]) : []
+  return Array.isArray(data) ? (data as TroveFileLink[]) : []
 }
 
 /** Connect (or change) the folder label for a trove. Last connector wins. */
-export async function setTroveLocalRoot(troveId: string, folderLabel: string): Promise<void> {
+export async function setTroveFileLink(troveId: string, folderLabel: string): Promise<void> {
   await ensureCsrf()
-  const res = await fetch(`/api/trove-local-roots/${encodeURIComponent(troveId)}`, {
+  const res = await fetch(`/api/trove-file-links/${encodeURIComponent(troveId)}`, {
     method: 'PUT',
     credentials: 'include',
     headers: writeHeaders(),
@@ -64,9 +64,9 @@ export async function setTroveLocalRoot(troveId: string, folderLabel: string): P
 }
 
 /** Idempotent: safe to call even if this trove was never registered server-side. */
-export async function deleteTroveLocalRoot(troveId: string): Promise<void> {
+export async function deleteTroveFileLink(troveId: string): Promise<void> {
   await ensureCsrf()
-  const res = await fetch(`/api/trove-local-roots/${encodeURIComponent(troveId)}`, {
+  const res = await fetch(`/api/trove-file-links/${encodeURIComponent(troveId)}`, {
     method: 'DELETE',
     credentials: 'include',
     headers: writeHeaders(),

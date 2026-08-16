@@ -135,7 +135,7 @@ export async function resolveFileInDirectory(
   }
 }
 
-export async function openTroveLocalFile(troveId: string, sourcePath: string): Promise<void> {
+export async function openLinkedTroveFile(troveId: string, sourcePath: string): Promise<void> {
   const handle = await getDirectoryHandle(troveId)
   if (!handle) {
     throw new Error('No folder connected for this trove in this browser. Use its ⋮ menu → Connect folder.')
