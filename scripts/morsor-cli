@@ -1162,6 +1162,84 @@ def _expand_trove_aliases(ids: list[str], aliases: dict[str, list[str]]) -> list
     return result
 
 
+def _get_server_trove_aliases(
+    base: str,
+    bearer: str | None,
+    extra_headers: list[str],
+    debug: bool,
+) -> dict[str, list[str]]:
+    """Fetch server-defined trove groups from GET /api/trove-groups as {id: [trove-id, ...]}.
+
+    Non-fatal: returns {} on any failure (server unreachable, older server without this
+    endpoint, bad response) so alias expansion still works from local config alone.
+    """
+    token = bearer
+    if (not token or not token.strip()) and is_likely_local_dev_base(base):
+        token = DEV_DEFAULT_TOKEN
+    url = strip_trailing_slash(base) + "/api/trove-groups"
+    headers: dict[str, str] = dict(_DEFAULT_HEADERS)
+    if token and token.strip():
+        headers["Authorization"] = "Bearer " + token.strip()
+    for h in extra_headers:
+        if ":" not in h or h.index(":") <= 0:
+            continue
+        k, v = h.split(":", 1)
+        headers[k.strip()] = v.strip()
+    req = urllib.request.Request(url, headers=headers)
+    if debug:
+        print(f"[debug] GET {url}", file=sys.stderr)
+    try:
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            raw = resp.read().decode("utf-8", errors="replace")
+        data = json.loads(raw)
+        if not isinstance(data, list):
+            return {}
+        result: dict[str, list[str]] = {}
+        for item in data:
+            if not isinstance(item, dict):
+                continue
+            gid = item.get("id")
+            trove_ids = item.get("troveIds")
+            if not gid or not isinstance(trove_ids, list):
+                continue
+            result[str(gid)] = [str(t) for t in trove_ids]
+        return result
+    except (HTTPError, URLError, json.JSONDecodeError, OSError) as e:
+        if debug:
+            print(f"[debug] GET {url} failed: {e}", file=sys.stderr)
+        return {}
+
+
+def _merge_trove_aliases(
+    local_aliases: dict[str, list[str]], server_aliases: dict[str, list[str]]
+) -> dict[str, list[str]]:
+    """Merge server-defined trove groups with local trove-aliases config.
+
+    On an id clash the local definition wins outright (no merging of the two id lists);
+    a warning is printed to stderr so the override isn't silent.
+    """
+    merged = dict(server_aliases)
+    for alias, ids in local_aliases.items():
+        if alias in merged:
+            print(
+                f"morsor-cli: warning: local trove alias {alias!r} overrides the "
+                f"server-defined trove group with the same id",
+                file=sys.stderr,
+            )
+        merged[alias] = ids
+    return merged
+
+
+def _load_merged_trove_aliases(
+    base: str, bearer: str | None, extra_headers: list[str], debug: bool
+) -> dict[str, list[str]]:
+    """Local trove-aliases config (MORSOR_PROPERTIES_FILE) merged with server-side trove
+    groups; local definitions win on id clashes (see _merge_trove_aliases)."""
+    local_aliases = _load_trove_aliases()
+    server_aliases = _get_server_trove_aliases(base, bearer, extra_headers, debug)
+    return _merge_trove_aliases(local_aliases, server_aliases)
+
+
 def _expand_sisters(
     sisters: list, aliases: dict[str, list[str]]
 ) -> list[tuple[str, str, list[str]]]:
@@ -1453,7 +1531,9 @@ def run_local_sisters_create(
     props_file = _morsor_properties_file()
     data = _load_morsor_properties(props_file)
     sisters = _get_sisters(data, props_file)
-    aliases = _get_trove_aliases(data)
+    local_aliases = _get_trove_aliases(data)
+    server_aliases = _get_server_trove_aliases(base, bearer, extra_headers, debug)
+    aliases = _merge_trove_aliases(local_aliases, server_aliases)
     expanded = _expand_sisters(sisters, aliases)  # list of (path, raw_trove_id, [companion_id, ...])
 
     # All companion trove IDs referenced in the config (after alias expansion).
@@ -1568,7 +1648,9 @@ def run_local_sisters_list(
     props_file = _morsor_properties_file()
     data = _load_morsor_properties(props_file)
     sisters = _get_sisters(data, props_file)
-    aliases = _get_trove_aliases(data)
+    local_aliases = _get_trove_aliases(data)
+    server_aliases = _get_server_trove_aliases(base, bearer, extra_headers, debug)
+    aliases = _merge_trove_aliases(local_aliases, server_aliases)
     expanded = _expand_sisters(sisters, aliases)  # list of (path, raw_trove_id, [companion_id, ...])
     server_state = _get_server_sisters(base, bearer, extra_headers, debug)
 
@@ -1821,9 +1903,9 @@ def run_local_command(
             local_trove_name_override,
         )
     elif subcommand in ("aliases", "alias"):
-        aliases = _load_trove_aliases()
+        aliases = _load_merged_trove_aliases(base, bearer, extra_headers, debug)
         if not aliases:
-            print("(no trove aliases configured — check MORSOR_PROPERTIES_FILE)")
+            print("(no trove aliases configured — check MORSOR_PROPERTIES_FILE or the server's trove groups)")
         else:
             for alias, ids in sorted(aliases.items()):
                 print(f"{alias}\t{', '.join(ids)}")
@@ -2480,7 +2562,10 @@ OPTIONS
 ENVIRONMENT
        MORSOR_CLI_BASE_URL     Default base URL (-b overrides).
        MORSOR_PROPERTIES_FILE  Path to YAML/JSON config. Used for local sisters and
-                              for trove aliases (morsor.trove-aliases).
+                              for trove aliases (morsor.trove-aliases). Local aliases are
+                              merged with server-side trove groups (GET /api/trove-groups);
+                              on an id clash the local definition wins and a warning is
+                              printed to stderr.
 
 ACTIONS
        search                           GET /api/search (default)
@@ -2497,7 +2582,8 @@ ACTIONS
                               Accepts optional --name NAME.
        local trove delete <id> Delete an ephemeral trove by id.
        local list              List all CLI-created ephemeral troves.
-       local aliases           Print trove aliases from MORSOR_PROPERTIES_FILE.
+       local aliases           Print trove aliases: local config merged with server-side
+                              trove groups (local wins on id clashes; see ENVIRONMENT).
        local rename <id> <name> Rename any ephemeral trove (sister or local).
        dynamic item add <trove> <title...>
                               Add a title to a DB-backed dynamic trove (trove id or name).
@@ -2666,7 +2752,7 @@ LOCAL (EPHEMERAL) TROVES
   local trove create [FILE]           # Register a file (or stdin) as an ephemeral trove
   local trove delete <id>             # Delete an ephemeral trove by id
   local list                          # List all CLI-created ephemeral troves
-  local aliases                       # Print configured trove aliases
+  local aliases                       # Print trove aliases (local + server, local wins)
   local rename <id> <new-name>        # Rename any ephemeral trove (sister or local)
 
 DYNAMIC (DB-BACKED) TROVES
@@ -2965,8 +3051,9 @@ def main(argv: list[str]) -> None:
                 file=sys.stderr,
             )
 
-    # Expand trove aliases from config before building the query string.
-    _aliases = _load_trove_aliases()
+    # Expand trove aliases: local config merged with server-side trove groups (local wins
+    # on id clashes; see _merge_trove_aliases) before building the query string.
+    _aliases = _load_merged_trove_aliases(base, bearer, extra_headers, debug)
     if _aliases:
         trove_filter = _expand_trove_aliases(trove_filter, _aliases)
         compare_troves = _expand_trove_aliases(compare_troves, _aliases)

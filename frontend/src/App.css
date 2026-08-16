@@ -1062,6 +1062,20 @@
   margin: 0.25rem 0.5rem;
 }
 
+.trove-groups-section-label {
+  margin: 0 0 0.3rem;
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #888;
+}
+
+.trove-group-list {
+  max-height: none;
+  margin-bottom: 0.75rem;
+}
+
 .sidebar-separator {
   margin: 0;
   border: none;
@@ -3438,6 +3452,124 @@
 .history-saved-status {
   margin: 0;
   color: #666;
+}
+
+/* Trove groups page */
+.trove-groups-create-form {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  margin-top: 0.75rem;
+}
+
+.trove-groups-create-input {
+  padding: 0.4rem 0.65rem;
+  font-size: 0.9rem;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  min-width: 16rem;
+}
+
+.trove-groups-table th:first-child,
+.trove-groups-table td:first-child {
+  width: 2rem;
+  padding-right: 0;
+}
+
+.trove-groups-row {
+  font-weight: 600;
+}
+
+.trove-groups-expand-btn {
+  border: none;
+  background: none;
+  cursor: pointer;
+  padding: 0.2rem 0.35rem;
+  font-size: 0.75rem;
+  color: #6633cc;
+}
+
+.trove-groups-child-row td {
+  border-bottom: 1px solid #eee;
+  background: #fafafa;
+  color: #444;
+  font-weight: 400;
+}
+
+.trove-groups-empty-cell {
+  color: #888;
+  font-style: italic;
+}
+
+.trove-groups-actions-cell {
+  white-space: nowrap;
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.trove-groups-add-btn {
+  width: 1.6rem;
+  height: 1.6rem;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1rem;
+  line-height: 1;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  background: #f8f8f8;
+  color: #333;
+  cursor: pointer;
+}
+
+.trove-groups-add-btn:hover:not(:disabled) {
+  background: #ede8ff;
+}
+
+.trove-groups-trash-btn {
+  margin-left: auto;
+  border: none;
+  background: none;
+  padding: 0.2rem;
+  display: inline-flex;
+  align-items: center;
+  color: #822;
+  cursor: pointer;
+}
+
+.trove-groups-trash-btn:hover:not(:disabled) {
+  color: #b00020;
+}
+
+.trove-groups-trash-btn:disabled,
+.trove-groups-add-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.trove-groups-add-picker {
+  max-width: 26rem;
+  padding: 0.5rem 0;
+}
+
+.trove-groups-add-list {
+  max-height: 14rem;
+  margin-top: 0.5rem;
+}
+
+.trove-groups-add-list-empty {
+  padding: 0.6rem;
+  color: #888;
+  font-style: italic;
+  font-size: 0.85rem;
+}
+
+.trove-groups-add-picker-actions {
+  display: flex;
+  gap: 0.75rem;
+  margin-top: 0.6rem;
 }
 
 /* Trove staleness banner */

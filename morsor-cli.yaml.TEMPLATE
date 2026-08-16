@@ -13,6 +13,10 @@ morsor:
     # - trove-id: another-trove
     #   path: "/path/to/another/directory"
 
+  # These are merged with any server-side trove groups (managed via the webapp's
+  # Trove Groups screen, GET /api/trove-groups). On an id clash, this local
+  # definition wins outright (no merging of the two id lists) and morsor-cli
+  # prints a warning to stderr.
   trove-aliases:
   - alias: my-alias
     trove-ids: trove-id-1,trove-id-2

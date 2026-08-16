@@ -4,6 +4,7 @@ import { Link, useSearchParams, useLocation } from 'react-router-dom'
 import type { SearchResultData, SearchResultRow, Trove, DuplicatesResultData, UniquesResultData } from './types'
 import type { FileTypeQuickModeValue } from './fileTypeQuickMode'
 import { getApiAuthHeaders, readApiErrorMessage } from './apiAuth'
+import { fetchTroveGroups, type TroveGroup } from './troveGroupsApi'
 import { getCsrfToken } from './getCsrfToken'
 import { performLogout } from './performLogout'
 import { queryCache } from './queryCache'
@@ -128,6 +129,7 @@ function hasUsableThumbnail(row: SearchResultRow | undefined | null): boolean {
 
 function MobileApp() {
   const [troves, setTroves] = useState<Trove[]>([])
+  const [troveGroups, setTroveGroups] = useState<TroveGroup[]>([])
   // Stable across background refreshes that don't add/remove/rename a trove, unlike `troves`
   // itself (refreshTroves always produces a new array reference). Lets effects that only need to
   // react to a trove's identity/existence — not its live metadata — avoid re-running on every poll.
@@ -1280,19 +1282,29 @@ function MobileApp() {
     }
   }, [])
 
+  const refreshTroveGroups = useCallback(async () => {
+    try {
+      setTroveGroups(await fetchTroveGroups())
+    } catch {
+      setTroveGroups([])
+    }
+  }, [])
+
   useEffect(() => {
     void refreshTroves()
+    void refreshTroveGroups()
     ensureLanguageCodeMap(getApiAuthHeaders())
       .then(setLanguageCodeMap)
       .catch(() => setLanguageCodeMap(null))
-  }, [refreshTroves])
+  }, [refreshTroves, refreshTroveGroups])
 
   // Background heartbeat so an already-open tab notices dynamic-trove edits made elsewhere
-  // (CLI, another tab) and drops its stale cached search results for that trove.
+  // (CLI, another tab) and drops its stale cached search results for that trove. Also picks up
+  // trove group edits made from the Trove Groups screen or another tab.
   useEffect(() => {
-    const id = setInterval(() => { void refreshTroves() }, 15000)
+    const id = setInterval(() => { void refreshTroves(); void refreshTroveGroups() }, 15000)
     return () => clearInterval(id)
-  }, [refreshTroves])
+  }, [refreshTroves, refreshTroveGroups])
 
   const soleDynamicTroveId = useMemo(() => {
     if (searchMode !== 'search' || selectedTroveIds.size !== 1) {
@@ -1659,6 +1671,82 @@ function MobileApp() {
       else next.add(id)
       return next
     })
+  }
+
+  // A group's member ids that are both known to still exist and eligible for the current tab
+  // (in the compare tab, the primary trove can't also be a compare target).
+  function eligibleTroveGroupMemberIds(group: TroveGroup): string[] {
+    const knownTroveIds = new Set(troves.map((t) => t.id))
+    return group.troveIds.filter(
+      (id) => knownTroveIds.has(id) && (!isDupOrUniques || id !== primaryTroveId)
+    )
+  }
+
+  function toggleTroveGroup(groupId: string) {
+    const group = troveGroups.find((g) => g.id === groupId)
+    if (!group) return
+    const memberIds = eligibleTroveGroupMemberIds(group)
+    if (memberIds.length === 0) return
+    if (isDupOrUniques) {
+      const allSelected = memberIds.every((id) => compareTroveIds.has(id))
+      setCompareTroveIds((prev) => {
+        const next = new Set(prev)
+        for (const id of memberIds) {
+          if (allSelected) next.delete(id)
+          else next.add(id)
+        }
+        return next
+      })
+      return
+    }
+    const allSelected = memberIds.every((id) => selectedTroveIds.has(id))
+    if (searchMode === 'search') setFreezeTroveListOrder(true)
+    const next = new Set(selectedTroveIds)
+    for (const id of memberIds) {
+      if (allSelected) next.delete(id)
+      else next.add(id)
+    }
+    setSelectedTroveIds(next)
+    if (searchMode === 'search') setUrlSearchTroveIds(next)
+    setSearchParams(buildSearchParams(null, next), { replace: true })
+  }
+
+  function renderTroveGroupsSection(filterText: string) {
+    if (troveGroups.length === 0) return null
+    if (isDupOrUniques && trovePickerSubTab === 'primary') return null
+    const filterLower = filterText.trim().toLowerCase()
+    const visibleGroups = troveGroups
+      .filter((g) => eligibleTroveGroupMemberIds(g).length > 0)
+      .filter((g) => !filterLower || g.name.toLowerCase().includes(filterLower))
+      .sort((a, b) => a.name.localeCompare(b.name))
+    if (visibleGroups.length === 0) return null
+    const activeSet = isDupOrUniques ? compareTroveIds : selectedTroveIds
+    return (
+      <>
+        <p className="mobile-trove-groups-section-label">Groups</p>
+        <ul className="mobile-trove-list mobile-trove-group-list" aria-label="Trove groups">
+          {visibleGroups.map((g) => {
+            const memberIds = eligibleTroveGroupMemberIds(g)
+            const selectedCount = memberIds.filter((id) => activeSet.has(id)).length
+            const allSelected = selectedCount === memberIds.length
+            const someSelected = selectedCount > 0 && !allSelected
+            return (
+              <li key={g.id} className={`mobile-trove-item${allSelected ? ' mobile-trove-item--selected' : ''}`}>
+                <label className="mobile-trove-label">
+                  <input
+                    type="checkbox"
+                    checked={allSelected}
+                    ref={(el) => { if (el) el.indeterminate = someSelected }}
+                    onChange={() => toggleTroveGroup(g.id)}
+                  />
+                  <span>{g.name} ({memberIds.length})</span>
+                </label>
+              </li>
+            )
+          })}
+        </ul>
+      </>
+    )
   }
 
   function clearTroves() {
@@ -2160,6 +2248,7 @@ function MobileApp() {
           )}
           <Link to="/mobile/about" className="mobile-nav-link">About</Link>
           <Link to="/history" className="mobile-nav-link">History</Link>
+          <Link to="/trove-groups" className="mobile-nav-link">Trove Groups</Link>
         </nav>
       </header>
       {copiedUrlFlare && (
@@ -3227,6 +3316,7 @@ onClick={() => {
               onConnectionChange={refreshConnectedLocalTroves}
               troveFilter={trovePickerFilter}
             />
+            {renderTroveGroupsSection(trovePickerFilter)}
             <ul className="mobile-trove-list">
               {isDupOrUniques && trovePickerSubTab === 'primary'
                 ? (() => {

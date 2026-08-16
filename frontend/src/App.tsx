@@ -16,6 +16,7 @@ import {
 import { DuplicateResultsView } from './DuplicateResultsView'
 import { UniquesResultsView } from './UniquesResultsView'
 import { getApiAuthHeaders, readApiErrorMessage } from './apiAuth'
+import { fetchTroveGroups, type TroveGroup } from './troveGroupsApi'
 import { getCsrfToken } from './getCsrfToken'
 import { performLogout } from './performLogout'
 import { queryCache } from './queryCache'
@@ -121,6 +122,7 @@ function App() {
   const [message, setMessage] = useState('')
   const [cacheEntries, setCacheEntries] = useState(0)
   const [troves, setTroves] = useState<Trove[]>([])
+  const [troveGroups, setTroveGroups] = useState<TroveGroup[]>([])
   // Stable across background refreshes that don't add/remove/rename a trove, unlike `troves`
   // itself (refreshTroves always produces a new array reference). Lets effects that only need to
   // react to a trove's identity/existence — not its live metadata — avoid re-running on every poll.
@@ -640,19 +642,29 @@ function App() {
     }
   }, [])
 
+  const refreshTroveGroups = useCallback(async () => {
+    try {
+      setTroveGroups(await fetchTroveGroups())
+    } catch {
+      setTroveGroups([])
+    }
+  }, [])
+
   useEffect(() => {
     void refreshTroves()
+    void refreshTroveGroups()
     ensureLanguageCodeMap(getApiAuthHeaders())
       .then(setLanguageCodeMap)
       .catch(() => setLanguageCodeMap(null))
-  }, [refreshTroves])
+  }, [refreshTroves, refreshTroveGroups])
 
   // Background heartbeat so an already-open tab notices dynamic-trove edits made elsewhere
-  // (CLI, another tab) and drops its stale cached search results for that trove.
+  // (CLI, another tab) and drops its stale cached search results for that trove. Also picks up
+  // trove group edits made from the Trove Groups screen or another tab.
   useEffect(() => {
-    const id = setInterval(() => { void refreshTroves() }, 15000)
+    const id = setInterval(() => { void refreshTroves(); void refreshTroveGroups() }, 15000)
     return () => clearInterval(id)
-  }, [refreshTroves])
+  }, [refreshTroves, refreshTroveGroups])
 
   const soleDynamicTroveId = useMemo(() => {
     if (searchMode !== 'search' || searchSelectedTroveIds.size !== 1) {
@@ -1339,6 +1351,70 @@ function App() {
       else next.add(id)
       return next
     })
+  }
+
+  // A group's member ids that are both known to still exist and eligible for the current tab
+  // (in the compare tab, the primary trove can't also be a compare target).
+  function eligibleTroveGroupMemberIds(group: TroveGroup): string[] {
+    const knownTroveIds = new Set(troves.map((t) => t.id))
+    return group.troveIds.filter(
+      (id) => knownTroveIds.has(id) && (searchMode === 'search' || id !== primaryTroveId)
+    )
+  }
+
+  function toggleTroveGroup(groupId: string) {
+    const group = troveGroups.find((g) => g.id === groupId)
+    if (!group) return
+    const memberIds = eligibleTroveGroupMemberIds(group)
+    if (memberIds.length === 0) return
+    const allSelected = memberIds.every((id) => selectedTroveIds.has(id))
+    if (searchMode === 'search') setFreezeTroveListOrder(true)
+    setSelectedTroveIds((prev) => {
+      const next = new Set(prev)
+      for (const id of memberIds) {
+        if (allSelected) next.delete(id)
+        else next.add(id)
+      }
+      return next
+    })
+  }
+
+  function renderTroveGroupsSection(filterText: string) {
+    if (troveGroups.length === 0) return null
+    const filterLower = filterText.trim().toLowerCase()
+    const visibleGroups = troveGroups
+      .filter((g) => eligibleTroveGroupMemberIds(g).length > 0)
+      .filter((g) => !filterLower || g.name.toLowerCase().includes(filterLower))
+      .sort((a, b) => a.name.localeCompare(b.name))
+    if (visibleGroups.length === 0) return null
+    return (
+      <>
+        <p className="trove-groups-section-label">Groups</p>
+        <ul className="trove-list trove-group-list" aria-label="Trove groups">
+          {visibleGroups.map((g) => {
+            const memberIds = eligibleTroveGroupMemberIds(g)
+            const selectedCount = memberIds.filter((id) => selectedTroveIds.has(id)).length
+            const allSelected = selectedCount === memberIds.length
+            const someSelected = selectedCount > 0 && !allSelected
+            return (
+              <li key={g.id} className={`trove-item ${allSelected ? 'trove-item--selected' : ''}`}>
+                <label className="trove-checkbox">
+                  <input
+                    type="checkbox"
+                    checked={allSelected}
+                    ref={(el) => { if (el) el.indeterminate = someSelected }}
+                    onChange={() => toggleTroveGroup(g.id)}
+                  />
+                  <span className="trove-name">
+                    {g.name} <span className="trove-count-suffix">({memberIds.length})</span>
+                  </span>
+                </label>
+              </li>
+            )
+          })}
+        </ul>
+      </>
+    )
   }
 
   function selectAllTroves() {
@@ -2304,6 +2380,7 @@ function App() {
                           </button>
                         )}
                       </div>
+                      {renderTroveGroupsSection(troveFilter)}
                       <ul className="trove-list">
                         {selectedTroves.map((t) => {
                           const isPrimaryDisabled = t.id === primaryTroveId
@@ -2469,6 +2546,7 @@ function App() {
             onConnectionChange={refreshConnectedLocalTroves}
             troveFilter={troveFilter}
           />
+          {renderTroveGroupsSection(troveFilter)}
           <ul className="trove-list">
             {selectedTroves.map(renderTroveRow)}
             {selectedTroves.length > 0 && notSelectedTroves.length > 0 && (
@@ -3906,6 +3984,7 @@ function App() {
         <div className="app-footer-row">
           <Link to="/about" className="app-footer-link">About</Link>
           <Link to="/history" className="app-footer-link">History</Link>
+          <Link to="/trove-groups" className="app-footer-link">Trove Groups</Link>
           <Link to={`/mobile${location.search}`} className="app-footer-link" onClick={() => sessionStorage.removeItem('morsorPreferDesktop')}>Mobile</Link>
         </div>
         <div className="app-footer-row">

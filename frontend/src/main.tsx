@@ -7,6 +7,7 @@ import About from './About'
 import MobileApp from './MobileApp'
 import MobileAbout from './MobileAbout'
 import History from './History'
+import TroveGroups from './TroveGroups'
 import Login from './Login'
 import { RequireAuth } from './RequireAuth'
 
@@ -46,6 +47,7 @@ createRoot(document.getElementById('root')!).render(
         <Route path="/" element={<RequireAuth><RootOrRedirect /></RequireAuth>} />
         <Route path="/about" element={<RequireAuth><About /></RequireAuth>} />
         <Route path="/history" element={<RequireAuth><History /></RequireAuth>} />
+        <Route path="/trove-groups" element={<RequireAuth><TroveGroups /></RequireAuth>} />
         <Route path="/login" element={<Login />} />
         <Route path="/mobile" element={<RequireAuth><MobileApp /></RequireAuth>} />
         <Route path="/mobile/about" element={<RequireAuth><MobileAbout /></RequireAuth>} />

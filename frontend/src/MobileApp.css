@@ -1201,6 +1201,26 @@
   border-top: 1px solid #ddd;
 }
 
+.mobile-trove-groups-section-label {
+  margin: 0.25rem 0 0.2rem;
+  padding: 0 0.1rem;
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #888;
+  text-align: left;
+}
+
+.mobile-trove-group-list {
+  flex: none;
+  max-height: 30vh;
+  overflow-y: auto;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid #eee;
+  margin-bottom: 0.25rem;
+}
+
 .mobile-trove-label {
   display: flex;
   align-items: center;
