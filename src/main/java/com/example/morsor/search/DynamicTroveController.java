@@ -179,6 +179,40 @@ public class DynamicTroveController {
         return ResponseEntity.noContent().build();
     }
 
+    /**
+     * Bulk-remove titles in one request. Titles not currently present (by normalized match) are
+     * skipped and listed in the response; they do not fail the request.
+     */
+    @PostMapping("/{troveId}/items/bulk-delete")
+    public ResponseEntity<DynamicTroveItemBulkDeleteResult> removeItemsBulk(
+            @PathVariable String troveId,
+            @RequestBody DynamicTroveItemBulkDeleteRequest body) {
+        if (body == null || body.titles() == null) {
+            return ResponseEntity.badRequest().build();
+        }
+        log.info(
+                "POST /api/dynamic-troves/{}/items/bulk-delete: titles.size={}",
+                troveId,
+                body.titles().size());
+        try {
+            DynamicTroveItemBulkDeleteResult result =
+                    searchDataService.removeDynamicTroveItemsBulk(troveId, body.titles());
+            if (result.removed() > 0) {
+                searchCache.clear();
+            }
+            return ResponseEntity.ok(result);
+        } catch (IllegalArgumentException e) {
+            log.warn("POST /api/dynamic-troves/{}/items/bulk-delete: bad request: {}", troveId, e.getMessage());
+            if (e.getMessage() != null && e.getMessage().startsWith("Unknown dynamic trove")) {
+                return ResponseEntity.notFound().build();
+            }
+            return ResponseEntity.badRequest().build();
+        } catch (IllegalStateException e) {
+            log.warn("POST /api/dynamic-troves/{}/items/bulk-delete: unavailable: {}", troveId, e.getMessage());
+            return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).build();
+        }
+    }
+
     private static String previewForLog(String s) {
         if (s == null) {
             return "(null)";

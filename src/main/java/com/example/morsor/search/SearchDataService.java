@@ -1023,6 +1023,76 @@ public class SearchDataService {
         return true;
     }
 
+    /**
+     * Bulk-remove titles from a dynamic trove in one transaction/index rebuild. Titles whose
+     * normalized form doesn't match any item currently in the trove (or are duplicated within this
+     * request) are skipped and returned in {@link DynamicTroveItemBulkDeleteResult#notFound()}.
+     */
+    public DynamicTroveItemBulkDeleteResult removeDynamicTroveItemsBulk(String troveId, List<String> titles) {
+        if (dynamicTroveRepository == null) {
+            throw new IllegalStateException("Dynamic troves are not available (no repository)");
+        }
+        if (troveId == null || troveId.isBlank()) {
+            throw new IllegalArgumentException("troveId is required");
+        }
+        if (titles == null) {
+            throw new IllegalArgumentException("titles is required");
+        }
+        if (titles.size() > MAX_DYNAMIC_BULK_ITEMS) {
+            throw new IllegalArgumentException("titles size exceeds limit " + MAX_DYNAMIC_BULK_ITEMS);
+        }
+        String id = troveId.trim();
+        List<String> removedTitles = new ArrayList<>();
+        List<String> notFound = new ArrayList<>();
+        synchronized (mergeLock) {
+            if (!dynamicTroveNames.containsKey(id)) {
+                throw new IllegalArgumentException("Unknown dynamic trove: " + id);
+            }
+            List<SearchResult> existing = dynamicTroves.getOrDefault(id, List.of());
+            Map<String, String> normalizedToStored = new HashMap<>();
+            for (SearchResult r : existing) {
+                String n = normalizeDynamicTroveItemTitle(r.title());
+                if (!n.isEmpty()) {
+                    normalizedToStored.putIfAbsent(n, r.title());
+                }
+            }
+            Set<String> toRemoveStored = new LinkedHashSet<>();
+            Set<String> seenNormalized = new HashSet<>();
+            for (String title : titles) {
+                String titleTrimmed = title == null ? "" : title.trim();
+                if (titleTrimmed.isEmpty()) {
+                    continue;
+                }
+                String normalized = normalizeDynamicTroveItemTitle(titleTrimmed);
+                if (normalized.isEmpty() || !seenNormalized.add(normalized)) {
+                    continue;
+                }
+                String stored = normalizedToStored.get(normalized);
+                if (stored == null) {
+                    notFound.add(titleTrimmed);
+                    continue;
+                }
+                toRemoveStored.add(stored);
+                removedTitles.add(stored);
+            }
+            if (!toRemoveStored.isEmpty()) {
+                dynamicTroveRepository.deleteItems(id, List.copyOf(toRemoveStored));
+                List<SearchResult> updated = existing.stream()
+                        .filter(r -> !toRemoveStored.contains(r.title()))
+                        .toList();
+                dynamicTroves.put(id, updated);
+                rebuildMergedIndexLocked();
+            }
+        }
+        log.info(
+                "Bulk-removed {} item(s) from dynamic trove \"{}\" ({} not found)",
+                removedTitles.size(),
+                id,
+                notFound.size());
+        return new DynamicTroveItemBulkDeleteResult(
+                id, removedTitles.size(), List.copyOf(removedTitles), List.copyOf(notFound));
+    }
+
     public boolean isDynamicTrove(String troveId) {
         if (troveId == null || troveId.isBlank()) {
             return false;

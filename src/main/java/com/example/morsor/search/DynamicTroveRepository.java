@@ -100,4 +100,18 @@ public class DynamicTroveRepository {
                 troveId,
                 title);
     }
+
+    public void deleteItems(String troveId, List<String> titles) {
+        if (titles == null || titles.isEmpty()) {
+            return;
+        }
+        jdbc.batchUpdate(
+                "DELETE FROM dynamic_trove_items WHERE trove_id = ? AND title = ?",
+                titles,
+                titles.size(),
+                (ps, title) -> {
+                    ps.setString(1, troveId);
+                    ps.setString(2, title);
+                });
+    }
 }

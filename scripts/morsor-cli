@@ -1948,6 +1948,51 @@ def _resolve_dynamic_trove_id(
     die(f"unknown dynamic trove: {ref!r}")
 
 
+def _extract_file_flag(args: list[str], usage: str) -> tuple[str | None, list[str]]:
+    """Pull an optional -f/--file VALUE out of args; its presence is what makes an
+    add/delete a bulk request. Returns (file_arg, remaining_args). VALUE "-" means stdin.
+    """
+    remaining: list[str] = []
+    file_arg: str | None = None
+    i = 0
+    while i < len(args):
+        a = args[i]
+        if a in ("-f", "--file"):
+            if file_arg is not None:
+                die(f"-f/--file may only be given once\nusage: {usage}")
+            if i + 1 >= len(args):
+                die(f"-f/--file requires a value (a path, or - for stdin)\nusage: {usage}")
+            file_arg = args[i + 1]
+            i += 2
+            continue
+        if a.startswith("-f="):
+            file_arg = a[len("-f="):]
+            i += 1
+            continue
+        if a.startswith("--file="):
+            file_arg = a[len("--file="):]
+            i += 1
+            continue
+        remaining.append(a)
+        i += 1
+    return file_arg, remaining
+
+
+def _read_titles_from_file_or_stdin(file_arg: str) -> tuple[list[str], str]:
+    """Read one-title-per-line from a path, or stdin when file_arg == '-'."""
+    if file_arg == "-":
+        lines = sys.stdin.read().splitlines()
+        input_label = "stdin"
+    else:
+        input_file = Path(file_arg).resolve()
+        if not input_file.is_file():
+            die(f"not a file: {input_file}")
+        lines = input_file.read_text(encoding="utf-8", errors="replace").splitlines()
+        input_label = f"file {input_file}"
+    titles = [line.strip() for line in lines if line.strip()]
+    return titles, input_label
+
+
 def run_dynamic_item_add(
     base: str,
     bearer: str | None,
@@ -1978,42 +2023,24 @@ def run_dynamic_item_add(
         )
 
 
-def run_dynamic_item_load(
+def run_dynamic_item_add_bulk(
     base: str,
     bearer: str | None,
     extra_headers: list[str],
     debug: bool,
     output_mode: str,
     trove_ref: str,
-    rest: list[str],
+    file_arg: str,
 ) -> None:
     """Bulk-add titles from a file or stdin (one per line) in a single API request.
 
     Titles that already exist in the trove (normalized match), or that duplicate an
-    earlier line in the same load, are skipped; after the load finishes they are
-    listed on stderr.
+    earlier line in the same request, are skipped; after the request finishes they
+    are listed on stderr.
     """
-    input_file: Path | None = None
-    if len(rest) > 1:
-        die("usage: morsor-cli dynamic item load <trove-id-or-name> [FILE]")
-    if len(rest) == 1:
-        token = rest[0]
-        if token.startswith("-") and token != "-":
-            die(f"unknown option for dynamic item load: {token}")
-        if token != "-":
-            input_file = Path(token).resolve()
-            if not input_file.is_file():
-                die(f"not a file: {input_file}")
-    if input_file is not None:
-        lines = input_file.read_text(encoding="utf-8", errors="replace").splitlines()
-        input_label = f"file {input_file}"
-    else:
-        lines = sys.stdin.read().splitlines()
-        input_label = "stdin"
-
-    titles = [line.strip() for line in lines if line.strip()]
+    titles, input_label = _read_titles_from_file_or_stdin(file_arg)
     if not titles:
-        die(f"dynamic item load: no non-empty titles in {input_label}")
+        die(f"dynamic item add -f: no non-empty titles in {input_label}")
 
     trove_id, trove_name = _resolve_dynamic_trove_id(
         base, bearer, extra_headers, debug, trove_ref
@@ -2052,7 +2079,7 @@ def run_dynamic_item_load(
         print_document_body(json.dumps(payload), output_mode if output_mode == "yaml" else "json")
     else:
         print(
-            f"Loaded {loaded} title(s) into dynamic trove "
+            f"Added {loaded} title(s) to dynamic trove "
             f"{trove_name!r} ({trove_id}) from {input_label}"
         )
 
@@ -2068,7 +2095,7 @@ def run_dynamic_item_load(
 
     if loaded == 0:
         die(
-            f"dynamic item load: no titles added to dynamic trove {trove_name!r}",
+            f"dynamic item add -f: no titles added to dynamic trove {trove_name!r}",
             code=1,
         )
 
@@ -2097,6 +2124,82 @@ def run_dynamic_item_delete(
     print(f"Deleted {title!r} from dynamic trove {trove_name!r} ({trove_id})")
 
 
+def run_dynamic_item_delete_bulk(
+    base: str,
+    bearer: str | None,
+    extra_headers: list[str],
+    debug: bool,
+    output_mode: str,
+    trove_ref: str,
+    file_arg: str,
+) -> None:
+    """Bulk-delete titles from a file or stdin (one per line) in a single API request.
+
+    Titles that aren't currently in the trove (normalized match) are skipped; after
+    the request finishes they are listed on stderr.
+    """
+    titles, input_label = _read_titles_from_file_or_stdin(file_arg)
+    if not titles:
+        die(f"dynamic item delete -f: no non-empty titles in {input_label}")
+
+    trove_id, trove_name = _resolve_dynamic_trove_id(
+        base, bearer, extra_headers, debug, trove_ref
+    )
+    path = (
+        "/api/dynamic-troves/"
+        + urllib.parse.quote(trove_id, safe="")
+        + "/items/bulk-delete"
+    )
+    result = _http_json(
+        base,
+        "POST",
+        path,
+        bearer,
+        extra_headers,
+        debug,
+        body_obj={"titles": titles},
+        timeout=max(60, min(600, 30 + len(titles) // 50)),
+    )
+    if not isinstance(result, dict):
+        die("POST items/bulk-delete: unexpected response")
+    removed = int(result.get("removed") or 0)
+    not_found_titles = result.get("notFound") or []
+    if not isinstance(not_found_titles, list):
+        die("POST items/bulk-delete: unexpected notFound field")
+    not_found_titles = [str(t) for t in not_found_titles]
+
+    if output_mode in ("json", "yaml"):
+        payload = {
+            "troveId": trove_id,
+            "name": trove_name,
+            "removed": removed,
+            "notFoundCount": len(not_found_titles),
+            "notFound": not_found_titles,
+        }
+        print_document_body(json.dumps(payload), output_mode if output_mode == "yaml" else "json")
+    else:
+        print(
+            f"Removed {removed} title(s) from dynamic trove "
+            f"{trove_name!r} ({trove_id}) per {input_label}"
+        )
+
+    if not_found_titles:
+        print(
+            f"morsor-cli: warning: {len(not_found_titles)} title(s) not found in "
+            f"dynamic trove {trove_name!r}:",
+            file=sys.stderr,
+        )
+        for t in not_found_titles:
+            print(t, file=sys.stderr)
+        print("--- End of not-found item list---", file=sys.stderr)
+
+    if removed == 0:
+        die(
+            f"dynamic item delete -f: no titles removed from dynamic trove {trove_name!r}",
+            code=1,
+        )
+
+
 def run_dynamic_command(
     args: list[str],
     base: str,
@@ -2110,35 +2213,50 @@ def run_dynamic_command(
     subcommand = args[0].lower()
     if subcommand in ("item", "items"):
         if len(args) < 2:
-            die(f"dynamic {subcommand} requires a subcommand: add, load, delete")
+            die(f"dynamic {subcommand} requires a subcommand: add, delete")
         op = args[1].lower()
         if op == "add":
-            if len(args) < 4:
-                die("usage: morsor-cli dynamic item add <trove-id-or-name> <title...>")
-            trove_ref = args[2]
-            title = " ".join(args[3:]).strip()
-            run_dynamic_item_add(
-                base, bearer, extra_headers, debug, output_mode, trove_ref, title
-            )
-        elif op == "load":
             if len(args) < 3:
-                die("usage: morsor-cli dynamic item load <trove-id-or-name> [FILE]")
+                die("usage: morsor-cli dynamic item add <trove-id-or-name> <title...> | -f FILE")
             trove_ref = args[2]
-            run_dynamic_item_load(
-                base, bearer, extra_headers, debug, output_mode, trove_ref, args[3:]
-            )
+            usage = "morsor-cli dynamic item add <trove-id-or-name> <title...> | -f FILE"
+            file_arg, rest = _extract_file_flag(args[3:], usage)
+            if file_arg is not None:
+                if rest:
+                    die(f"dynamic item add: no title expected alongside -f\nusage: {usage}")
+                run_dynamic_item_add_bulk(
+                    base, bearer, extra_headers, debug, output_mode, trove_ref, file_arg
+                )
+            else:
+                if not rest:
+                    die(f"usage: {usage}")
+                title = " ".join(rest).strip()
+                run_dynamic_item_add(
+                    base, bearer, extra_headers, debug, output_mode, trove_ref, title
+                )
         elif op in ("delete", "del", "rm", "remove"):
-            if len(args) < 4:
-                die("usage: morsor-cli dynamic item delete <trove-id-or-name> <title...>")
+            if len(args) < 3:
+                die("usage: morsor-cli dynamic item delete <trove-id-or-name> <title...> | -f FILE")
             trove_ref = args[2]
-            title = " ".join(args[3:]).strip()
-            run_dynamic_item_delete(
-                base, bearer, extra_headers, debug, trove_ref, title
-            )
+            usage = "morsor-cli dynamic item delete <trove-id-or-name> <title...> | -f FILE"
+            file_arg, rest = _extract_file_flag(args[3:], usage)
+            if file_arg is not None:
+                if rest:
+                    die(f"dynamic item delete: no title expected alongside -f\nusage: {usage}")
+                run_dynamic_item_delete_bulk(
+                    base, bearer, extra_headers, debug, output_mode, trove_ref, file_arg
+                )
+            else:
+                if not rest:
+                    die(f"usage: {usage}")
+                title = " ".join(rest).strip()
+                run_dynamic_item_delete(
+                    base, bearer, extra_headers, debug, trove_ref, title
+                )
         else:
             die(
                 f"unknown subcommand: dynamic {subcommand} {op!r}  "
-                f"(expected: add, load, delete)"
+                f"(expected: add, delete)"
             )
     else:
         die(f"unknown dynamic subcommand: {subcommand!r}  (expected: item)")
@@ -2167,8 +2285,9 @@ SYNOPSIS
     morsor-cli [OPTIONS] local list
 
     morsor-cli [OPTIONS] dynamic item add <trove> <title...>
-    morsor-cli [OPTIONS] dynamic item load <trove> [FILE]
+    morsor-cli [OPTIONS] dynamic item add <trove> -f FILE
     morsor-cli [OPTIONS] dynamic item delete <trove> <title...>
+    morsor-cli [OPTIONS] dynamic item delete <trove> -f FILE
 
        morsor-cli [OPTIONS] METHOD PATH [-- querystring]
 
@@ -2361,14 +2480,20 @@ ACTIONS
        local rename <id> <name> Rename any ephemeral trove (sister or local).
        dynamic item add <trove> <title...>
                               Add a title to a DB-backed dynamic trove (trove id or name).
-       dynamic item load <trove> [FILE]
+       dynamic item add <trove> -f FILE
                               Bulk-add titles (one per line) from FILE, or stdin when
-                              FILE is omitted, in a single API request. Titles already
-                              in the trove (normalized match) are skipped; after the
-                              load finishes, every skipped duplicate is listed on stderr.
+                              FILE is "-", in a single API request. Titles already in
+                              the trove (normalized match) are skipped; after the
+                              request finishes, every skipped duplicate is listed on
+                              stderr.
        dynamic item delete <trove> <title...>
                               Delete a dynamic-trove item by title (normalized match:
                               case-insensitive, collapsed whitespace).
+       dynamic item delete <trove> -f FILE
+                              Bulk-delete titles (one per line) from FILE, or stdin when
+                              FILE is "-", in a single API request. Titles not currently
+                              in the trove (normalized match) are skipped; after the
+                              request finishes, every skipped title is listed on stderr.
        login                  Authenticate; save token to ~/.morsor/session-token.json
                               and print export MORSOR_CLI_TOKEN=… for shell use
        logout                 Revoke all tokens; delete ~/.morsor/session-token.json
@@ -2429,9 +2554,11 @@ EXAMPLES
        Add / load / delete titles on a dynamic (DB-backed) trove:
 
               ./scripts/morsor-cli dynamic item add my-list "Hello World"
-              ./scripts/morsor-cli dynamic item load my-list /path/to/titles.txt
-              cat /path/to/titles.txt | ./scripts/morsor-cli dynamic item load my-list
+              ./scripts/morsor-cli dynamic item add my-list -f /path/to/titles.txt
+              cat /path/to/titles.txt | ./scripts/morsor-cli dynamic item add my-list -f -
               ./scripts/morsor-cli dynamic item delete my-list "Hello World"
+              ./scripts/morsor-cli dynamic item delete my-list -f /path/to/titles.txt
+              cat /path/to/titles.txt | ./scripts/morsor-cli dynamic item delete my-list -f -
 
        Duplicates: primary is ephemeral local trove; compare against vinyl and CDs;
        large page; JSON to jq (titles of primary rows):
@@ -2523,8 +2650,9 @@ LOCAL (EPHEMERAL) TROVES
 
 DYNAMIC (DB-BACKED) TROVES
   dynamic item add <trove> <title...>     # Add a title (trove id or name)
-  dynamic item load <trove> [FILE]        # Bulk-add from file or stdin (one title/line)
+  dynamic item add <trove> -f FILE        # Bulk-add from file or stdin (- for stdin, one title/line)
   dynamic item delete <trove> <title...>  # Delete by title
+  dynamic item delete <trove> -f FILE     # Bulk-delete from file or stdin (- for stdin, one title/line)
 
 ENV
   MORSOR_CLI_BASE_URL      Default base URL (overridden by -b/--base)
@@ -2542,9 +2670,11 @@ Examples:
   morsor-cli local trove create /path/to/titles.txt
   cat /path/to/titles.txt | morsor-cli local trove create
   morsor-cli dynamic item add my-list "Hello World"
-  morsor-cli dynamic item load my-list /path/to/titles.txt
-  cat titles.txt | morsor-cli dynamic item load my-list
+  morsor-cli dynamic item add my-list -f /path/to/titles.txt
+  cat titles.txt | morsor-cli dynamic item add my-list -f -
   morsor-cli dynamic item delete my-list "Hello World"
+  morsor-cli dynamic item delete my-list -f /path/to/titles.txt
+  cat titles.txt | morsor-cli dynamic item delete my-list -f -
 """.strip()
     )
 
