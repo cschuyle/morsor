@@ -49,6 +49,8 @@ import {
   type UniquesTabSession,
 } from './sessionTabState'
 import { fetchTroveSyncState } from './troveSyncStateApi'
+import { parseTroveIds, getDismissedTroveIds, setDismissedTroveIds, clearDismissedTroveIds, shouldShowStaleBanner } from './troveStaleDismissal'
+import { TrovesStaleTrovesPopover } from './TrovesStaleTrovesPopover'
 import {
   addDynamicTroveItem,
   createDynamicTrove,
@@ -199,7 +201,12 @@ function MobileApp() {
   const [reloadTrovesInProgress, setReloadTrovesInProgress] = useState(false)
   const [reloadTrovesProgress, setReloadTrovesProgress] = useState({ current: 0, total: 0 })
   const [trovesStale, setTrovesStale] = useState(false)
+  const [trovesDataStale, setTrovesDataStale] = useState(false)
   const [staleTroveIds, setStaleTroveIds] = useState<string>('')
+  const [staleTrovesPopoverOpen, setStaleTrovesPopoverOpen] = useState(false)
+  const staleEllipsisRef = useRef<HTMLButtonElement>(null)
+  const [staleIndicatorPopoverOpen, setStaleIndicatorPopoverOpen] = useState(false)
+  const staleIndicatorRef = useRef<HTMLButtonElement>(null)
   const [fileTypeFilters, setFileTypeFilters] = useState<Set<string>>(() => {
     const ftAll = new URLSearchParams(window.location.search).getAll('fileTypes')
     return new Set(parseFileTypesQueryValues(ftAll))
@@ -583,8 +590,15 @@ function MobileApp() {
             skipNextStalePollRef.current = false
             return
           }
-          setTrovesStale(state.stale)
+          setTrovesDataStale(state.stale)
           setStaleTroveIds(state.stale && state.staleTroveIds ? state.staleTroveIds : '')
+          if (!state.stale) {
+            setTrovesStale(false)
+            clearDismissedTroveIds()
+          } else {
+            const currentIds = parseTroveIds(state.staleTroveIds ?? '')
+            setTrovesStale(shouldShowStaleBanner(currentIds, getDismissedTroveIds()))
+          }
         })
         .catch(() => { /* ignore */ })
     }
@@ -3677,6 +3691,33 @@ onClick={() => {
                 <span className="mobile-footer-sep" aria-hidden="true">·</span>
               </>
             )}
+            {trovesDataStale && !reloadTrovesInProgress && (
+              <>
+                <button
+                  type="button"
+                  ref={staleIndicatorRef}
+                  className="app-footer-stale-indicator"
+                  title={staleTroveIds ? `Trove data has changed: ${staleTroveIds}` : 'Trove data has changed'}
+                  aria-label={staleTroveIds ? `Trove data has changed: ${staleTroveIds}` : 'Trove data has changed'}
+                  aria-haspopup="dialog"
+                  aria-expanded={staleIndicatorPopoverOpen}
+                  onClick={() => setStaleIndicatorPopoverOpen((o) => !o)}
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z" />
+                    <line x1="12" y1="9" x2="12" y2="13" />
+                    <line x1="12" y1="17" x2="12.01" y2="17" />
+                  </svg>
+                  <TrovesStaleTrovesPopover
+                    open={staleIndicatorPopoverOpen}
+                    troveIds={parseTroveIds(staleTroveIds)}
+                    anchorRef={staleIndicatorRef}
+                    onClose={() => setStaleIndicatorPopoverOpen(false)}
+                  />
+                </button>
+                <span className="mobile-footer-sep" aria-hidden="true">·</span>
+              </>
+            )}
             <button
               type="button"
               className="mobile-footer-link mobile-clear-cache-btn mobile-reload-troves-btn"
@@ -3684,6 +3725,8 @@ onClick={() => {
               onClick={async () => {
                 if (reloadInProgressRef.current) return
                 setTrovesStale(false)
+                setTrovesDataStale(false)
+                clearDismissedTroveIds()
                 reloadInProgressRef.current = true
                 const runId = ++reloadRunIdRef.current
                 setReloadTrovesInProgress(true)
@@ -3784,13 +3827,48 @@ onClick={() => {
       {trovesStale && !reloadTrovesInProgress && createPortal(
         <div className="troves-stale-banner mobile-troves-stale-banner" role="alert">
           <span className="troves-stale-message">
-            Trove data has changed{staleTroveIds ? `: ${staleTroveIds}` : ''}.
+            {(() => {
+              const troveIdsList = parseTroveIds(staleTroveIds)
+              const inlineIds = troveIdsList.slice(0, 2)
+              const hasMore = troveIdsList.length > inlineIds.length
+              return (
+                <>
+                  {troveIdsList.length} {troveIdsList.length === 1 ? 'trove' : 'troves'} updated
+                  {inlineIds.length > 0 ? `: ${inlineIds.join(', ')}` : ''}
+                  {hasMore && (
+                    <>
+                      {', '}
+                      <button
+                        type="button"
+                        ref={staleEllipsisRef}
+                        className="troves-stale-ellipsis-btn"
+                        aria-haspopup="dialog"
+                        aria-expanded={staleTrovesPopoverOpen}
+                        aria-label="Show all updated troves"
+                        onClick={() => setStaleTrovesPopoverOpen((o) => !o)}
+                      >
+                        …
+                      </button>
+                    </>
+                  )}
+                  .
+                  <TrovesStaleTrovesPopover
+                    open={staleTrovesPopoverOpen}
+                    troveIds={troveIdsList}
+                    anchorRef={staleEllipsisRef}
+                    onClose={() => setStaleTrovesPopoverOpen(false)}
+                  />
+                </>
+              )
+            })()}
           </span>
           <button
             type="button"
             className="troves-stale-reload-btn"
             onClick={() => {
               setTrovesStale(false)
+              setStaleTrovesPopoverOpen(false)
+              clearDismissedTroveIds()
               skipNextStalePollRef.current = true
               partialReloadIdsRef.current = staleTroveIds
               document.querySelector<HTMLButtonElement>('.mobile-reload-troves-btn')?.click()
@@ -3802,7 +3880,11 @@ onClick={() => {
             type="button"
             className="troves-stale-dismiss-btn"
             aria-label="Dismiss"
-            onClick={() => setTrovesStale(false)}
+            onClick={() => {
+              setTrovesStale(false)
+              setStaleTrovesPopoverOpen(false)
+              setDismissedTroveIds(parseTroveIds(staleTroveIds))
+            }}
           >
             ✕
           </button>

@@ -9,14 +9,16 @@ import org.springframework.stereotype.Service;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * Background poller that compares trove manifest timestamps to a baseline and marks the
- * {@code trove_staleness} DB row when any trove has changed. Polling is paused once a
- * stale state is detected and resumes only after {@link #resume()} is called (i.e. after
- * a successful manual reload).
+ * {@code trove_staleness} DB row with the cumulative set of troves that have changed since
+ * the baseline was last captured. The baseline (and the cumulative set) only resets when
+ * {@link #resume()} is called (i.e. after a successful manual reload), so changes that occur
+ * after the first one is detected keep getting folded into the same stale record.
  */
 @Service
 public class TrovePollerService {
@@ -32,11 +34,11 @@ public class TrovePollerService {
     /** True after first tick where baseline has been captured; avoids false-positives on startup. */
     private final AtomicBoolean baselineInitialized = new AtomicBoolean(false);
 
-    /** True when a change has been detected; polling is a no-op until resume() is called. */
-    private final AtomicBoolean paused = new AtomicBoolean(false);
-
     /** Last known snapshot of (troveId → change token). */
     private final Map<String, String> lastKnownTimestamps = new ConcurrentHashMap<>();
+
+    /** Trove ids most recently written to the stale record; avoids redundant DB writes when nothing new changed. */
+    private volatile Set<String> lastAnnounced = Set.of();
 
     public TrovePollerService(SearchDataService searchDataService,
                                TroveStalenessRepository stalenessRepository) {
@@ -46,7 +48,7 @@ public class TrovePollerService {
 
     @Scheduled(fixedDelayString = "${moocho.poll.interval-ms:10000}")
     public void poll() {
-        if (!pollEnabled || paused.get()) {
+        if (!pollEnabled) {
             return;
         }
         try {
@@ -72,10 +74,10 @@ public class TrovePollerService {
                     changed.add(prev);
                 }
             }
-            if (!changed.isEmpty()) {
-                log.info("TrovePollerService: detected changes in troves: {}; marking stale and pausing", changed);
+            if (!changed.isEmpty() && !Set.copyOf(changed).equals(lastAnnounced)) {
+                log.info("TrovePollerService: detected changes in troves (cumulative): {}", changed);
                 stalenessRepository.markStale(changed);
-                paused.set(true);
+                lastAnnounced = Set.copyOf(changed);
             }
         } catch (Exception e) {
             log.warn("TrovePollerService: poll tick failed: {}", e.getMessage());
@@ -83,7 +85,7 @@ public class TrovePollerService {
     }
 
     /**
-     * Called after a successful reload to clear the paused state and update the baseline
+     * Called after a successful reload to reset the baseline and the cumulative changed-set
      * so the new data becomes the reference point for future comparisons.
      */
     public void resume() {
@@ -96,7 +98,7 @@ public class TrovePollerService {
         } catch (Exception e) {
             log.warn("TrovePollerService.resume: could not refresh baseline: {}", e.getMessage());
         }
-        paused.set(false);
+        lastAnnounced = Set.of();
         log.info("TrovePollerService: resumed polling");
     }
 }

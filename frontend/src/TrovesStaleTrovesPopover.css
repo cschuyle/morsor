@@ -1,0 +1,27 @@
+.troves-stale-popover {
+  box-sizing: border-box;
+  max-height: min(50vh, 16rem);
+  overflow: auto;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.18);
+  color: #252525;
+  font-size: 0.875rem;
+  line-height: 1.35;
+}
+
+.troves-stale-popover-list {
+  margin: 0;
+  padding: 0.25rem 0;
+  list-style: none;
+}
+
+.troves-stale-popover-item {
+  padding: 0.4rem 0.75rem;
+  text-align: left;
+}
+
+.troves-stale-popover-item + .troves-stale-popover-item {
+  border-top: 1px solid #f0f0f0;
+}
