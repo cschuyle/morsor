@@ -2396,7 +2396,14 @@ SYNOPSIS
 
 DESCRIPTION
        morsor-cli calls the backend under -b/--base (default http://localhost:8080).
-       Set MORSOR_CLI_BASE_URL to override the default base URL.
+       Set MORSOR_CLI_BASE_URL to override the default base URL. When neither -b/
+       --base nor MORSOR_CLI_BASE_URL is given, morsor-cli warns on stderr that it
+       is falling back to the localhost default, so a misconfigured (or entirely
+       unconfigured) target is never silent. To point at a real server:
+
+              export MORSOR_CLI_BASE_URL=https://your-server.example.com
+
+       or pass -b/--base on each invocation.
 
        Authenticated servers: use login (session cookie jar) or -T/--token with a
        Bearer API token.
@@ -2560,7 +2567,12 @@ OPTIONS
               Print the CLI version (the last git commit of the repo) and exit.
 
 ENVIRONMENT
-       MORSOR_CLI_BASE_URL     Default base URL (-b overrides).
+       MORSOR_CLI_BASE_URL     Default base URL (-b overrides). If unset (and -b is
+                              not passed), morsor-cli falls back to
+                              http://localhost:8080 and prints a warning to stderr
+                              each run. Set it once (e.g. in your shell profile) to
+                              silence the warning and stop targeting localhost:
+                                export MORSOR_CLI_BASE_URL=https://your-server.example.com
        MORSOR_PROPERTIES_FILE  Path to YAML/JSON config. Used for sister-link and
                               for trove aliases (morsor.trove-aliases). Local aliases are
                               merged with server-side trove groups (GET /api/trove-groups);
@@ -2926,6 +2938,13 @@ def main(argv: list[str]) -> None:
     env_base = os.environ.get("MORSOR_CLI_BASE_URL")
     if (not base_set_by_arg) and env_base and env_base.strip():
         base = strip_trailing_slash(env_base.strip())
+    elif not base_set_by_arg:
+        print(
+            f"morsor-cli: no -b/--base given and MORSOR_CLI_BASE_URL is unset — "
+            f"defaulting to {base}\n"
+            f"morsor-cli: set MORSOR_CLI_BASE_URL or pass -b/--base to point elsewhere",
+            file=sys.stderr,
+        )
 
     file_token = _load_session_token(base)
     env_token = (os.environ.get("MORSOR_CLI_TOKEN") or "").strip()
