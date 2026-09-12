@@ -45,4 +45,9 @@ public class JdbcApiTokenRepository implements ApiTokenRepository {
     public int deleteAllForUser(long userId) {
         return jdbc.update("DELETE FROM api_tokens WHERE user_id = ?", userId);
     }
+
+    @Override
+    public void deleteByTokenHash(String tokenHash) {
+        jdbc.update("DELETE FROM api_tokens WHERE token_hash = ?", tokenHash);
+    }
 }

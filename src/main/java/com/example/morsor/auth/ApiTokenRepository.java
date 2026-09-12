@@ -11,4 +11,7 @@ public interface ApiTokenRepository {
 
     /** Deletes all tokens belonging to the given user. Returns the number deleted. */
     int deleteAllForUser(long userId);
+
+    /** Deletes a single token by its hash (used to revoke just the caller's own token). */
+    void deleteByTokenHash(String tokenHash);
 }

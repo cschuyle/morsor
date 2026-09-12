@@ -115,7 +115,11 @@ public class AuthController {
         ));
     }
 
-    /** Revokes all API tokens for the authenticated user. Used by the CLI to rotate on re-login. */
+    /**
+     * Revokes every API token for the authenticated user, across all devices. Used for an
+     * explicit "sign out everywhere" action (e.g. {@code morsor-cli logout --all}) — normal
+     * per-device login/logout only touches that device's own token; see {@link #deleteCurrentToken}.
+     */
     @DeleteMapping("/tokens")
     public ResponseEntity<Void> deleteAllTokens() {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
@@ -128,6 +132,25 @@ public class AuthController {
             return ResponseEntity.status(403).build();
         }
         apiTokenRepository.deleteAllForUser(user.getId());
+        return ResponseEntity.noContent().build();
+    }
+
+    /** Revokes only the token used to make this request. Used by per-device {@code morsor-cli logout}. */
+    @DeleteMapping("/tokens/current")
+    public ResponseEntity<Void> deleteCurrentToken(HttpServletRequest request) {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null || !auth.isAuthenticated() || auth.getPrincipal() == null) {
+            return ResponseEntity.status(401).build();
+        }
+        String authHeader = request.getHeader("Authorization");
+        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+            return ResponseEntity.status(401).build();
+        }
+        String token = authHeader.substring("Bearer ".length()).trim();
+        if (token.isEmpty()) {
+            return ResponseEntity.status(401).build();
+        }
+        apiTokenRepository.deleteByTokenHash(tokenHashService.hash(token));
         return ResponseEntity.noContent().build();
     }
 

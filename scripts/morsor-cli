@@ -816,10 +816,11 @@ def _extract_xsrf(jar: CookieJar, resp: Any, debug: bool = False) -> str | None:
     return None
 
 
-def run_logout(base: str, bearer: str | None, debug: bool = False) -> None:
+def run_logout(base: str, bearer: str | None, debug: bool = False, revoke_all: bool = False) -> None:
     if not bearer or not bearer.strip():
         die(f"not logged in — no token found in {_SESSION_TOKEN_FILE}, MORSOR_CLI_TOKEN, or -T/--token")
-    url = strip_trailing_slash(base) + "/api/tokens"
+    path = "/api/tokens" if revoke_all else "/api/tokens/current"
+    url = strip_trailing_slash(base) + path
     req = urllib.request.Request(
         url,
         method="DELETE",
@@ -835,7 +836,10 @@ def run_logout(base: str, bearer: str | None, debug: bool = False) -> None:
     except URLError as e:
         die(_server_unreachable(base, e))
     _delete_session_token()
-    print(f"morsor-cli: logged out — token revoked and {_SESSION_TOKEN_FILE} deleted", file=sys.stderr)
+    if revoke_all:
+        print(f"morsor-cli: logged out — every token for this account revoked and {_SESSION_TOKEN_FILE} deleted", file=sys.stderr)
+    else:
+        print(f"morsor-cli: logged out — this machine's token revoked and {_SESSION_TOKEN_FILE} deleted", file=sys.stderr)
     print(f"morsor-cli: run 'eval $(morsor-cli logout)' to also clear MORSOR_CLI_TOKEN from this shell", file=sys.stderr)
     print("unset MORSOR_CLI_TOKEN")
 
@@ -931,21 +935,12 @@ def _run_login_inner(base: str, user: str, pw: str, jar: CookieJar, opener: Any,
     csrf_resp3.read()
     xsrf = _extract_xsrf(jar, csrf_resp3, debug=debug) or xsrf
 
-    # Revoke all previous tokens so re-login rotates the credential.
-    del_req = urllib.request.Request(
-        base_u + "/api/tokens",
-        method="DELETE",
-        headers={"X-XSRF-TOKEN": xsrf},
-    )
-    try:
-        open_req(del_req)
-    except HTTPError as e:
-        if debug:
-            print(f"[debug] DELETE /api/tokens: HTTP {e.code} (ignored)", file=sys.stderr)
-
+    # Each login mints its own token named after this machine, rather than revoking
+    # tokens from other machines — that's what lets morsor-cli run authenticated on
+    # more than one machine at once. Use 'morsor-cli logout --all' to revoke everywhere.
     tok_req = urllib.request.Request(
         base_u + "/api/tokens",
-        data=b"{}",
+        data=json.dumps({"name": socket.gethostname()}).encode("utf-8"),
         method="POST",
         headers={"Content-Type": "application/json", "X-XSRF-TOKEN": xsrf},
     )
@@ -2614,9 +2609,14 @@ ACTIONS
                               in the trove (normalized match) are skipped; after the
                               request finishes, every skipped title is listed on stderr.
        login                  Authenticate; save token to ~/.morsor/session-token.json
-                              and print export MORSOR_CLI_TOKEN=… for shell use
-       logout                 Revoke all tokens; delete ~/.morsor/session-token.json
-                              and print unset MORSOR_CLI_TOKEN
+                              and print export MORSOR_CLI_TOKEN=… for shell use. Each
+                              login mints a new token named after this machine's
+                              hostname, without revoking tokens from other machines —
+                              this is what lets morsor-cli run authenticated on more
+                              than one machine at once.
+       logout                 Revoke this machine's token; delete
+                              ~/.morsor/session-token.json and print unset MORSOR_CLI_TOKEN
+       logout --all           Revoke every token for this account, on every machine
 
 SHORTHAND PARAMETERS (after an action)
        Keys are normalized for convenience, e.g. -p → primaryTrove, -c →
@@ -2722,8 +2722,9 @@ USAGE SUMMARY
   morsor-cli --version   # Print version (last git commit) and exit
 
 AUTH
-  morsor-cli [OPTIONS] login          # saves token to ~/.morsor/session-token.json
-  morsor-cli [OPTIONS] logout         # revokes token and deletes the file
+  morsor-cli [OPTIONS] login          # saves a per-machine token to ~/.morsor/session-token.json
+  morsor-cli [OPTIONS] logout         # revokes this machine's token and deletes the file
+  morsor-cli [OPTIONS] logout --all   # revokes every token for this account, all machines
 
 INFO
   troves | status                     # List troves or server status
@@ -3024,13 +3025,18 @@ def main(argv: list[str]) -> None:
         return
 
     if positional[0].lower() == "logout":
-        if len(positional) > 1:
-            die("logout takes no arguments")
+        revoke_all = False
+        rest = positional[1:]
+        if rest == ["--all"]:
+            revoke_all = True
+            rest = []
+        if rest:
+            die("logout takes no arguments (or --all to revoke every device's token)")
         if body_file:
             die("--file is not valid with logout")
         if extra_headers:
             die("-H is not valid with logout")
-        run_logout(base, bearer, debug=debug)
+        run_logout(base, bearer, debug=debug, revoke_all=revoke_all)
         return
 
     idx = 0
