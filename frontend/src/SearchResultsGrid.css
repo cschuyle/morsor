@@ -983,6 +983,17 @@
   color: #333;
 }
 
+.search-results-delete-item-icon {
+  width: 1rem;
+  height: 1rem;
+  object-fit: contain;
+  opacity: 0.65;
+}
+
+.search-results-delete-item-btn:hover .search-results-delete-item-icon {
+  opacity: 1;
+}
+
 .search-results-delete-item-btn--gallery {
   position: absolute;
   top: 0.25rem;

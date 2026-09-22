@@ -1138,7 +1138,7 @@ export function SearchResultsGrid({ data, sortBy = null, sortDir = 'asc', onSort
             onDeleteItem(info.row.original)
           }}
         >
-          ×
+          <img src="/trashcan.png" alt="" className="search-results-delete-item-icon" />
         </button>
       ),
     }
@@ -1841,7 +1841,7 @@ export function SearchResultsGrid({ data, sortBy = null, sortDir = 'asc', onSort
                         onDeleteItem(row)
                       }}
                     >
-                      ×
+                      <img src="/trashcan.png" alt="" className="search-results-delete-item-icon" />
                     </button>
                   )}
                   <div

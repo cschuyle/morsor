@@ -334,7 +334,7 @@ export function DuplicateResultsView({
                         }
                       }}
                     >
-                      ×
+                      <img src="/trashcan.png" alt="" className="search-results-delete-item-icon" />
                     </button>
                   </td>
                 )}
