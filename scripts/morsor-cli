@@ -2581,6 +2581,8 @@ ACTIONS
        trove, troves                    GET /api/troves
        troves get <id>                  GET /api/troves/{id} (full trove document; text mode prints YAML)
        troves reload                    POST /api/troves/reload (reload trove data)
+       troves stale, troves sync-state  GET /api/troves/sync-state (troves changed since last
+                                        reload? lists changed trove ids; exits 3 when stale)
        status                           GET /api/status
        local sister-link load    Reconcile sister-link troves from config (see above).
        local sister-link list    List configured sister-links and their upload status.
@@ -2712,6 +2714,35 @@ SEE ALSO
 """.strip()
 
 
+def run_troves_sync_state(
+    base: str,
+    bearer: str | None,
+    extra_headers: list[str],
+    debug: bool,
+    output_mode: str,
+) -> None:
+    """GET /api/troves/sync-state — report whether trove sources changed since the last reload.
+
+    Exits 3 when stale so scripts can do: morsor-cli troves stale || morsor-cli troves reload
+    """
+    data = _http_json(base, "GET", "/api/troves/sync-state", bearer, extra_headers, debug)
+    if not isinstance(data, dict):
+        die(f"troves sync-state: unexpected response: {data!r}")
+    stale = bool(data.get("stale"))
+    if output_mode != "text":
+        dump_parsed_body(data, output_mode)
+    elif not stale:
+        print("troves: up to date")
+    else:
+        ids = [t for t in (data.get("staleTroveIds") or "").split(",") if t.strip()]
+        print(f"troves: STALE (changes detected at {data.get('detectedAt')})")
+        for tid in ids:
+            print(f"  {tid}")
+        print("run: morsor-cli troves reload")
+    if stale:
+        sys.exit(3)
+
+
 def print_summary_usage() -> None:
     print(
         """
@@ -2730,6 +2761,7 @@ INFO
   troves | status                     # List troves or server status
   troves get <trove-id>               # Trove items as native JSON (from S3 source)
   troves reload                       # Trigger a full trove data reload on the server
+  troves stale | sync-state           # Show whether troves changed since last reload (exit 3 if stale)
 
 SEARCH  [-t <trove,...>] [query text]
   search                              # Full-text search (default action)
@@ -2998,6 +3030,11 @@ def main(argv: list[str]) -> None:
 
     if positional[0].lower() in ("trove", "troves") and len(positional) > 1 and positional[1].lower() == "reload":
         run_troves_reload(base, bearer, extra_headers, debug)
+        return
+
+    if positional[0].lower() in ("trove", "troves") and len(positional) > 1 \
+            and positional[1].lower() in ("stale", "sync-state"):
+        run_troves_sync_state(base, bearer, extra_headers, debug, output_mode)
         return
 
     if positional[0].lower() in ("trove", "troves") and len(positional) > 1 and positional[1].lower() == "get":
