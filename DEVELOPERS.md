@@ -262,6 +262,16 @@ Use the `postgres` profile so the app uses Postgres instead of H2:
 SPRING_PROFILES_ACTIVE=postgres SPRING_DATASOURCE_PASSWORD=morsor ./gradlew bootRun
 ```
 
+###  Run the app locally against the production database
+
+```bash
+./bootrun-proddb.sh
+```
+
+Set `MORSOR_PROD_DB_HOST`, `MORSOR_PROD_DB_NAME`, `MORSOR_PROD_DB_USER` and `MORSOR_PROD_DB_PASSWORD` (e.g. in `.envrc`). The script adds the `postgres` and `proddb` profiles to `SPRING_PROFILES_ACTIVE` and drops `no-auth` (sign in with a prod user). Under `proddb`, Flyway only validates (startup fails if this build has migrations prod lacks; it never migrates prod) and trove polling is off. Edits made in the local app (dynamic troves, saved queries, etc.) are real prod writes.
+
+`./pgsql-prod.sh` opens `psql` on the same database using the same variables; extra arguments go to `psql` (e.g. `./pgsql-prod.sh -c '\dt'`).
+
 Profile defaults for Postgres now live in `src/main/resources/application-postgres.properties`.
 You can override `SPRING_DATASOURCE_URL`, `SPRING_DATASOURCE_USERNAME`, and `SPRING_DATASOURCE_PASSWORD` as needed.
 

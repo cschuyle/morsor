@@ -49,3 +49,9 @@ export MOOCHO_REGISTRY=namespace/morsor
 
 # Docker image version. If unset or empty, the deploy script provides this (a datetime and sha). You can override it here.
 #export MOOCHO_VERSION=latest
+
+# Local run against the production database: ./bootrun-proddb.sh (see its --help).
+#export MORSOR_PROD_DB_HOST=dpg-xxxx.oregon-postgres.render.com
+#export MORSOR_PROD_DB_NAME=...
+#export MORSOR_PROD_DB_USER=...
+#export MORSOR_PROD_DB_PASSWORD=...
