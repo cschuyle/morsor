@@ -20,6 +20,8 @@ import { fileTypeSetHas, normalizeFileTypeToken, pruneRequiredFileTypes } from '
 import {
   SearchResultsGrid,
   collectExtraFieldKeysFromRows,
+  gridExtraFieldKeys,
+  pickableExtraFieldKeys,
   extraFieldKeyMatchesFilter,
   formatLittlePrinceFieldLabel,
   gallerySortSelectValue,
@@ -282,12 +284,14 @@ function MobileApp() {
     if (searchMode !== 'search' || !Array.isArray(searchResult?.results)) {
       return [] as string[]
     }
-    return collectExtraFieldKeysFromRows(searchResult.results)
+    return pickableExtraFieldKeys(collectExtraFieldKeysFromRows(searchResult.results))
   }, [searchMode, searchResult?.results])
 
   const visibleExtraFieldKeysForGrid = useMemo(
-    () => [...extraGridFieldsSelected],
-    [extraGridFieldsSelected]
+    () => searchMode === 'search'
+      ? gridExtraFieldKeys(extraGridFieldsSelected, searchResult?.availableExtraFieldKeys, searchResult?.results)
+      : [...extraGridFieldsSelected],
+    [searchMode, extraGridFieldsSelected, searchResult?.availableExtraFieldKeys, searchResult?.results]
   )
 
   const mobileOverflowDropdownOpen = fileTypeDropdownOpen || extraFieldDropdownOpen

@@ -6,6 +6,8 @@ import type { FileTypeQuickModeValue } from './fileTypeQuickMode'
 import {
   SearchResultsGrid,
   collectExtraFieldKeysFromRows,
+  gridExtraFieldKeys,
+  pickableExtraFieldKeys,
   extraFieldKeyMatchesFilter,
   formatLittlePrinceFieldLabel,
   gallerySortSelectValue,
@@ -299,7 +301,7 @@ function App() {
     if (searchMode !== 'search' || !Array.isArray(searchResult?.results)) {
       return [] as string[]
     }
-    return collectExtraFieldKeysFromRows(searchResult.results)
+    return pickableExtraFieldKeys(collectExtraFieldKeysFromRows(searchResult.results))
   }, [searchMode, searchResult?.results])
 
   const galleryExtraSortKeys = useMemo(() => {
@@ -319,8 +321,10 @@ function App() {
   )
 
   const visibleExtraFieldKeysForGrid = useMemo(
-    () => [...extraGridFieldsSelected],
-    [extraGridFieldsSelected]
+    () => searchMode === 'search'
+      ? gridExtraFieldKeys(extraGridFieldsSelected, searchResult?.availableExtraFieldKeys, searchResult?.results)
+      : [...extraGridFieldsSelected],
+    [searchMode, extraGridFieldsSelected, searchResult?.availableExtraFieldKeys, searchResult?.results]
   )
 
   useEffect(() => {

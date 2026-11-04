@@ -1,3 +1,5 @@
 package com.example.morsor.search;
 
-public record DynamicTroveItemRow(String troveId, String title) {}
+import java.time.Instant;
+
+public record DynamicTroveItemRow(String troveId, String title, Instant createdAt) {}

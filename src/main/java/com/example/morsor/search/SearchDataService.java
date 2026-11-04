@@ -603,7 +603,7 @@ public class SearchDataService {
         for (DynamicTroveItemRow item : items) {
             String name = dynamicTroveNames.getOrDefault(item.troveId(), item.troveId());
             List<SearchResult> list = byTrove.computeIfAbsent(item.troveId(), k -> new ArrayList<>());
-            list.add(dynamicItemToSearchResult(item.title(), item.troveId(), name));
+            list.add(dynamicItemToSearchResult(item.title(), item.troveId(), name, item.createdAt()));
         }
         for (Map.Entry<String, List<SearchResult>> e : byTrove.entrySet()) {
             dynamicTroves.put(e.getKey(), List.copyOf(e.getValue()));
@@ -611,9 +611,20 @@ public class SearchDataService {
         log.info("Loaded {} dynamic trove(s) ({} item(s)) from DB", dynamicTroveNames.size(), items.size());
     }
 
+    /**
+     * Extra-field key carrying when a dynamic trove item was added (ISO-8601 instant, second
+     * precision so lexicographic order matches chronological order for {@code extra:} sorting).
+     */
+    static final String DYNAMIC_ITEM_ADDED_ON_FIELD = "addedOn";
+
     /** SearchResult.id is the item title (dynamic items have no separate id). */
-    private static SearchResult dynamicItemToSearchResult(String title, String troveId, String troveName) {
+    private static SearchResult dynamicItemToSearchResult(
+            String title, String troveId, String troveName, java.time.Instant addedOn) {
         String t = title != null ? title : "";
+        Map<String, Object> extraFields = addedOn != null
+                ? Map.of(DYNAMIC_ITEM_ADDED_ON_FIELD,
+                        addedOn.truncatedTo(java.time.temporal.ChronoUnit.SECONDS).toString())
+                : null;
         return new SearchResult(
                 t,
                 "dynamicTitle",
@@ -627,7 +638,7 @@ public class SearchDataService {
                 t,
                 List.of(),
                 null,
-                null);
+                extraFields);
     }
 
     /**
@@ -824,11 +835,12 @@ public class SearchDataService {
             } catch (DataIntegrityViolationException e) {
                 throw new IllegalStateException("Trove \"" + id + "\" already exists as dynamic", e);
             }
-            dynamicTroveRepository.insertItems(id, titles);
+            java.time.Instant addedOn = java.time.Instant.now();
+            dynamicTroveRepository.insertItems(id, titles, addedOn);
             dynamicTroveNames.put(id, displayName);
             dynamicTroveUpdatedAt.put(id, java.time.Instant.now().toString());
             dynamicTroves.put(id, titles.stream()
-                    .map(t -> dynamicItemToSearchResult(t, id, displayName))
+                    .map(t -> dynamicItemToSearchResult(t, id, displayName, addedOn))
                     .toList());
             rebuildMergedIndexLocked();
         }
@@ -912,8 +924,9 @@ public class SearchDataService {
                             "An item with that title already exists in this trove (normalized form must be unique)");
                 }
             }
-            dynamicTroveRepository.insertItem(id, titleTrimmed);
-            SearchResult result = dynamicItemToSearchResult(titleTrimmed, id, troveName);
+            java.time.Instant addedOn = java.time.Instant.now();
+            dynamicTroveRepository.insertItem(id, titleTrimmed, addedOn);
+            SearchResult result = dynamicItemToSearchResult(titleTrimmed, id, troveName, addedOn);
             List<SearchResult> updated = new ArrayList<>(existing.size() + 1);
             updated.addAll(existing);
             updated.add(result);
@@ -961,6 +974,7 @@ public class SearchDataService {
                 }
             }
             List<SearchResult> updated = new ArrayList<>(existing);
+            java.time.Instant addedOn = java.time.Instant.now();
             for (String title : titles) {
                 String titleTrimmed = title == null ? "" : title.trim();
                 if (titleTrimmed.isEmpty()) {
@@ -980,10 +994,10 @@ public class SearchDataService {
                 }
                 added.add(titleTrimmed);
                 normalizedPresent.add(normalized);
-                updated.add(dynamicItemToSearchResult(titleTrimmed, id, troveName));
+                updated.add(dynamicItemToSearchResult(titleTrimmed, id, troveName, addedOn));
             }
             if (!added.isEmpty()) {
-                dynamicTroveRepository.insertItems(id, added);
+                dynamicTroveRepository.insertItems(id, added, addedOn);
                 dynamicTroves.put(id, List.copyOf(updated));
                 touchDynamicTroveLocked(id);
                 rebuildMergedIndexLocked();
@@ -1197,8 +1211,12 @@ public class SearchDataService {
             return "";
         }
         StringBuilder sb = new StringBuilder();
-        for (Object v : extraFields.values()) {
-            appendExtraFieldValue(sb, v);
+        for (Map.Entry<String, Object> e : extraFields.entrySet()) {
+            // Timestamps would make every dynamic item match numeric queries like "2026".
+            if (DYNAMIC_ITEM_ADDED_ON_FIELD.equals(e.getKey())) {
+                continue;
+            }
+            appendExtraFieldValue(sb, e.getValue());
         }
         return sb.toString();
     }

@@ -97,6 +97,10 @@ class DynamicTroveControllerTest {
         assertThat(search.getBody().results().get(0).result().id()).isEqualTo("Alpha Widget");
         assertThat(search.getBody().results().get(0).result().trove()).isEqualTo(uniqueName);
         assertThat(search.getBody().results().get(0).result().troveId()).isEqualTo(expectedSlug);
+        assertThat(search.getBody().results().get(0).result().extraFields())
+                .containsKey(SearchDataService.DYNAMIC_ITEM_ADDED_ON_FIELD);
+        assertThat(search.getBody().availableExtraFieldKeys())
+                .contains(SearchDataService.DYNAMIC_ITEM_ADDED_ON_FIELD);
 
         URI deleteUri = UriComponentsBuilder
                 .fromUriString(base() + "/api/dynamic-troves/" + troveId + "/items")
@@ -196,6 +200,18 @@ class DynamicTroveControllerTest {
                 SearchResponse.class);
         assertThat(search.getBody()).isNotNull();
         assertThat(search.getBody().results()).hasSize(1);
+        // Reloaded from the DB: addedOn comes from created_at, and isn't full-text searchable.
+        assertThat(search.getBody().results().get(0).result().extraFields())
+                .containsKey(SearchDataService.DYNAMIC_ITEM_ADDED_ON_FIELD);
+        String addedOn = (String) search.getBody().results().get(0).result().extraFields()
+                .get(SearchDataService.DYNAMIC_ITEM_ADDED_ON_FIELD);
+        ResponseEntity<SearchResponse> byYear = restTemplate.exchange(
+                base() + "/api/search?query=" + addedOn.substring(0, 4) + "&trove=" + troveId,
+                HttpMethod.GET,
+                null,
+                SearchResponse.class);
+        assertThat(byYear.getBody()).isNotNull();
+        assertThat(byYear.getBody().results()).isEmpty();
 
         restTemplate.exchange(
                 base() + "/api/dynamic-troves/" + troveId,

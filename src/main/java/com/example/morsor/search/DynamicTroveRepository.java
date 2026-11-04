@@ -25,7 +25,10 @@ public class DynamicTroveRepository {
                     rs.getTimestamp("updated_at").toInstant().toString());
 
     private static final RowMapper<DynamicTroveItemRow> ITEM_MAPPER = (rs, rowNum) ->
-            new DynamicTroveItemRow(rs.getString("trove_id"), rs.getString("title"));
+            new DynamicTroveItemRow(
+                    rs.getString("trove_id"),
+                    rs.getString("title"),
+                    rs.getTimestamp("created_at").toInstant());
 
     public List<DynamicTroveRow> findAllTroves() {
         return jdbc.query(
@@ -43,13 +46,13 @@ public class DynamicTroveRepository {
 
     public List<DynamicTroveItemRow> findAllItems() {
         return jdbc.query(
-                "SELECT trove_id, title FROM dynamic_trove_items ORDER BY created_at, title",
+                "SELECT trove_id, title, created_at FROM dynamic_trove_items ORDER BY created_at, title",
                 ITEM_MAPPER);
     }
 
     public List<DynamicTroveItemRow> findItemsByTroveId(String troveId) {
         return jdbc.query(
-                "SELECT trove_id, title FROM dynamic_trove_items WHERE trove_id = ? ORDER BY created_at, title",
+                "SELECT trove_id, title, created_at FROM dynamic_trove_items WHERE trove_id = ? ORDER BY created_at, title",
                 ITEM_MAPPER,
                 troveId);
     }
@@ -86,19 +89,19 @@ public class DynamicTroveRepository {
                 id);
     }
 
-    public void insertItem(String troveId, String title) {
+    public void insertItem(String troveId, String title, Instant createdAt) {
         jdbc.update(
                 "INSERT INTO dynamic_trove_items (trove_id, title, created_at) VALUES (?, ?, ?)",
                 troveId,
                 title,
-                Timestamp.from(Instant.now()));
+                Timestamp.from(createdAt));
     }
 
-    public void insertItems(String troveId, List<String> titles) {
+    public void insertItems(String troveId, List<String> titles, Instant createdAt) {
         if (titles == null || titles.isEmpty()) {
             return;
         }
-        Timestamp now = Timestamp.from(Instant.now());
+        Timestamp now = Timestamp.from(createdAt);
         jdbc.batchUpdate(
                 "INSERT INTO dynamic_trove_items (trove_id, title, created_at) VALUES (?, ?, ?)",
                 titles,

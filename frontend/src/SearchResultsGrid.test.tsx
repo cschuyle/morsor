@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
-import { SearchResultsGrid, collectExtraFieldKeysFromRows } from './SearchResultsGrid'
+import { SearchResultsGrid, collectExtraFieldKeysFromRows, gridExtraFieldKeys, pickableExtraFieldKeys } from './SearchResultsGrid'
 
 describe('SearchResultsGrid copy titles', () => {
   const originalClipboard = navigator.clipboard
@@ -80,5 +80,27 @@ describe('collectExtraFieldKeysFromRows', () => {
         },
       ]),
     ).toEqual(['subtitles'])
+  })
+})
+
+describe('gridExtraFieldKeys', () => {
+  it('adds addedOn when the full result set has it, even if the current page does not', () => {
+    const pageRows = [{ id: '1', title: 'Static item', extraFields: { isbn: 'x' } }]
+    expect(gridExtraFieldKeys(new Set(['isbn']), ['addedOn', 'isbn'], pageRows)).toEqual(['addedOn', 'isbn'])
+  })
+
+  it('omits addedOn when no dynamic trove item is in the result set', () => {
+    expect(gridExtraFieldKeys(new Set(['isbn']), ['isbn'], [])).toEqual(['isbn'])
+  })
+
+  it('falls back to page rows when the API omits availableExtraFieldKeys', () => {
+    const rows = [{ id: 'a', title: 'a', extraFields: { addedOn: '2026-11-03T12:00:00Z' } }]
+    expect(gridExtraFieldKeys([], undefined, rows)).toEqual(['addedOn'])
+  })
+})
+
+describe('pickableExtraFieldKeys', () => {
+  it('keeps auto columns out of the picker', () => {
+    expect(pickableExtraFieldKeys(['addedOn', 'isbn'])).toEqual(['isbn'])
   })
 })

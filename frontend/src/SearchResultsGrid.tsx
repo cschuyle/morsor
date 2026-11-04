@@ -211,6 +211,12 @@ function formatExtraFieldDisplayValue(
       return resolved
     }
   }
+  if (jsonKey === DYNAMIC_ITEM_ADDED_ON_KEY && typeof value === 'string') {
+    const d = new Date(value)
+    if (!Number.isNaN(d.getTime())) {
+      return d.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })
+    }
+  }
   const videoFormatted = formatVideoExtraFieldValue(jsonKey, value, languageCodeMap)
   if (videoFormatted != null) {
     return videoFormatted
@@ -647,6 +653,31 @@ export function mergeGalleryExtraSortKeys(
     base.sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }))
   }
   return base
+}
+
+/** Extra-field key the server sets on dynamic trove items: when the item was added (ISO-8601 instant). */
+export const DYNAMIC_ITEM_ADDED_ON_KEY = 'addedOn'
+
+/** Extra-field columns shown automatically whenever present, so they are not offered in the picker. */
+const AUTO_EXTRA_FIELD_KEYS: readonly string[] = [DYNAMIC_ITEM_ADDED_ON_KEY]
+
+/** Extra-field keys to offer in the column picker (auto columns removed). */
+export function pickableExtraFieldKeys(keys: string[]): string[] {
+  return keys.filter((k) => !AUTO_EXTRA_FIELD_KEYS.includes(k))
+}
+
+/**
+ * List-view extra columns: auto columns present anywhere in the full result set (API
+ * {@code availableExtraFieldKeys}, so they show on every page), then the user's picks.
+ */
+export function gridExtraFieldKeys(
+  selected: Iterable<string>,
+  availableFromApi: string[] | null | undefined,
+  fallbackRows: SearchResultRow[] | null | undefined
+): string[] {
+  const available = Array.isArray(availableFromApi) ? availableFromApi : collectExtraFieldKeysFromRows(fallbackRows)
+  const auto = AUTO_EXTRA_FIELD_KEYS.filter((k) => available.includes(k))
+  return [...auto, ...[...selected].filter((k) => !auto.includes(k))]
 }
 
 /** Built-in (title, score, trove) and extra-field sorts merged and ordered by display label. */
