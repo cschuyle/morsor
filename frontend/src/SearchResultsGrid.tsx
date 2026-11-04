@@ -214,7 +214,7 @@ function formatExtraFieldDisplayValue(
   if (jsonKey === DYNAMIC_ITEM_ADDED_ON_KEY && typeof value === 'string') {
     const d = new Date(value)
     if (!Number.isNaN(d.getTime())) {
-      return d.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })
+      return d.toLocaleDateString(undefined, { dateStyle: 'medium' })
     }
   }
   const videoFormatted = formatVideoExtraFieldValue(jsonKey, value, languageCodeMap)
